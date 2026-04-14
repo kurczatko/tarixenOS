@@ -1,0 +1,1 @@
+wszytskie nazwy mają być po polsku oprócz nazw technicznych i nazw plików, za ruszanie tego pliku jest się od razu dyskfalifikowanym z projektu tylko wlasciciel moze zmieniac nazwy.md
