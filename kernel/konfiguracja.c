@@ -8,8 +8,8 @@ void konfiguracja() {
     keyboard_init();
     vga_init();
     blue();
-    printf("                                      XentariOS                                                                                                                                                                                                   \n");
-    printf("Witam w Systemie XentariOS!                                                                                                              \n");
+    printf("                                      tarixeniOS                                                                                                                                                                                                   \n");
+    printf("Witam w Systemie tarixeniOS!                                                                                                              \n");
     printf("nasz system jest dopiero co stworzony wiec sie nie dziw ze jest niedokonczony                                                                                                                                                                          \n");
     printf("mam nadzieje ze ci sie spodoba                                                                                                                                         \n");
     printf("napisz cos aby wyjsc z konfiguracji                                                                                                                                                                                                             \n");
