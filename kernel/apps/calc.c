@@ -6,10 +6,10 @@
 void calc() {
     keyboard_init();
     vga_init();
-    printf("siema w kalkulatorze\n");
-    printf("wpisz pierwsza liczbe:\n");
+    printf(" siema w kalkulatorze\n");
+    printf(" wpisz pierwsza liczbe:\n");
     char n1 = keyboard_getchar();
-    printf("teraz druga:\n");
+    printf(" teraz druga:\n");
     char n2 = keyboard_getchar();
-    printf("wynik: %d\n", (n1 - '0') + (n2 - '0'));
+    printf(" wynik: %d\n", (n1 - '0') + (n2 - '0'));
 }
