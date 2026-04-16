@@ -4,6 +4,7 @@
 #include "../../drivers/keyboard.h"
 #include "../kernel/apps/kaka.h"
 #include "../kernel/apps/pakiet.h"
+#include "../kernel/apps/calc.h"
 
 void shell() {
     vga_init();
@@ -25,8 +26,8 @@ void shell() {
                 printf(" i - info o systemie\n");
                 printf(" p - pisanie\n");
                 printf(" k - gra pt. kaka\n");
-                printf(" w - pytanie o wysranie\n");
                 printf(" { - pakiet biurowy\n");
+                printf(" c - kalkulator\n");
             }
 
             if (buf[0] == 'v') {
@@ -36,6 +37,10 @@ void shell() {
 
             if (buf[0] == '{') {
                 pakiet();
+            }
+
+            if (buf[0] == 'c') {
+                calc();
             }
 
             if (buf[0] == 'l') {
@@ -48,10 +53,6 @@ void shell() {
                 printf(" -\n");
                 printf(" -\n");
                 printf( "---------------------\n");
-            }
-
-            if(buf[0] == 'w') {
-                printf(" wysrales sie dzisiaj?\n");
             }
 
             if(buf[0] == 'i') {
