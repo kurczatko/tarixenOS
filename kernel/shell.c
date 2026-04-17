@@ -30,11 +30,16 @@ void shell() {
                 printf(" { - pakiet biurowy\n");
                 printf(" c - kalkulator\n");
                 printf(" a - sklep z aplikacjami\n");
+                printf(" r - wylaczenie");
             }
 
             if (buf[0] == 'v') {
                 printf(" wersja: 1.0.0\n");
                 printf("\n");
+            }
+
+            if (buf[0] == 'r') {
+                asm volatile("cli; hlt");
             }
 
             if (buf[0] == 'a') {
