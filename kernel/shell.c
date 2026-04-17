@@ -30,7 +30,7 @@ void shell() {
                 printf(" { - pakiet biurowy\n");
                 printf(" c - kalkulator\n");
                 printf(" a - sklep z aplikacjami\n");
-                printf(" r - wylaczenie");
+                printf(" r - wylaczenie\n");
             }
 
             if (buf[0] == 'v') {
