@@ -28,6 +28,6 @@ void wait_key() {
 
 void graficzny() {
     set_mode_13h();
-    putpixel(2, 13, 7);
+    putpixel(2, 13, 7); //2137, jp2gmd
     wait_key();
 }
