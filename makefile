@@ -9,7 +9,6 @@ OS_IMAGE := $(BUILD_DIR)/tarixenios.img
 KERNEL_MAX_SECTORS := 20
 FLOPPY_SIZE := 1474560
 
-# UEFI64 stub (skip cross-compiler if missing)
 UEFI_BIN := $(BUILD_DIR)/uefi64.bin
 KERNEL_ELF64 := $(BUILD_DIR)/kernel64.elf
 ISO_IMAGE := $(BUILD_DIR)/tarixenios.iso
