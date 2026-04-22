@@ -8,7 +8,6 @@ uint8_t inb(uint16_t port) {
 }
 
 void keyboard_init(void) {
-    // Podstawowa inicjalizacja - czekaj na gotowość
     while (inb(0x64) & 2);
 }
 
