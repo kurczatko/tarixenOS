@@ -1,5 +1,4 @@
-<img width="296" height="117" alt="Zrzut ekranu_20260417_205309" src="https://github.com/user-attachments/assets/34eae0c9-57a7-4754-88e6-8131c4a2bb83" />
-
+<img width="263" height="98" alt="Zrzut ekranu_20260423_162321" src="https://github.com/user-attachments/assets/50a7d58c-3085-4277-9c50-bbd027994462" />
 System tarixenOS to system napisany w C który ma za zadanie być zamiennikiem dla systemów korporacyjnych lub tych cięższych, przez co nadaje się na stare komputery. Mile widziane są jakiekolwiek sugestie dotyczące systemu.
 jeżeli chcesz dodać jakąś funkcje śmiało wyślij zmiane a ja ją zatwierdze.
 
