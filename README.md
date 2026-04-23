@@ -43,3 +43,7 @@ musisz pisać komentarze po polsku i commity po polsku i większość rzeczy po 
 kod masz pisać w C, ponieważ c++ nie nadaje się według mnie bo ma za dużo niepotrzebnych funkcji.
 
 c++ można użyć tylko wtedy gdy pozwole i nie w krytycznych miejscach, tylko w obsłudze użytkownika ale i ta większość w C.
+
+# historia
+
+system powstał ponieważ od zawsze chciałem stworzyć system ale nie wiedziałem od czego zacząć, gdy poznałem assembler i C, obejrzałem kilka poradników wziąłem się do roboty. 
