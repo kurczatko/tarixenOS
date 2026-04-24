@@ -3,7 +3,7 @@
 #include "../include/printf/vga.h"
 #include "../../drivers/keyboard.h"
 
-void wyp() {
+void wyp() { // funkcja wypisywania tekstu
     vga_init();
     keyboard_init();
     printf(" napisz cos:\n");
