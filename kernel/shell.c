@@ -39,11 +39,16 @@ void shell() {
                 printf(" g - kalendarz\n");
                 printf(" u - panika jadra\n");
                 printf(" m - ilosc dostepnej pamieci\n");
+                printf(" cs - sprawdz sam\n");
             }
 
             if (buf[0] == 'v') {
                 printf(" wersja: 1.0.0\n");
                 printf("\n");
+            }
+
+            if(buf[0] == 'c' && buf[1] == 's') {
+                printf(" UwU\n");
             }
 
             if(buf[0]=='m'){
