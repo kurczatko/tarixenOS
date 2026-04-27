@@ -12,8 +12,6 @@ void kernel_main(void)
     while(1) {
         keyboard_init();
         blue();
-        ekran_bootowania();
-        keyboard_getchar();
         konfiguracja();
         vga_init();
         printf("system jest prosty w uzyciu, napisz 'h' aby wejsc w menu pomocy.\n");
