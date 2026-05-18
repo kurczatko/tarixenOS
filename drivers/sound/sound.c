@@ -121,7 +121,7 @@ void hda_play_sound(void) {
     *(volatile uint32_t*)(hda_base + HDA_OS0_CTL) &= ~0x02;
     
     //ustaw adres bdl
-    *(volatile uint32_t*)(hda_base + HDA_OS0_BDLPL) = (uint32_t)(uintptr_t)bdl;
+    *(volatile uint32_t*)(hda_base + HDA_OS0_BDLPL) = (uint32_t)(uintptr_t); bdl;
     *(volatile uint32_t*)(hda_base + HDA_OS0_BDLPU) = 0;
 
     //ustaw parametry dma
