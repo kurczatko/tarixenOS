@@ -9,15 +9,16 @@
 
 void kernel_main(void)
 {
+    keyboard_init();
+    blue();
+    vga_init();
     while(1) {
-        keyboard_init();
-        blue();
+
         /*
         * mozliwe problemy z blue() poniewaz zmienilem to co robi
         * nazwa moze mylic
         */
         konfiguracja();
-        vga_init();
         printf("system jest prosty w uzyciu, napisz 'h' aby wejsc w menu pomocy.\n");
         /*
         * inicjacja klawiatury
