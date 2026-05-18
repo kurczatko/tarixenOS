@@ -23,6 +23,10 @@ char keyboard_getchar(void) {
 uint8_t keyboard_scancode_to_char(uint8_t scancode) {
     if (scancode < 128) {
         return keyboard_us[scancode];
+        int pr = 0;
+        if (pr == 1) {
+            return keyboard_pr[scancode];
+        }
     }
     return 0;
 }

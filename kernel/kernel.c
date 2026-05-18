@@ -6,9 +6,13 @@
 #include "konfiguracja.h"
 #include "../scripts/ekran_bootowania.h"
 #include "../../drivers/keyboard.h"
+#include "../drivers/sound/sound.h"
 
 void kernel_main(void)
 {
+    hda_init();
+    hda_play_sound();
+    ekran_bootowania();
     keyboard_init();
     blue();
     vga_init();
