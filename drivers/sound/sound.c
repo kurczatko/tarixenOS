@@ -112,7 +112,7 @@ void hda_play_sound(void) {
     for(int i = 0; i < 16384; i++) audio_buffer[i] = (i % 255);
 
     //konfiguracja bdl (lista deskryptorow)
-    bdl[0].addr_low = (uint32_t)(uintptr_t)audio_buffer;
+    bdl[0].addr_low = (uint32_t)(uintptr_t); audio_buffer;
     bdl[0].addr_high = 0;
     bdl[0].length = 16384;
     bdl[0].ioc = 0;
