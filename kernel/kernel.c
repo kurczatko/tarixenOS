@@ -14,7 +14,6 @@ void kernel_main(void)
     // hda_play_sound();
     keyboard_init();
     vga_init();
-    blue();
 
     /*
     * mozliwe problemy z blue() poniewaz zmienilem to co robi
