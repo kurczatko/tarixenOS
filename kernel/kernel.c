@@ -12,10 +12,9 @@ void kernel_main(void)
 {
     // hda_init();
     // hda_play_sound();
-    ekran_bootowania();
     keyboard_init();
-    blue();
     vga_init();
+    blue();
 
     /*
     * mozliwe problemy z blue() poniewaz zmienilem to co robi
