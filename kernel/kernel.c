@@ -16,22 +16,20 @@ void kernel_main(void)
     keyboard_init();
     blue();
     vga_init();
-    while(1) {
 
-        /*
-        * mozliwe problemy z blue() poniewaz zmienilem to co robi
-        * nazwa moze mylic
-        */
-        konfiguracja();
-        printf("system jest prosty w uzyciu, napisz 'h' aby wejsc w menu pomocy.\n");
-        /*
-        * inicjacja klawiatury
-        * wyczyszczenie ekranu bo uzytkownik go nie wymyl (chyba)
-        * konfiguracja
-        * inicjacja vga
-        * wypisanie tekstu
-        * i nareszcie shell
-        */
-        shell();
-    }
+    /*
+    * mozliwe problemy z blue() poniewaz zmienilem to co robi
+    * nazwa moze mylic
+    */
+    konfiguracja();
+    printf("system jest prosty w uzyciu, napisz 'h' aby wejsc w menu pomocy.\n");
+    /*
+    * inicjacja klawiatury
+    * wyczyszczenie ekranu bo uzytkownik go nie wymyl (chyba)
+    * konfiguracja
+    * inicjacja vga
+    * wypisanie tekstu
+    * i nareszcie shell
+    */
+    shell();
 }
