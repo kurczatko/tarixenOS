@@ -31,5 +31,4 @@ void kernel_main(void)
     * i nareszcie shell
     */
     shell();
-    __asm__ __volatile__ ("hlt"); // zatrzymanie procesora (komentarz po to bo assembler to nie jezyk programowania tylko tortura umyslowa)
 }
