@@ -12,15 +12,12 @@ void kernel_main(void)
 {
     // hda_init();
     // hda_play_sound();
-    keyboard_init();
-    vga_init();
 
     /*
     * mozliwe problemy z blue() poniewaz zmienilem to co robi
     * nazwa moze mylic
     */
     konfiguracja();
-    printf("system jest prosty w uzyciu, napisz 'h' aby wejsc w menu pomocy.\n");
     /*
     * inicjacja klawiatury
     * wyczyszczenie ekranu bo uzytkownik go nie wymyl (chyba)
@@ -31,3 +28,5 @@ void kernel_main(void)
     */
     shell();
 }
+
+// ten plik ma byc najmniejszy jak sie da zeby latwo sie lapalo bledy, a wszystko co bardziej zlozone lepiej dokumentowane (dzieki bogu narazie jest krotki)
