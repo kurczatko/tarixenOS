@@ -11,7 +11,7 @@
 #include "panika.h"
 #include "../scripts/mem.h"
 #include "../include/blue.h"
-#include "../user_land/konta.h"
+// #include "../user_land/konta.h"
 #include "../system_plikow/system_plikow.h"
 
 void shell() {
@@ -54,7 +54,9 @@ void shell() {
                 printf("\n");
             }
 
-            if (buf[0] == '^') {
+            // narazie wywalam, bo to winowajca kilku bledow
+
+            /* if (buf[0] == '^') {
                 printf("czy chcesz:\n");
                 printf("a. stworzyc folder\n b. wyswietlic zawartosc tego gdzie jestes\n c. stworzyc plik\n UWAGA! jak wpisujesz nazwe to tylko jedna litera.");
                 char odp = keyboard_getchar();
@@ -73,7 +75,7 @@ void shell() {
                     char plik[2] = { keyboard_getchar(), 0 };
                     create_file(plik, 32);
                 }
-            }
+            } */
 
             if (buf[0] == 'b') {
                 blue();
