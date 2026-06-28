@@ -46,7 +46,7 @@ void shell() {
                 printf(" m - ilosc dostepnej pamieci\n");
                 printf(" cs - sprawdz sam\n");
                 printf(" b - czyszczenie ekranu\n");
-                printf(" q - wszytsko co zwiazane z plikami\n");
+                // printf(" q - wszytsko co zwiazane z plikami\n");
             }
 
             if (buf[0] == 'v') {
