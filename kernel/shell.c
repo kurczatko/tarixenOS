@@ -50,7 +50,7 @@ void shell() {
             }
 
             if (buf[0] == 'v') {
-                printf(" wersja: 2.0.0\n");
+                printf(" wersja: 3.0.0\n");
                 printf("\n");
             }
 
