@@ -21,5 +21,8 @@ void konta() {
         printf(" dobrze!\n");
     } else {
         printf(" zle! wywalaj wlamywaczu\n");
+        while(1) {
+            keyboard_getchar();
+        }
     }
 }
