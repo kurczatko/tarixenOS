@@ -11,14 +11,14 @@
 #include "panika.h"
 #include "../scripts/mem.h"
 #include "../include/blue.h"
-// #include "../user_land/konta.h"
+#include "../user_land/konta.h"
 #include "../system_plikow/system_plikow.h"
 
 void shell() {
     vga_init();
     keyboard_init();
 
-    // konta();
+    konta();
 
     printf(" &#| ");
     char buf[256] = {0};
