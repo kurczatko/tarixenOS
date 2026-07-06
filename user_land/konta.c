@@ -10,11 +10,19 @@ void konta() {
     keyboard_init();
     printf(" prosimy o utworzenie konta.\n");
     printf(" jak chcesz sie nazywac? (jedna litera)\n");
-    char nazwa = keyboard_getchar();
+    char uzytkownik = keyboard_getchar();
+    
+    int uzytkownik_upr = 0;
+    /*
+    * domyslne uprawnienia czyli zwykly uztkownik
+    * jesli jest ustawione na 1 to jest administrator
+    * eksperymentalne
+    */
+
     printf(" jakie haslo? (jedna litera) \n");
     char haslo = keyboard_getchar();
     blue();
-    printf("%c\n", nazwa);
+    printf("%c\n", uzytkownik);
     printf("wpisz haslo:");
     char zgdh = keyboard_getchar();
     if (zgdh == haslo) {
