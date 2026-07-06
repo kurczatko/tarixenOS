@@ -4,10 +4,11 @@
 #include "../../drivers/keyboard.h"
 #include "../include/blue.h"
 
-void konfiguracja() {
+void konfiguracja() { /* nie dotykać jeśli nie trzeba bo to raczej ważne co pierwsze widzi uzytkownik */
     keyboard_init();
     vga_init();
     blue();
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!\n"); // zwracanie uwagi uzytkownikowi
     printf("                                      tarixenOS                                                                                                                                                                                                   \n");
     printf(" Witam w Systemie tarixenOS!                                                                                                              \n");
     printf(" nasz system jest dopiero co stworzony wiec sie nie dziw ze jest niedokonczony                                                                                                                                                                          \n");
