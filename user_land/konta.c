@@ -19,7 +19,7 @@ void konta() {
     * eksperymentalne
     */
 
-    printf(" jakie haslo? (jedna litera) \n");
+    printf(" jakie haslo? (jeden znak) \n");
     char haslo = keyboard_getchar();
     blue();
     printf("%c\n", uzytkownik);
