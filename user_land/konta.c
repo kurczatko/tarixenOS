@@ -22,7 +22,7 @@ void konta() {
     printf(" jakie haslo? (jeden znak) \n");
     char haslo = keyboard_getchar();
     blue();
-    printf("%c\n",  uzytkownik);
+    printf(" %c\n", uzytkownik);
     printf(" wpisz haslo:");
     char zgdh = keyboard_getchar();
     if (zgdh == haslo) {
