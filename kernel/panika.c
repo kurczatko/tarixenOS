@@ -8,6 +8,7 @@ void panika() {
     blue();
     vga_init();
     keyboard_init();
+    printf(" !!!!!!!!!!!!!!!!!!!\n");
     printf(" system sie popsul!\n");
     printf(" this is the end!\n");
     printf(" ==================\n");
