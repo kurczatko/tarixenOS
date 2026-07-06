@@ -8,7 +8,7 @@ void konfiguracja() { /* nie dotykać jeśli nie trzeba bo to raczej ważne co p
     keyboard_init();
     vga_init();
     blue();
-    printf("!!!!!!!!!!!!!!!!!!!!!!!!!\n"); // zwracanie uwagi uzytkownikowi
+    printf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n"); // zwracanie uwagi uzytkownikowi
     printf("                                      tarixenOS                                                                                                                                                                                                   \n");
     printf(" Witam w Systemie tarixenOS!                                                                                                              \n");
     printf(" nasz system jest dopiero co stworzony wiec sie nie dziw ze jest niedokonczony                                                                                                                                                                          \n");
