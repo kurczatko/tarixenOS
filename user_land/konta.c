@@ -4,6 +4,7 @@
 #include "../../drivers/keyboard.h"
 #include "../include/blue.h"
 #include "../kernel/shell.h"
+#include "../kernel/panika.h"
 
 void konta() {
     vga_init();
@@ -18,6 +19,16 @@ void konta() {
     * jesli jest ustawione na 1 to jest administrator
     * eksperymentalne
     */
+
+    if (uzytkownik_upr == 0) {
+        printf("masz status zwyklego uzytkownika.\n");
+    }
+    if (uzytkownik_upr == 1) {
+        printf("masz status administratora.\n");
+    } else {
+        printf("system uprawnien zostal uszkodzony.\n");
+        panika();
+    }
 
     printf(" jakie haslo? (jeden znak) \n");
     char haslo = keyboard_getchar();
