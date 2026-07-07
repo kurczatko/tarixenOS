@@ -5,7 +5,7 @@
 static uint16_t* vga_buffer;
 static uint8_t row = 0;
 static uint8_t col = 0;
-uint8_t color = 0x02;
+uint8_t color = 0x0E;
 
 static uint16_t vga_entry(char c, uint8_t color) {
     return (uint16_t)c | (uint16_t)color << 8;
