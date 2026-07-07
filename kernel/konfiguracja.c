@@ -9,7 +9,7 @@ void konfiguracja() { /* nie dotykać jeśli nie trzeba bo to raczej ważne co p
     vga_init();
     blue();
     printf("===================================================================================\n"); // zwracanie uwagi uzytkownikowi
-    printf("|                                      tarixenOS                                  |                                                                                                                                                                \n");
+    printf("|                                      tarixenOS                                 X|                                                                                                                                                                \n");
     printf("| Witam w Systemie tarixenOS!                                                     |                                                          \n");
     printf("| nasz system jest dopiero co stworzony wiec sie nie dziw ze jest niedokonczony   |                                                                                                                                                                         \n");
     printf("| mam nadzieje ze ci sie spodoba                                                  |                                                                                       \n");
