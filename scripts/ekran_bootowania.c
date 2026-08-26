@@ -12,5 +12,6 @@ void ekran_bootowania() {
     printf("..\n");
     printf("...\n");
     printf("TarixenOS Beta\n");
+    printf("nacisnij enter aby kontynuowac\n");
     keyboard_getchar();
 }
