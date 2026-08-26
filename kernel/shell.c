@@ -13,6 +13,7 @@
 #include "../include/blue.h"
 #include "../user_land/konta.h"
 #include "../system_plikow/system_plikow.h"
+#include "syscals/random.h"
 
 void shell() {
     vga_init();
@@ -46,6 +47,7 @@ void shell() {
                 printf(" m - ilosc dostepnej pamieci\n");
                 printf(" cs - sprawdz sam\n");
                 printf(" b - czyszczenie ekranu\n");
+                printf(" z - losowa liczba\n");
                 // printf(" q - wszytsko co zwiazane z plikami\n");
             }
 
@@ -79,6 +81,11 @@ void shell() {
 
             if (buf[0] == 'b') {
                 blue();
+            }
+
+            if (buf[0] == 'z') {
+                printf(" losowa liczba:");
+                random();
             }
 
             if(buf[0] == 'c' && buf[1] == 's') {

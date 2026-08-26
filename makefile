@@ -6,7 +6,7 @@ BOOT_BIN32 := $(BUILD_DIR)/boot.bin
 KERNEL_ELF32 := $(BUILD_DIR)/kernel32.elf
 KERNEL_BIN32 := $(BUILD_DIR)/kernel32.bin
 OS_IMAGE := $(BUILD_DIR)/tarixenOS.img
-KERNEL_MAX_SECTORS := 20
+KERNEL_MAX_SECTORS := 32
 FLOPPY_SIZE := 1474560
 
 UEFI_BIN := $(BUILD_DIR)/uefi64.bin
@@ -25,7 +25,7 @@ CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wex
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(wildcard kernel/*.c) $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c)
+KERNEL_SOURCES := $(wildcard kernel/*.c) $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c)
 KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SOURCES))
 KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(KERNEL_SOURCES))
 
@@ -73,7 +73,7 @@ $(KERNEL_ELF64): $(KERNEL_OBJECTS64) linker64.ld | $(BUILD_DIR)
 	fi
 
 $(KERNEL_BIN32): $(KERNEL_ELF32)
-	$(OBJCOPY) -O binary $< $@
+	$(OBJCOPY) --change-addresses=-0x1000 -O binary $< $@
 
 $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
 	dd if=/dev/zero of=$@ bs=$(FLOPPY_SIZE) count=1 status=none

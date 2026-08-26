@@ -3,7 +3,7 @@
 
 KERNEL_LOAD_SEGMENT equ 0x0000
 KERNEL_LOAD_OFFSET  equ 0x1000
-KERNEL_SECTORS      equ 20
+KERNEL_SECTORS      equ 32
 CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
 
@@ -17,13 +17,9 @@ start:
     mov sp, 0x7C00
     mov [boot_drive], dl
 
-    mov ah, 0x02
-    mov al, KERNEL_SECTORS
-    mov ch, 0x00
-    mov cl, 0x02
-    mov dh, 0x00
     mov dl, [boot_drive]
-    mov bx, KERNEL_LOAD_OFFSET
+    mov si, disk_address_packet
+    mov ah, 0x42
     int 0x13
     jc disk_error
 
@@ -39,6 +35,14 @@ disk_error:
     jmp disk_error
 
 boot_drive db 0
+
+disk_address_packet:
+    db 0x10
+    db 0
+    dw KERNEL_SECTORS
+    dw KERNEL_LOAD_OFFSET
+    dw KERNEL_LOAD_SEGMENT
+    dq 1
 
 align 8
 gdt_start:

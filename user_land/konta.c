@@ -23,7 +23,7 @@ void konta() {
     if (uzytkownik_upr == 0) {
         printf("masz status zwyklego uzytkownika.\n");
     }
-    if (uzytkownik_upr == 1) {
+    else if (uzytkownik_upr == 1) {
         printf("masz status administratora.\n");
     } else {
         printf("system uprawnien zostal uszkodzony.\n");

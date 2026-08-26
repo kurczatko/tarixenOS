@@ -9,11 +9,11 @@ void konfiguracja() { /* nie dotykać jeśli nie trzeba bo to raczej ważne co p
     vga_init();
     blue();
     printf("===================================================================================\n"); // zwracanie uwagi uzytkownikowi
-    printf("|                                      tarixenOS                                 X|                                                                                                                                                                \n");
-    printf("| Witam w Systemie tarixenOS!                                                     |                                                          \n");
-    printf("| nasz system jest dopiero co stworzony wiec sie nie dziw ze jest niedokonczony   |                                                                                                                                                                         \n");
-    printf("| mam nadzieje ze ci sie spodoba                                                  |                                                                                       \n");
-    printf("| kliknij enter aby wyjsc z konfiguracji                                          |                                                                                                                                                                   \n");
+    printf("                                      tarixenOS                                                                                                                                                                                                 \n");
+    printf(" Witam w Systemie tarixenOS!                                                                                                               \n");
+    printf(" nasz system jest dopiero co stworzony wiec sie nie dziw ze jest niedokonczony                                                                                                                                                                           \n");
+    printf(" mam nadzieje ze ci sie spodoba                                                                                                                                         \n");
+    printf(" kliknij enter aby wyjsc z konfiguracji                                                                                                                                                                                                            \n");
     printf("===================================================================================                                                                                                                                                                                                                                                   ");
     keyboard_getchar();
 }
