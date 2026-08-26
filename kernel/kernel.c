@@ -17,6 +17,7 @@ void kernel_main(void)
     * mozliwe problemy z blue() poniewaz zmienilem to co robi
     * nazwa moze mylic
     */
+    ekran_bootowania();
     konfiguracja();
     /*
     * inicjacja klawiatury
