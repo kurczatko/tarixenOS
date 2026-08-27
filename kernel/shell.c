@@ -48,7 +48,7 @@ void shell() {
                 printf(" cs - sprawdz sam\n");
                 printf(" b - czyszczenie ekranu\n");
                 printf(" z - losowa liczba\n");
-                // printf(" q - wszytsko co zwiazane z plikami\n");
+                printf(" ^ - wszytsko co zwiazane z plikami\n");
             }
 
             if (buf[0] == 'v') {
@@ -56,28 +56,28 @@ void shell() {
                 printf("\n");
             }
 
-            // narazie wywalam, bo to winowajca kilku bledow
 
-            /* if (buf[0] == '^') {
-                printf("czy chcesz:\n");
-                printf("a. stworzyc folder\n b. wyswietlic zawartosc tego gdzie jestes\n c. stworzyc plik\n UWAGA! jak wpisujesz nazwe to tylko jedna litera.");
+
+            if (buf[0] == '^') {
+                printf(" czy chcesz:\n");
+                printf(" a. stworzyc folder\n b. wyswietlic zawartosc tego gdzie jestes\n c. stworzyc plik\n UWAGA! jak wpisujesz nazwe to tylko jedna litera.");
                 char odp = keyboard_getchar();
                 if (odp == 'a') {
-                    printf("nazwa:");
+                    printf(" nazwa:");
                     char nazwa[2] = { keyboard_getchar(), 0 };
                     create_dir(nazwa);
                 }
                 if (odp == 'b') {
-                    printf("w jakim folderze?:");
+                    printf(" w jakim folderze?:");
                     char folder[2] = { keyboard_getchar(), 0 };
                     ls(folder);
                 }
                 if (odp == 'c') {
-                    printf("nazwa:");
+                    printf(" nazwa:");
                     char plik[2] = { keyboard_getchar(), 0 };
                     create_file(plik, 32);
                 }
-            } */
+            }
 
             if (buf[0] == 'b') {
                 blue();
