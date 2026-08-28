@@ -14,8 +14,5 @@ void panika() {
     printf(" ==================\n");
     printf(" jesli system sie popsul bo uzyles do tego komendy to ok\n");
     printf(" jesli samo to wyslij to (skarge) na kurczatkojestslodkie@gmail.com\n");
-    int zawsze = 1;
-    while(zawsze) {
-        keyboard_getchar();
-    }
+    __asm__ __volatile__("hlt");
 }
