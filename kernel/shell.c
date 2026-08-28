@@ -14,6 +14,7 @@
 #include "../user_land/konta.h"
 #include "../system_plikow/system_plikow.h"
 #include "syscals/random.h"
+#include "shutdown.h"
 
 void shell() {
     vga_init();
@@ -84,7 +85,7 @@ void shell() {
             }
 
             if (buf[0] == 'z') {
-                printf(" losowa liczba:");
+                printf(" losowa liczba:\n");
                 random();
             }
 
@@ -109,7 +110,7 @@ void shell() {
             }
 
             if (buf[0] == 'r') {
-                asm volatile("cli; hlt");
+                shutdown();
             }
 
             if (buf[0] == 'a') {
