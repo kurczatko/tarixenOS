@@ -5,7 +5,7 @@
 static uint16_t* vga_buffer;
 static uint8_t row = 0;
 static uint8_t col = 0;
-uint8_t color = 0x0E;
+uint8_t color = 0x70;
 
 static void vga_update_cursor(void) {
     uint16_t position = row * 80 + col;
