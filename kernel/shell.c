@@ -2,6 +2,7 @@
 #include "../include/printf/printf.h"
 #include "../include/printf/vga.h"
 #include "../../drivers/keyboard.h"
+#include "../../drivers/mouse.h"
 #include "../kernel/apps/kaka.h"
 #include "../kernel/apps/pakiet.h"
 #include "../kernel/apps/calc.h"
@@ -19,6 +20,7 @@
 void shell() {
     vga_init();
     keyboard_init();
+    mouse_init();
 
     konta();
 

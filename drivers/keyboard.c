@@ -1,4 +1,5 @@
 #include "keyboard.h"
+#include "mouse.h"
 #include "../include/printf/types.h"
 
 uint8_t inb(uint16_t port) {
@@ -17,7 +18,11 @@ void keyboard_init(void) {
 char keyboard_getchar(void) {
     uint8_t scancode;
     while (1) {
-        while (!(inb(KEYBOARD_STATUS_PORT) & 1)); //nareszcie naprawiłem to ze miedzy literami jest odstep a nie powinno byc, łuhu!!!!!
+        mouse_poll();
+        while (!(inb(KEYBOARD_STATUS_PORT) & 1) ||
+               (inb(KEYBOARD_STATUS_PORT) & 0x20)) {
+            mouse_poll();
+        } //nareszcie naprawiłem to ze miedzy literami jest odstep a nie powinno byc, łuhu!!!!!
         scancode = inb(KEYBOARD_DATA_PORT);
 
         if (scancode == 0x2A || scancode == 0x36) {

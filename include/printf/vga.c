@@ -19,6 +19,54 @@ static uint16_t vga_entry(char c, uint8_t color) {
     return (uint16_t)c | (uint16_t)color << 8;
 }
 
+static int mouse_x = 40;
+static int mouse_y = 12;
+static uint16_t mouse_saved_cell;
+static uint8_t mouse_cursor_drawn = 0;
+
+void vga_mouse_cursor_hide(void) {
+    if (mouse_cursor_drawn) {
+        vga_buffer[mouse_y * 80 + mouse_x] = mouse_saved_cell;
+        mouse_cursor_drawn = 0;
+    }
+}
+
+static void vga_mouse_cursor_show(void) {
+    uint16_t cell;
+    uint8_t attributes;
+
+    if (mouse_cursor_drawn) {
+        vga_mouse_cursor_hide();
+    }
+
+    cell = vga_buffer[mouse_y * 80 + mouse_x];
+    mouse_saved_cell = cell;
+    attributes = (uint8_t)(cell >> 8);
+    attributes = (uint8_t)((attributes << 4) | (attributes >> 4));
+    vga_buffer[mouse_y * 80 + mouse_x] =
+        (cell & 0x00FF) | ((uint16_t)attributes << 8);
+    mouse_cursor_drawn = 1;
+}
+
+void vga_mouse_cursor_init(void) {
+    mouse_x = 40;
+    mouse_y = 12;
+    vga_mouse_cursor_show();
+}
+
+void vga_mouse_cursor_move(int delta_x, int delta_y) {
+    vga_mouse_cursor_hide();
+    mouse_x += delta_x;
+    mouse_y += delta_y;
+
+    if (mouse_x < 0) mouse_x = 0;
+    if (mouse_x > 79) mouse_x = 79;
+    if (mouse_y < 0) mouse_y = 0;
+    if (mouse_y > 24) mouse_y = 24;
+
+    vga_mouse_cursor_show();
+}
+
 void vga_init() {
     vga_buffer = VGA_MEMORY;
     asm volatile ("outb %0, %1" : : "a"((uint8_t)0x0A), "Nd"((uint16_t)0x3D4));
@@ -29,10 +77,13 @@ void vga_init() {
 }
 
 void vga_putc(char c) {
+    vga_mouse_cursor_hide();
+
     if (c == '\n') {
         row++;
         col = 0;
         vga_update_cursor();
+        vga_mouse_cursor_show();
         return;
     }
 
@@ -42,6 +93,7 @@ void vga_putc(char c) {
             vga_buffer[row * 80 + col] = vga_entry(' ', color);
         }
         vga_update_cursor();
+        vga_mouse_cursor_show();
         return;
     }
 
@@ -66,6 +118,7 @@ void vga_putc(char c) {
     }
 
     vga_update_cursor();
+    vga_mouse_cursor_show();
 }
 
 void vga_cursor_left(void) {
