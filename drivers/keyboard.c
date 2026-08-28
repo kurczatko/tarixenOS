@@ -7,6 +7,9 @@ uint8_t inb(uint16_t port) {
     return ret;
 }
 
+static uint8_t shift_pressed = 0;
+static uint8_t caps_lock = 0;
+
 void keyboard_init(void) {
     while (inb(0x64) & 2);
 }
@@ -16,6 +19,21 @@ char keyboard_getchar(void) {
     while (1) {
         while (!(inb(KEYBOARD_STATUS_PORT) & 1)); //nareszcie naprawiłem to ze miedzy literami jest odstep a nie powinno byc, łuhu!!!!!
         scancode = inb(KEYBOARD_DATA_PORT);
+
+        if (scancode == 0x2A || scancode == 0x36) {
+            shift_pressed = 1;
+            continue;
+        }
+
+        if (scancode == 0xAA || scancode == 0xB6) {
+            shift_pressed = 0;
+            continue;
+        }
+
+        if (scancode == 0x3A) {
+            caps_lock = !caps_lock;
+            continue;
+        }
 
         if (scancode == 0xE0) {
             while (!(inb(KEYBOARD_STATUS_PORT) & 1));
@@ -28,7 +46,13 @@ char keyboard_getchar(void) {
         }
 
         if (scancode < 0x80) {
-            return keyboard_scancode_to_char(scancode);
+            char character = keyboard_scancode_to_char(scancode);
+
+            if (character >= 'a' && character <= 'z' &&
+                (shift_pressed != caps_lock)) {
+                character = character - 'a' + 'A';
+            }
+            return character;
         }
     }
 }
