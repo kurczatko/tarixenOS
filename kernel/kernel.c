@@ -1,33 +1,20 @@
-
-#include "../include/printf/printf.h"
 #include "../include/printf/vga.h"
 #include "shell.h"
 #include "../include/blue.h"
 #include "konfiguracja.h"
 #include "../scripts/ekran_bootowania.h"
 #include "../../drivers/keyboard.h"
-#include "../drivers/sound/sound.h"
+#include "panika.h"
 
 void kernel_main(void)
 {
-    // hda_init();
-    // hda_play_sound();
-
-    /*
-    * mozliwe problemy z blue() poniewaz zmienilem to co robi
-    * nazwa moze mylic
-    */
+    vga_init();
+    keyboard_init();
+    blue();
     ekran_bootowania();
     konfiguracja();
-    /*
-    * inicjacja klawiatury
-    * wyczyszczenie ekranu bo uzytkownik go nie wymyl (chyba)
-    * konfiguracja
-    * inicjacja vga
-    * wypisanie tekstu
-    * i nareszcie shell
-    */
-    shell();
+    while(1) {
+        shell();
+    }
+    panika();   // kernel panic jak shell sie skonczy (nie powinien sie skonczyc)
 }
-
-// ten plik ma byc najmniejszy jak sie da zeby latwo sie lapalo bledy, a wszystko co bardziej zlozone lepiej dokumentowane (dzieki bogu narazie jest krotki)

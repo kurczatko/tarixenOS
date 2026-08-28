@@ -7,6 +7,11 @@
 #define KEYBOARD_DATA_PORT 0x60
 #define KEYBOARD_STATUS_PORT 0x64
 
+#define KEYBOARD_LEFT  1
+#define KEYBOARD_RIGHT 2
+#define KEYBOARD_UP    3
+#define KEYBOARD_DOWN  4
+
 // funkcje klawiaturowe
 void keyboard_init(void);
 char keyboard_getchar(void);

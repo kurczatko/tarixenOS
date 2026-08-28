@@ -24,12 +24,17 @@ void shell() {
 
     printf(" &#| ");
     char buf[256] = {0};
-    int i = 0;
+    int length = 0;
+    int cursor = 0;
     while (1) {
         char com = keyboard_getchar();
         if (com == '\n' || com == '\r') {
+            while (cursor < length) {
+                vga_cursor_right();
+                cursor++;
+            }
             printf("\n");
-            buf[i] = 0;
+            buf[length] = 0;
 
             if (buf[0] == 'h') {
                 printf(" h - pomoc\n");
@@ -156,15 +161,54 @@ void shell() {
             }
 
             printf(" &#| ");
-            i = 0;
+            length = 0;
+            cursor = 0;
         } else if (com == '\b') {
-            if (i > 0) {
-                i--;
-                printf("\b \b");
+            if (cursor > 0) {
+                int position;
+
+                cursor--;
+                for (position = cursor; position < length - 1; position++) {
+                    buf[position] = buf[position + 1];
+                }
+                length--;
+                buf[length] = 0;
+
+                vga_cursor_left();
+                for (position = cursor; position < length; position++) {
+                    printf("%c", buf[position]);
+                }
+                printf(" ");
+                for (position = cursor; position <= length; position++) {
+                    vga_cursor_left();
+                }
             }
-        } else if (i < 255) {
-            buf[i++] = com;
+        } else if (com == KEYBOARD_LEFT) {
+            if (cursor > 0) {
+                cursor--;
+                vga_cursor_left();
+            }
+        } else if (com == KEYBOARD_RIGHT) {
+            if (cursor < length) {
+                cursor++;
+                vga_cursor_right();
+            }
+        } else if (length < 255) {
+            int position;
+
+            for (position = length; position > cursor; position--) {
+                buf[position] = buf[position - 1];
+            }
+            buf[cursor] = com;
+            cursor++;
+            length++;
             printf("%c", com);
+            for (position = cursor; position < length; position++) {
+                printf("%c", buf[position]);
+            }
+            for (position = cursor; position < length; position++) {
+                vga_cursor_left();
+            }
         }
     }
 }
