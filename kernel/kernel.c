@@ -5,10 +5,12 @@
 #include "../scripts/ekran_bootowania.h"
 #include "../../drivers/keyboard.h"
 #include "panika.h"
+#include "../drivers/mouse.h"
 
 void kernel_main(void)
 {
     vga_init();
+    mouse_init();
     keyboard_init();
     blue();
     ekran_bootowania();

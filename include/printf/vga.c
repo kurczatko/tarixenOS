@@ -96,6 +96,11 @@ void vga_mouse_cursor_move(int delta_x, int delta_y) {
     vga_mouse_cursor_show();
 }
 
+void vga_mouse_cursor_position(int* x, int* y) {
+    *x = mouse_x;
+    *y = mouse_y;
+}
+
 void vga_init() {
     vga_buffer = VGA_MEMORY;
     asm volatile ("outb %0, %1" : : "a"((uint8_t)0x0A), "Nd"((uint16_t)0x3D4));

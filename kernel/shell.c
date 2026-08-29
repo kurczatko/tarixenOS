@@ -3,6 +3,7 @@
 #include "../include/printf/vga.h"
 #include "../../drivers/keyboard.h"
 #include "../../drivers/mouse.h"
+#include "../graficzny/menu_start.h"
 #include "../kernel/apps/kaka.h"
 #include "../kernel/apps/pakiet.h"
 #include "../kernel/apps/calc.h"
@@ -23,6 +24,7 @@ void shell() {
     mouse_init();
 
     konta();
+    menu_start();
 
     printf(" &#| ");
     char buf[256] = {0};

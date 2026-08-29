@@ -13,5 +13,6 @@ void vga_cursor_right(void);
 void vga_mouse_cursor_init(void);
 void vga_mouse_cursor_move(int delta_x, int delta_y);
 void vga_mouse_cursor_hide(void);
+void vga_mouse_cursor_position(int* x, int* y);
 
 #endif
