@@ -19,6 +19,35 @@ static uint16_t vga_entry(char c, uint8_t color) {
     return (uint16_t)c | (uint16_t)color << 8;
 }
 
+static void vga_mouse_cursor_show(void);
+
+static void vga_scroll(void) {
+    uint16_t source_row;
+    uint16_t column;
+
+    for (source_row = 2; source_row < 25; source_row++) {
+        for (column = 0; column < 80; column++) {
+            vga_buffer[(source_row - 1) * 80 + column] =
+                vga_buffer[source_row * 80 + column];
+        }
+    }
+    for (column = 0; column < 80; column++) {
+        vga_buffer[24 * 80 + column] = vga_entry(' ', color);
+    }
+    row = 24;
+    col = 0;
+}
+
+void vga_draw_top_bar(void) {
+    uint16_t index;
+
+    vga_mouse_cursor_hide();
+    for (index = 0; index < 80; index++) {
+        vga_buffer[index] = vga_entry(' ', 0x20);
+    }
+    vga_mouse_cursor_show();
+}
+
 static int mouse_x = 40;
 static int mouse_y = 12;
 static uint16_t mouse_saved_cell;
@@ -73,7 +102,16 @@ void vga_init() {
     asm volatile ("outb %0, %1" : : "a"((uint8_t)0x0E), "Nd"((uint16_t)0x3D5));
     asm volatile ("outb %0, %1" : : "a"((uint8_t)0x0B), "Nd"((uint16_t)0x3D4));
     asm volatile ("outb %0, %1" : : "a"((uint8_t)0x0F), "Nd"((uint16_t)0x3D5));
+    vga_draw_top_bar();
     vga_update_cursor();
+}
+
+void vga_reset_text_cursor(void) {
+    vga_mouse_cursor_hide();
+    row = 1;
+    col = 0;
+    vga_update_cursor();
+    vga_mouse_cursor_show();
 }
 
 void vga_putc(char c) {
@@ -82,6 +120,9 @@ void vga_putc(char c) {
     if (c == '\n') {
         row++;
         col = 0;
+        if (row >= 25) {
+            vga_scroll();
+        }
         vga_update_cursor();
         vga_mouse_cursor_show();
         return;
@@ -106,15 +147,7 @@ void vga_putc(char c) {
     }
     
     if (row >= 25) {
-        //przesuwanie ekranu
-        for (uint16_t i = 0; i < 1920; i++) {
-            vga_buffer[i] = vga_buffer[i + 80];
-        }
-        for (uint16_t i = 1920; i < 2000; i++) {
-            vga_buffer[i] = vga_entry(' ', color);
-        }
-        row = 24;
-        col = 0;
+        vga_scroll();
     }
 
     vga_update_cursor();
