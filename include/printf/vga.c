@@ -59,27 +59,36 @@ void vga_draw_top_bar(void) {
 
 static int mouse_x = 40;
 static int mouse_y = 12;
-static uint16_t mouse_saved_cell;
+static uint16_t mouse_saved_cell_top;
+static uint16_t mouse_saved_cell_bottom;
 static uint8_t mouse_cursor_drawn = 0;
 
 void vga_mouse_cursor_hide(void) {
     if (mouse_cursor_drawn) {
-        vga_buffer[mouse_y * 80 + mouse_x] = mouse_saved_cell;
+        vga_buffer[mouse_y * 80 + mouse_x] = mouse_saved_cell_top;
+        vga_buffer[(mouse_y + 1) * 80 + mouse_x] = mouse_saved_cell_bottom;
         mouse_cursor_drawn = 0;
     }
 }
 
 static void vga_mouse_cursor_show(void) {
-    uint16_t cell;
+    uint16_t cell_top, cell_bottom;
 
     if (mouse_cursor_drawn) {
         vga_mouse_cursor_hide();
     }
 
-    cell = vga_buffer[mouse_y * 80 + mouse_x];
-    mouse_saved_cell = cell;
+    cell_top = vga_buffer[mouse_y * 80 + mouse_x];
+    cell_bottom = vga_buffer[(mouse_y + 1) * 80 + mouse_x];
+
+    mouse_saved_cell_top = cell_top;
+    mouse_saved_cell_bottom = cell_bottom;
+
     vga_buffer[mouse_y * 80 + mouse_x] =
-        vga_entry('\\', vga_cursor_color(cell));
+        vga_entry('^', vga_cursor_color(cell_top));
+    vga_buffer[(mouse_y + 1) * 80 + mouse_x] =
+        vga_entry('|', vga_cursor_color(cell_bottom));
+
     mouse_cursor_drawn = 1;
 }
 
@@ -97,7 +106,7 @@ void vga_mouse_cursor_move(int delta_x, int delta_y) {
     if (mouse_x < 0) mouse_x = 0;
     if (mouse_x > 79) mouse_x = 79;
     if (mouse_y < 0) mouse_y = 0;
-    if (mouse_y > 24) mouse_y = 24;
+    if (mouse_y > 23) mouse_y = 23;
 
     vga_mouse_cursor_show();
 }
