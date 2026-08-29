@@ -25,6 +25,7 @@ static void vga_scroll(void) {
     uint16_t source_row;
     uint16_t column;
 
+    vga_mouse_cursor_hide();
     for (source_row = 2; source_row < 25; source_row++) {
         for (column = 0; column < 80; column++) {
             vga_buffer[(source_row - 1) * 80 + column] =
@@ -36,6 +37,7 @@ static void vga_scroll(void) {
     }
     row = 24;
     col = 0;
+    vga_mouse_cursor_show();
 }
 
 void vga_draw_top_bar(void) {
