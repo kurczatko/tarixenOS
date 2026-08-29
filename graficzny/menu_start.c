@@ -2,6 +2,7 @@
 #include "../include/blue.h"
 #include "../include/printf/types.h"
 #include "../include/printf/vga.h"
+#include "../kernel/shutdown.h"
 
 static uint8_t menu_open = 0;
 static uint16_t saved_screen[2000];
@@ -29,6 +30,7 @@ void menu_start() {
 void menu_start_click(void) {
 	uint16_t* vga_buffer = (uint16_t*)0xB8000;
 	uint16_t blue_entry = (uint16_t)' ' | (uint16_t)0x17 << 8;
+	uint16_t yellow_entry = (uint16_t)' ' | (uint16_t)0xE0 << 8;
 	int index;
 
 	menu_open = 1;
@@ -38,6 +40,13 @@ void menu_start_click(void) {
 		saved_screen[index] = vga_buffer[index];
 		vga_buffer[index] = blue_entry;
 	}
+	for (index = 0; index < 6; index++) {
+		vga_buffer[index] = yellow_entry;
+	}
+	vga_buffer[0] = (uint16_t)'w' | (uint16_t)0xE0 << 8;
+	vga_buffer[1] = (uint16_t)'y' | (uint16_t)0xE0 << 8;
+	vga_buffer[2] = (uint16_t)'l' | (uint16_t)0xE0 << 8;
+	vga_buffer[3] = (uint16_t)'.' | (uint16_t)0xE0 << 8;
 	vga_buffer[79] = (uint16_t)'X' | (uint16_t)0x47 << 8;
 	vga_mouse_cursor_move(0, 0);
 }
@@ -50,6 +59,10 @@ void menu_start_mouse_click(void) {
 
 	vga_mouse_cursor_position(&mouse_x, &mouse_y);
 	if (menu_open) {
+		if (mouse_x < 6 && mouse_y == 0) {
+			shutdown();
+			return;
+		}
 		if (mouse_x == 79 && mouse_y == 0) {
 			menu_open = 0;
 			vga_mouse_cursor_hide();
