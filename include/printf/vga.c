@@ -85,7 +85,7 @@ static void vga_mouse_cursor_show(void) {
     mouse_saved_cell_bottom = cell_bottom;
 
     vga_buffer[mouse_y * 80 + mouse_x] =
-        vga_entry('^', vga_cursor_color(cell_top));
+        vga_entry('', vga_cursor_color(cell_top)); // po to aby moglo sie kliknac nawet jak kursor jest obok (bo uzytkownicy pewnie są niechlujni)
     vga_buffer[(mouse_y + 1) * 80 + mouse_x] =
         vga_entry('|', vga_cursor_color(cell_bottom));
 
