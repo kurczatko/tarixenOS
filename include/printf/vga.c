@@ -19,6 +19,13 @@ static uint16_t vga_entry(char c, uint8_t color) {
     return (uint16_t)c | (uint16_t)color << 8;
 }
 
+static uint8_t vga_cursor_color(uint16_t cell) {
+    uint8_t background = (uint8_t)(cell >> 8) & 0x70;
+    uint8_t foreground = background == 0x70 ? 0x00 : 0x0F;
+
+    return background | foreground;
+}
+
 static void vga_mouse_cursor_show(void);
 
 static void vga_scroll(void) {
@@ -64,7 +71,6 @@ void vga_mouse_cursor_hide(void) {
 
 static void vga_mouse_cursor_show(void) {
     uint16_t cell;
-    uint8_t attributes;
 
     if (mouse_cursor_drawn) {
         vga_mouse_cursor_hide();
@@ -72,10 +78,8 @@ static void vga_mouse_cursor_show(void) {
 
     cell = vga_buffer[mouse_y * 80 + mouse_x];
     mouse_saved_cell = cell;
-    attributes = (uint8_t)(cell >> 8);
-    attributes = (uint8_t)((attributes << 4) | (attributes >> 4));
     vga_buffer[mouse_y * 80 + mouse_x] =
-        (cell & 0x00FF) | ((uint16_t)attributes << 8);
+        vga_entry('\\', vga_cursor_color(cell));
     mouse_cursor_drawn = 1;
 }
 

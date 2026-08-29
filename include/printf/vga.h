@@ -8,6 +8,7 @@ void vga_draw_top_bar(void);
 void vga_reset_text_cursor(void);
 void vga_text_cursor_position(int* x, int* y);
 void vga_set_text_cursor_position(int x, int y);
+void vga_text_cursor_tick(void);
 void vga_putc(char c);
 void vga_print(const char* str);
 void vga_cursor_left(void);
