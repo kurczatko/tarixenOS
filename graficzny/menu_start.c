@@ -4,6 +4,9 @@
 #include "../include/printf/vga.h"
 
 static uint8_t menu_open = 0;
+static uint16_t saved_screen[2000];
+static int saved_cursor_x;
+static int saved_cursor_y;
 
 void menu_start() {
 	uint16_t* vga_buffer = (uint16_t*)0xB8000;
@@ -26,10 +29,13 @@ void menu_start() {
 void menu_start_click(void) {
 	uint16_t* vga_buffer = (uint16_t*)0xB8000;
 	uint16_t blue_entry = (uint16_t)' ' | (uint16_t)0x17 << 8;
+	int index;
 
 	menu_open = 1;
 	vga_mouse_cursor_hide();
-	for (int index = 0; index < 2000; index++) {
+	vga_text_cursor_position(&saved_cursor_x, &saved_cursor_y);
+	for (index = 0; index < 2000; index++) {
+		saved_screen[index] = vga_buffer[index];
 		vga_buffer[index] = blue_entry;
 	}
 	vga_buffer[79] = (uint16_t)'X' | (uint16_t)0x47 << 8;
@@ -39,14 +45,18 @@ void menu_start_click(void) {
 void menu_start_mouse_click(void) {
 	int mouse_x;
 	int mouse_y;
+	int index;
+	uint16_t* vga_buffer = (uint16_t*)0xB8000;
 
 	vga_mouse_cursor_position(&mouse_x, &mouse_y);
 	if (menu_open) {
 		if (mouse_x == 79 && mouse_y == 0) {
 			menu_open = 0;
-			vga_draw_top_bar();
-			vga_reset_text_cursor();
-			menu_start();
+			vga_mouse_cursor_hide();
+			for (index = 0; index < 2000; index++) {
+				vga_buffer[index] = saved_screen[index];
+			}
+			vga_set_text_cursor_position(saved_cursor_x, saved_cursor_y);
 		}
 		return;
 	}

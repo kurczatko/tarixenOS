@@ -119,6 +119,19 @@ void vga_reset_text_cursor(void) {
     vga_mouse_cursor_show();
 }
 
+void vga_text_cursor_position(int* x, int* y) {
+    *x = col;
+    *y = row;
+}
+
+void vga_set_text_cursor_position(int x, int y) {
+    vga_mouse_cursor_hide();
+    col = x;
+    row = y;
+    vga_update_cursor();
+    vga_mouse_cursor_show();
+}
+
 void vga_putc(char c) {
     vga_mouse_cursor_hide();
 
