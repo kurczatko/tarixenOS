@@ -21,7 +21,6 @@
 void shell() {
     vga_init();
     keyboard_init();
-    mouse_init();
 
     konta();
     menu_start();
