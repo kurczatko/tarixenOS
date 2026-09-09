@@ -8,7 +8,36 @@ CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
 
 
-start:
+    jmp short boot_start
+    nop
+    db 'TARIXEN '
+    dw 512
+    db 1
+    dw 192
+    db 2
+    dw 0
+    dw 0
+    db 0xF8
+    dw 0
+    dw 63
+    dw 255
+    dd 0
+    dd 131072
+    dd 1024
+    dw 0
+    dw 0
+    dd 2
+    dw 1
+    dw 6
+    times 12 db 0
+    db 0x80
+    db 0
+    db 0x29
+    dd 0x20260909
+    db 'TARIXENOS  '
+    db 'FAT32   '
+
+boot_start:
     cli
     xor ax, ax
     mov ds, ax
@@ -42,7 +71,7 @@ disk_address_packet:
     dw KERNEL_SECTORS
     dw KERNEL_LOAD_OFFSET
     dw KERNEL_LOAD_SEGMENT
-    dq 1
+    dq 192
 
 align 8
 gdt_start:
@@ -65,7 +94,8 @@ protected_mode:
     mov ss, ax
     mov esp, 0x90000
 
-    jmp KERNEL_LOAD_OFFSET
+    mov eax, KERNEL_LOAD_OFFSET
+    jmp eax
 
 times 510 - ($ - $$) db 0
 dw 0xAA55 ; six seveeeeen

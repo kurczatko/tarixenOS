@@ -6,6 +6,7 @@
 #include "../../drivers/keyboard.h"
 #include "panika.h"
 #include "../drivers/mouse.h"
+#include "../system_plikow/system_plikow.h"
 
 void kernel_main(void)
 {
@@ -15,6 +16,7 @@ void kernel_main(void)
     blue();
     ekran_bootowania();
     konfiguracja();
+    init_fs();
     while(1) {
         shell();
     }

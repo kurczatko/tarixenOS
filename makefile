@@ -6,8 +6,8 @@ BOOT_BIN32 := $(BUILD_DIR)/boot.bin
 KERNEL_ELF32 := $(BUILD_DIR)/kernel32.elf
 KERNEL_BIN32 := $(BUILD_DIR)/kernel32.bin
 OS_IMAGE := $(BUILD_DIR)/tarixenOS.img
-KERNEL_MAX_SECTORS := 32
-FLOPPY_SIZE := 1474560
+KERNEL_MAX_SECTORS := 64
+FLOPPY_SIZE := 67108864
 
 UEFI_BIN := $(BUILD_DIR)/uefi64.bin
 KERNEL_ELF64 := $(BUILD_DIR)/kernel64.elf
@@ -20,7 +20,7 @@ LD64 := ld
 OBJCOPY := objcopy
 NASM := nasm
 
-CFLAGS32 := -m32 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector
+CFLAGS32 := -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector
 CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector -mcmodel=kernel -mno-red-zone
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
@@ -77,8 +77,18 @@ $(KERNEL_BIN32): $(KERNEL_ELF32)
 
 $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
 	dd if=/dev/zero of=$@ bs=$(FLOPPY_SIZE) count=1 status=none
-	dd if=$(BOOT_BIN32) of=$@ conv=notrunc status=none
-	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=1 conv=notrunc status=none
+	@if command -v mkfs.fat >/dev/null 2>&1; then \
+		mkfs.fat -F 32 -S 512 -s 1 -R 192 -n TARIXENOS $@ >/dev/null; \
+	else \
+		echo "Brak mkfs.fat - obraz nie zostanie sformatowany jako FAT32"; exit 1; \
+	fi
+	dd if=$(BOOT_BIN32) of=$@ bs=1 count=3 conv=notrunc status=none
+	dd if=$(BOOT_BIN32) of=$@ bs=1 skip=90 seek=90 count=420 conv=notrunc status=none
+	@kernel_size=$$(stat -c %s $(KERNEL_BIN32)); \
+	if [ $$kernel_size -gt $$((32 * 512)) ]; then \
+		echo "Kernel jest za duzy dla pojedynczego odczytu BIOS: $$kernel_size bajtow"; exit 1; \
+	fi
+	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=192 conv=notrunc status=none
 	@if [ -f $(UEFI_BIN) ]; then \
 		echo "UEFI stub gotowy (img BIOS32)"; \
 	fi
