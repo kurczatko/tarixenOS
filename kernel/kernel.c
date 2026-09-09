@@ -7,18 +7,14 @@
 #include "panika.h"
 #include "../drivers/mouse.h"
 #include "../system_plikow/system_plikow.h"
+#include "../graficzny/rysowanie.h"
 
 void kernel_main(void)
 {
-    vga_init();
+    rysowanie_init();
     mouse_init();
     keyboard_init();
-    blue();
-    ekran_bootowania();
-    konfiguracja();
-    init_fs();
     while(1) {
-        shell();
+        mouse_poll();
     }
-    panika();   // kernel panic jak shell sie skonczy (nie powinien sie skonczyc)
 }

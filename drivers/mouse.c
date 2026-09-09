@@ -2,6 +2,7 @@
 #include "../graficzny/menu_start.h"
 #include "../include/printf/types.h"
 #include "../include/printf/vga.h"
+#include "../graficzny/rysowanie.h"
 
 #define MOUSE_DATA_PORT 0x60
 #define MOUSE_STATUS_PORT 0x64
@@ -49,7 +50,7 @@ void mouse_init(void) {
     mouse_wait_output();
     response = mouse_inb(MOUSE_DATA_PORT);
     (void)response;
-    vga_mouse_cursor_init();
+    kursor_graficzny_init();
 }
 
 void mouse_poll(void) {
@@ -92,12 +93,12 @@ void mouse_poll(void) {
 
     accumulated_x += delta_x;
     accumulated_y += delta_y;
-    delta_x = accumulated_x / 8;
-    delta_y = accumulated_y / 16;
-    accumulated_x %= 8;
-    accumulated_y %= 16;
+    delta_x = accumulated_x / 2;
+    delta_y = accumulated_y / 2;
+    accumulated_x %= 2;
+    accumulated_y %= 2;
 
     if (delta_x != 0 || delta_y != 0) {
-        vga_mouse_cursor_move(delta_x, -delta_y);
+        kursor_graficzny_przesun(delta_x, -delta_y);
     }
 }

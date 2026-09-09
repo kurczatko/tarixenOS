@@ -46,6 +46,9 @@ boot_start:
     mov sp, 0x7C00
     mov [boot_drive], dl
 
+    mov ax, 0x0012
+    int 0x10
+
     mov dl, [boot_drive]
     mov si, disk_address_packet
     mov ah, 0x42
