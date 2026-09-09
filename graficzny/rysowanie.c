@@ -76,31 +76,17 @@ static void odswiez_fragment_z_bufora(int x, int y, int szerokosc, int wysokosc)
     ustaw_kontroler_grafiki(1, 0);
     ustaw_kontroler_grafiki(8, 0xFF);
     for (uint8_t plane = 0; plane < 4; plane++) {
-        ustaw_kontroler_grafiki(4, plane);
         wybierz_plane(plane);
         for (int wiersz = 0; wiersz < wysokosc; wiersz++) {
             for (int bajt = pierwszy_bajt; bajt <= ostatni_bajt; bajt++) {
-                uint8_t maska = 0;
-                uint8_t wartosc;
+                uint8_t wartosc = 0;
                 int pierwszy_piksel = bajt * 8;
                 for (int bit = 0; bit < 8; bit++) {
                     int piksel_x = pierwszy_piksel + bit;
-                    if (piksel_x >= x && piksel_x < x + szerokosc) {
-                        maska |= (uint8_t)(0x80 >> bit);
-                    }
-                }
-                uint32_t adres = (uint32_t)(y + wiersz) * 80 + bajt;
-                wartosc = PAMIEC_GRAFICZNA[adres];
-                for (int bit = 0; bit < 8; bit++) {
-                    int piksel_x = pierwszy_piksel + bit;
-                    if (piksel_x >= x && piksel_x < x + szerokosc &&
-                        (obraz[(y + wiersz) * EKRAN_SZEROKOSC + piksel_x] & (1 << plane))) {
+                    if (obraz[(y + wiersz) * EKRAN_SZEROKOSC + piksel_x] & (1 << plane))
                         wartosc |= (uint8_t)(0x80 >> bit);
-                    } else if (piksel_x >= x && piksel_x < x + szerokosc) {
-                        wartosc &= (uint8_t)~(0x80 >> bit);
-                    }
                 }
-                PAMIEC_GRAFICZNA[adres] = (PAMIEC_GRAFICZNA[adres] & (uint8_t)~maska) | (wartosc & maska);
+                PAMIEC_GRAFICZNA[(uint32_t)(y + wiersz) * 80 + bajt] = wartosc;
             }
         }
     }
