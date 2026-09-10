@@ -109,7 +109,6 @@ void rysuj_prostokat(int x, int y, int szerokosc, int wysokosc, uint8_t kolor)
     for (int pion = 0; pion < wysokosc; pion++)
         for (int poziom = 0; poziom < szerokosc; poziom++)
             rysuj_piksel(x + poziom, y + pion, kolor);
-    odswiez_ekran();
 }
 
 void rysuj_kwadrat(int x, int y, int bok, uint8_t kolor)
