@@ -17,5 +17,6 @@ void kursor_graficzny_init(void);
 void kursor_graficzny_przesun(int delta_x, int delta_y);
 void kursor_graficzny_pozycja(int *x, int *y);
 void odswiez_widok(void);
+void ustaw_kolor_tapety(uint8_t kolor);
 
 #endif

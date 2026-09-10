@@ -95,6 +95,7 @@ void mouse_poll(void) {
     }
     if (!(packet[0] & 1)) {
         left_button_pressed = 0;
+        okno_zakoncz_przeciaganie();
     }
 
     delta_x = (int)packet[1];
@@ -111,5 +112,11 @@ void mouse_poll(void) {
 
     if (delta_x != 0 || delta_y != 0) {
         kursor_graficzny_przesun(delta_x, -delta_y);
+        {
+            int x;
+            int y;
+            mouse_pozycja(&x, &y);
+            if (left_button_pressed) okno_obsluz_ruch(x, y);
+        }
     }
 }

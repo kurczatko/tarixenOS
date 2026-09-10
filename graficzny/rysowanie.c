@@ -13,6 +13,7 @@
 static int kursor_x;
 static int kursor_y;
 static uint8_t obraz[EKRAN_SZEROKOSC * EKRAN_WYSOKOSC];
+static uint8_t kolor_tapety = KOLOR_TLA;
 
 static void wybierz_plane(uint8_t numer);
 
@@ -150,7 +151,17 @@ void narysuj_pasek_zadan(void)
 
 void wypelnij_ekran(uint8_t kolor)
 {
+    kolor_tapety = kolor;
     wypelnij_obraz_planami(kolor);
+}
+
+void ustaw_kolor_tapety(uint8_t kolor)
+{
+    kolor_tapety = kolor & 0x0F;
+    for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++)
+        for (int x = 0; x < EKRAN_SZEROKOSC; x++)
+            obraz[y * EKRAN_SZEROKOSC + x] = kolor_tapety;
+    odswiez_ekran();
 }
 
 static void przywroc_tlo_kursora(void)

@@ -8,6 +8,9 @@
 #define KOLOR_X 4
 
 static struct okno *aktywne_okno;
+static uint8_t przeciaganie;
+static int przesuniecie_x;
+static int przesuniecie_y;
 
 void okno_ustaw_aktywne(struct okno *okno)
 {
@@ -23,9 +26,15 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->wysokosc = wysokosc;
     okno->tytul = tytul;
     okno->rysuj_zawartosc = rysuj_zawartosc;
+    okno->obsluz_klik = 0;
     okno->otwarte = 1;
     aktywne_okno = okno;
     okno_narysuj(okno);
+}
+
+void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_klik)
+{
+    if (okno) okno->obsluz_klik = obsluz_klik;
 }
 
 void okno_narysuj(struct okno *okno)
@@ -58,4 +67,36 @@ void okno_obsluz_klikniecie(int x, int y)
         x < aktywne_okno->x + aktywne_okno->szerokosc - 6 &&
         y >= aktywne_okno->y + 4 && y < aktywne_okno->y + 20)
         okno_zamknij(aktywne_okno);
+    else if (x >= aktywne_okno->x + 2 && x < aktywne_okno->x + aktywne_okno->szerokosc - 22 &&
+             y >= aktywne_okno->y + 2 && y < aktywne_okno->y + 22) {
+        przeciaganie = 1;
+        przesuniecie_x = x - aktywne_okno->x;
+        przesuniecie_y = y - aktywne_okno->y;
+    } else if (aktywne_okno->obsluz_klik) {
+        aktywne_okno->obsluz_klik(x - aktywne_okno->x, y - aktywne_okno->y);
+    }
+}
+
+void okno_obsluz_ruch(int x, int y)
+{
+    int stare_x;
+    int stare_y;
+    if (!przeciaganie || !aktywne_okno || !aktywne_okno->otwarte) return;
+    stare_x = aktywne_okno->x;
+    stare_y = aktywne_okno->y;
+    aktywne_okno->x = x - przesuniecie_x;
+    aktywne_okno->y = y - przesuniecie_y;
+    if (aktywne_okno->x < 0) aktywne_okno->x = 0;
+    if (aktywne_okno->y < 0) aktywne_okno->y = 0;
+    if (aktywne_okno->x + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
+        aktywne_okno->x = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
+    if (aktywne_okno->y + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
+        aktywne_okno->y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
+    rysuj_prostokat(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc, 1);
+    okno_narysuj(aktywne_okno);
+}
+
+void okno_zakoncz_przeciaganie(void)
+{
+    przeciaganie = 0;
 }
