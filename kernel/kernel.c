@@ -8,10 +8,12 @@
 #include "../drivers/mouse.h"
 #include "../system_plikow/system_plikow.h"
 #include "../graficzny/rysowanie.h"
+#include "../graficzny/menu_start.h"
 
-void kernel_main(void)
+void __attribute__((section(".text.entry"))) kernel_main(void)
 {
     rysowanie_init();
+    menu_start();
     mouse_init();
     keyboard_init();
     while(1) {

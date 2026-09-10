@@ -1,80 +1,63 @@
 #include "menu_start.h"
-#include "../include/blue.h"
-#include "../include/printf/types.h"
-#include "../include/printf/vga.h"
+#include "czcionka.h"
+#include "rysowanie.h"
+#include "../drivers/mouse.h"
 #include "../kernel/shutdown.h"
 
-static uint8_t menu_open = 0;
-static uint16_t saved_screen[2000];
-static int saved_cursor_x;
-static int saved_cursor_y;
+#define START_X 8
+#define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 2)
+#define START_SZEROKOSC 72
+#define START_WYSOKOSC 16
+#define MENU_X 8
+#define MENU_Y 300
+#define MENU_SZEROKOSC 104
+#define MENU_WYSOKOSC 144
 
-void menu_start() {
-	uint16_t* vga_buffer = (uint16_t*)0xB8000;
-	uint16_t blue_entry = (uint16_t)' ' | (uint16_t)0x17 << 8;
-	uint8_t column;
+static uint8_t menu_otwarte;
 
-	vga_mouse_cursor_hide();
-	vga_draw_top_bar();
-	for (column = 0; column < 6; column++) {
-		vga_buffer[column] = blue_entry;
-	}
-	vga_buffer[1] = (uint16_t)'s' | (uint16_t)0x17 << 8;
-	vga_buffer[2] = (uint16_t)'t' | (uint16_t)0x17 << 8;
-	vga_buffer[3] = (uint16_t)'a' | (uint16_t)0x17 << 8;
-	vga_buffer[4] = (uint16_t)'r' | (uint16_t)0x17 << 8;
-	vga_buffer[5] = (uint16_t)'t' | (uint16_t)0x17 << 8;
-	vga_mouse_cursor_move(0, 0);
+void menu_start(void)
+{
+    menu_otwarte = 0;
+    rysuj_prostokat(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC, 7);
+    rysuj_tekst_8x8(START_X + 8, START_Y + 4, "start", 0);
+    odswiez_widok();
 }
 
-void menu_start_click(void) {
-	uint16_t* vga_buffer = (uint16_t*)0xB8000;
-	uint16_t blue_entry = (uint16_t)' ' | (uint16_t)0x17 << 8;
-	uint16_t yellow_entry = (uint16_t)' ' | (uint16_t)0xE0 << 8;
-	int index;
-
-	menu_open = 1;
-	vga_mouse_cursor_hide();
-	vga_text_cursor_position(&saved_cursor_x, &saved_cursor_y);
-	for (index = 0; index < 2000; index++) {
-		saved_screen[index] = vga_buffer[index];
-		vga_buffer[index] = blue_entry;
-	}
-	for (index = 0; index < 6; index++) {
-		vga_buffer[index] = yellow_entry;
-	}
-	vga_buffer[0] = (uint16_t)'w' | (uint16_t)0xE0 << 8;
-	vga_buffer[1] = (uint16_t)'y' | (uint16_t)0xE0 << 8;
-	vga_buffer[2] = (uint16_t)'l' | (uint16_t)0xE0 << 8;
-	vga_buffer[3] = (uint16_t)'.' | (uint16_t)0xE0 << 8;
-	vga_buffer[79] = (uint16_t)'X' | (uint16_t)0x47 << 8;
-	vga_mouse_cursor_move(0, 0);
+static void menu_start_narysuj(void)
+{
+    rysuj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, 15);
+    rysuj_prostokat(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, 3);
+    rysuj_prostokat(MENU_X + 6, MENU_Y + 12, MENU_SZEROKOSC - 12, 28, 7);
+    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 22, "WYLACZ", 0);
+    odswiez_widok();
 }
 
-void menu_start_mouse_click(void) {
-	int mouse_x;
-	int mouse_y;
-	int index;
-	uint16_t* vga_buffer = (uint16_t*)0xB8000;
+static void menu_start_wyczysc(void)
+{
+    rysuj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, 1);
+    odswiez_widok();
+}
 
-	vga_mouse_cursor_position(&mouse_x, &mouse_y);
-	if (menu_open) {
-		if (mouse_x < 6 && mouse_y == 0) {
-			shutdown();
-			return;
-		}
-		if (mouse_x == 79 && mouse_y == 0) {
-			menu_open = 0;
-			vga_mouse_cursor_hide();
-			for (index = 0; index < 2000; index++) {
-				vga_buffer[index] = saved_screen[index];
-			}
-			vga_set_text_cursor_position(saved_cursor_x, saved_cursor_y);
-		}
-		return;
-	}
+void menu_start_mouse_click(void)
+{
+    int x;
+    int y;
 
-	if (mouse_x < 6 && mouse_y == 0) {
-		menu_start_click();
-	}
+    mouse_pozycja(&x, &y);
+    if (!menu_otwarte && x >= START_X && x < START_X + START_SZEROKOSC &&
+        y >= START_Y && y < START_Y + START_WYSOKOSC) {
+        menu_otwarte = 1;
+        menu_start_narysuj();
+        return;
+    }
+    if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+        y >= MENU_Y + 12 && y < MENU_Y + 40) {
+        shutdown();
+        return;
+    }
+    if (menu_otwarte && (x < MENU_X || x >= MENU_X + MENU_SZEROKOSC ||
+                         y < MENU_Y || y >= MENU_Y + MENU_WYSOKOSC)) {
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+    }
 }

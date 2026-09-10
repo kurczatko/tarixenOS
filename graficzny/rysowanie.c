@@ -67,6 +67,11 @@ static void odswiez_ekran(void)
     }
 }
 
+void odswiez_widok(void)
+{
+    odswiez_ekran();
+}
+
 static void odswiez_fragment_z_bufora(int x, int y, int szerokosc, int wysokosc)
 {
     int pierwszy_bajt = x >> 3;
@@ -170,6 +175,12 @@ void kursor_graficzny_przesun(int delta_x, int delta_y)
     if (kursor_x > EKRAN_SZEROKOSC - KURSOR_BOK) kursor_x = EKRAN_SZEROKOSC - KURSOR_BOK;
     if (kursor_y > EKRAN_WYSOKOSC - KURSOR_BOK) kursor_y = EKRAN_WYSOKOSC - KURSOR_BOK;
     rysuj_fragment(kursor_x, kursor_y, KURSOR_BOK, KURSOR_BOK, KOLOR_KURSORA);
+}
+
+void kursor_graficzny_pozycja(int *x, int *y)
+{
+    *x = kursor_x;
+    *y = kursor_y;
 }
 
 void rysowanie_init(void)

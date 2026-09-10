@@ -3,5 +3,6 @@
 
 void mouse_init(void);
 void mouse_poll(void);
+void mouse_pozycja(int *x, int *y);
 
 #endif

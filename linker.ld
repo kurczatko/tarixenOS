@@ -1,13 +1,12 @@
 ENTRY(kernel_main)
 
-PROVIDE(kernel_main = .);
-
 SECTIONS
 {
     . = 0x1000;
 
     .text ALIGN(4) :
     {
+        KEEP(*(.text.entry))
         *(.text)
         *(.text.*)
     }

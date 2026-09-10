@@ -1,8 +1,9 @@
 #include "mouse.h"
-#include "../graficzny/menu_start.h"
 #include "../include/printf/types.h"
 #include "../include/printf/vga.h"
 #include "../graficzny/rysowanie.h"
+#include "../graficzny/okno.h"
+#include "../graficzny/menu_start.h"
 
 #define MOUSE_DATA_PORT 0x60
 #define MOUSE_STATUS_PORT 0x64
@@ -13,6 +14,10 @@ static uint8_t packet_index = 0;
 static int accumulated_x = 0;
 static int accumulated_y = 0;
 static uint8_t left_button_pressed = 0;
+
+void mouse_pozycja(int *x, int *y) {
+    kursor_graficzny_pozycja(x, y);
+}
 
 static uint8_t mouse_inb(uint16_t port) {
     uint8_t value;
@@ -80,7 +85,13 @@ void mouse_poll(void) {
 
     if ((packet[0] & 1) && !left_button_pressed) {
         left_button_pressed = 1;
-        menu_start_mouse_click();
+        {
+            int x;
+            int y;
+            mouse_pozycja(&x, &y);
+            okno_obsluz_klikniecie(x, y);
+            menu_start_mouse_click();
+        }
     }
     if (!(packet[0] & 1)) {
         left_button_pressed = 0;
