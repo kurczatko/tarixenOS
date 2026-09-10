@@ -3,6 +3,7 @@
 #include "rysowanie.h"
 #include "../drivers/mouse.h"
 #include "../kernel/shutdown.h"
+#include "../kernel/notatnik.h"
 
 #define START_X 8
 #define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 2)
@@ -28,13 +29,15 @@ static void menu_start_narysuj(void)
     rysuj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, 15);
     rysuj_prostokat(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, 3);
     rysuj_prostokat(MENU_X + 6, MENU_Y + 12, MENU_SZEROKOSC - 12, 28, 7);
-    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 22, "WYLACZ", 0);
+    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 22, "NOTATNIK", 0);
+    rysuj_prostokat(MENU_X + 6, MENU_Y + 48, MENU_SZEROKOSC - 12, 28, 7);
+    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 58, "WYLACZ", 0);
     odswiez_widok();
 }
 
 static void menu_start_wyczysc(void)
 {
-    rysuj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, 1);
+    odtworz_fragment_tla(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
     odswiez_widok();
 }
 
@@ -52,6 +55,13 @@ void menu_start_mouse_click(void)
     }
     if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
         y >= MENU_Y + 12 && y < MENU_Y + 40) {
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+        notatnik_otworz();
+        return;
+    }
+    if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+        y >= MENU_Y + 48 && y < MENU_Y + 76) {
         shutdown();
         return;
     }

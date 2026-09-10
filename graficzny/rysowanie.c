@@ -98,6 +98,35 @@ static void odswiez_fragment_z_bufora(int x, int y, int szerokosc, int wysokosc)
     }
 }
 
+void odtworz_fragment_tla(int x, int y, int szerokosc, int wysokosc)
+{
+    int dolny_y;
+    int gorny_x;
+    int dolny_x;
+
+    if (x < 0) {
+        szerokosc += x;
+        x = 0;
+    }
+    if (y < 0) {
+        wysokosc += y;
+        y = 0;
+    }
+    if (x + szerokosc > EKRAN_SZEROKOSC) szerokosc = EKRAN_SZEROKOSC - x;
+    if (y + wysokosc > EKRAN_WYSOKOSC) wysokosc = EKRAN_WYSOKOSC - y;
+    if (szerokosc > 0 && wysokosc > 0) {
+        dolny_y = y + wysokosc;
+        gorny_x = x;
+        dolny_x = x + szerokosc;
+        for (int piksel_y = y; piksel_y < dolny_y; piksel_y++)
+            for (int piksel_x = gorny_x; piksel_x < dolny_x; piksel_x++)
+                obraz[piksel_y * EKRAN_SZEROKOSC + piksel_x] =
+                    piksel_y >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC ?
+                    KOLOR_PASKA_ZADAN : kolor_tapety;
+        odswiez_fragment_z_bufora(x, y, szerokosc, wysokosc);
+    }
+}
+
 void rysuj_piksel(int x, int y, uint8_t kolor)
 {
     if (x < 0 || x >= EKRAN_SZEROKOSC || y < 0 || y >= EKRAN_WYSOKOSC) return;

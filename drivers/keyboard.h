@@ -14,6 +14,7 @@
 
 // funkcje klawiaturowe
 void keyboard_init(void);
+uint8_t keyboard_dane_dostepne(void);
 char keyboard_getchar(void);
 uint8_t keyboard_scancode_to_char(uint8_t scancode);
 

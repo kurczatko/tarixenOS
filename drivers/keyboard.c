@@ -15,6 +15,10 @@ void keyboard_init(void) {
     while (inb(0x64) & 2);
 }
 
+uint8_t keyboard_dane_dostepne(void) {
+    return (inb(KEYBOARD_STATUS_PORT) & 1) && !(inb(KEYBOARD_STATUS_PORT) & 0x20);
+}
+
 char keyboard_getchar(void) {
     uint8_t scancode;
     while (1) {

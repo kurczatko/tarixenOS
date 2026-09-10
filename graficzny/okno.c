@@ -55,7 +55,7 @@ void okno_zamknij(struct okno *okno)
 {
     if (!okno || !okno->otwarte) return;
     okno->otwarte = 0;
-    rysuj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc, 1);
+    odtworz_fragment_tla(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
     odswiez_widok();
     if (aktywne_okno == okno) aktywne_okno = 0;
 }
@@ -92,7 +92,7 @@ void okno_obsluz_ruch(int x, int y)
         aktywne_okno->x = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
     if (aktywne_okno->y + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
         aktywne_okno->y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
-    rysuj_prostokat(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc, 1);
+    odtworz_fragment_tla(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
     okno_narysuj(aktywne_okno);
 }
 
