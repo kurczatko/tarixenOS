@@ -4,6 +4,7 @@
 #include "../drivers/mouse.h"
 #include "../kernel/shutdown.h"
 #include "../kernel/notatnik.h"
+#include "eksplorator_plikow.h"
 
 #define START_X 8
 #define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 2)
@@ -32,6 +33,8 @@ static void menu_start_narysuj(void)
     rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 22, "NOTATNIK", 0);
     rysuj_prostokat(MENU_X + 6, MENU_Y + 48, MENU_SZEROKOSC - 12, 28, 7);
     rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 58, "WYLACZ", 0);
+    rysuj_prostokat(MENU_X + 6, MENU_Y + 84, MENU_SZEROKOSC - 12, 28, 7);
+    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 94, "PLIKI", 0);
     odswiez_widok();
 }
 
@@ -65,6 +68,10 @@ void menu_start_mouse_click(void)
         shutdown();
         return;
     }
+    if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+        y >= MENU_Y + 84 && y < MENU_Y + 112) {
+            eksplorator_plikow();
+        }
     if (menu_otwarte && (x < MENU_X || x >= MENU_X + MENU_SZEROKOSC ||
                          y < MENU_Y || y >= MENU_Y + MENU_WYSOKOSC)) {
         menu_otwarte = 0;

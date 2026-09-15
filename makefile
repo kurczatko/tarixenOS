@@ -1,12 +1,11 @@
 BUILD_DIR := build
 ISO_DIR := $(BUILD_DIR)/iso
 
-# BIOS32
 BOOT_BIN32 := $(BUILD_DIR)/boot.bin
 KERNEL_ELF32 := $(BUILD_DIR)/kernel32.elf
 KERNEL_BIN32 := $(BUILD_DIR)/kernel32.bin
 OS_IMAGE := $(BUILD_DIR)/tarixenOS.img
-KERNEL_MAX_SECTORS := 64
+KERNEL_MAX_SECTORS := 512
 FLOPPY_SIZE := 67108864
 
 UEFI_BIN := $(BUILD_DIR)/uefi64.bin
@@ -85,8 +84,8 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
 	dd if=$(BOOT_BIN32) of=$@ bs=1 count=3 conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 skip=90 seek=90 count=420 conv=notrunc status=none
 	@kernel_size=$$(stat -c %s $(KERNEL_BIN32)); \
-	if [ $$kernel_size -gt $$((32 * 512)) ]; then \
-		echo "Kernel jest za duzy dla pojedynczego odczytu BIOS: $$kernel_size bajtow"; exit 1; \
+	if [ $$kernel_size -gt $$((512 * 512)) ]; then \
+		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
 	fi
 	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=192 conv=notrunc status=none
 	@if [ -f $(UEFI_BIN) ]; then \
@@ -109,4 +108,3 @@ $(ISO_IMAGE): $(UEFI_BIN) $(KERNEL_ELF64) | $(ISO_DIR)
 
 clean:
 	rm -rf $(BUILD_DIR)
-

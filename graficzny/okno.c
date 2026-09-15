@@ -11,6 +11,57 @@ static struct okno *aktywne_okno;
 static uint8_t przeciaganie;
 static int przesuniecie_x;
 static int przesuniecie_y;
+static int ramka_x;
+static int ramka_y;
+static uint8_t ramka_widoczna;
+
+static void narysuj_przerywana_ramke(int x, int y, int szerokosc, int wysokosc)
+{
+    int i;
+    for (i = 0; i < szerokosc; i++) {
+        if ((i / 4) % 2 == 0) {
+            rysuj_piksel(x + i, y, 0);
+            rysuj_piksel(x + i, y + wysokosc - 1, 0);
+        } else {
+            rysuj_piksel(x + i, y, 15);
+            rysuj_piksel(x + i, y + wysokosc - 1, 15);
+        }
+    }
+    for (i = 0; i < wysokosc; i++) {
+        if ((i / 4) % 2 == 0) {
+            rysuj_piksel(x, y + i, 0);
+            rysuj_piksel(x + szerokosc - 1, y + i, 0);
+        } else {
+            rysuj_piksel(x, y + i, 15);
+            rysuj_piksel(x + szerokosc - 1, y + i, 15);
+        }
+    }
+    odswiez_widok();
+}
+
+static void zmaz_przerywana_ramke(int x, int y, int szerokosc, int wysokosc)
+{
+    int ox;
+    int oy;
+    int ow;
+    int oh;
+
+    odtworz_fragment_tla(x, y, szerokosc, 1);
+    odtworz_fragment_tla(x, y + wysokosc - 1, szerokosc, 1);
+    odtworz_fragment_tla(x, y, 1, wysokosc);
+    odtworz_fragment_tla(x + szerokosc - 1, y, 1, wysokosc);
+
+    if (aktywne_okno && aktywne_okno->otwarte) {
+        ox = aktywne_okno->x;
+        oy = aktywne_okno->y;
+        ow = aktywne_okno->szerokosc;
+        oh = aktywne_okno->wysokosc;
+
+        if (x < ox + ow && x + szerokosc > ox && y < oy + oh && y + wysokosc > oy) {
+            okno_narysuj(aktywne_okno);
+        }
+    }
+}
 
 void okno_ustaw_aktywne(struct okno *okno)
 {
@@ -54,6 +105,9 @@ void okno_narysuj(struct okno *okno)
 void okno_zamknij(struct okno *okno)
 {
     if (!okno || !okno->otwarte) return;
+    if (przeciaganie && aktywne_okno == okno) {
+        okno_zakoncz_przeciaganie();
+    }
     okno->otwarte = 0;
     odtworz_fragment_tla(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
     odswiez_widok();
@@ -72,6 +126,10 @@ void okno_obsluz_klikniecie(int x, int y)
         przeciaganie = 1;
         przesuniecie_x = x - aktywne_okno->x;
         przesuniecie_y = y - aktywne_okno->y;
+        ramka_x = aktywne_okno->x;
+        ramka_y = aktywne_okno->y;
+        ramka_widoczna = 1;
+        narysuj_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
     } else if (aktywne_okno->obsluz_klik) {
         aktywne_okno->obsluz_klik(x - aktywne_okno->x, y - aktywne_okno->y);
     }
@@ -79,24 +137,56 @@ void okno_obsluz_klikniecie(int x, int y)
 
 void okno_obsluz_ruch(int x, int y)
 {
-    int stare_x;
-    int stare_y;
+    int nx;
+    int ny;
     if (!przeciaganie || !aktywne_okno || !aktywne_okno->otwarte) return;
-    stare_x = aktywne_okno->x;
-    stare_y = aktywne_okno->y;
-    aktywne_okno->x = x - przesuniecie_x;
-    aktywne_okno->y = y - przesuniecie_y;
-    if (aktywne_okno->x < 0) aktywne_okno->x = 0;
-    if (aktywne_okno->y < 0) aktywne_okno->y = 0;
-    if (aktywne_okno->x + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
-        aktywne_okno->x = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
-    if (aktywne_okno->y + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
-        aktywne_okno->y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
-    odtworz_fragment_tla(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
-    okno_narysuj(aktywne_okno);
+
+    nx = x - przesuniecie_x;
+    ny = y - przesuniecie_y;
+
+    if (nx < 0) nx = 0;
+    if (ny < 0) ny = 0;
+    if (nx + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
+        nx = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
+    if (ny + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
+        ny = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
+
+    if (nx == ramka_x && ny == ramka_y) return;
+
+    if (ramka_widoczna) {
+        zmaz_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+    }
+
+    ramka_x = nx;
+    ramka_y = ny;
+    ramka_widoczna = 1;
+
+    narysuj_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
 }
 
 void okno_zakoncz_przeciaganie(void)
 {
+    int stare_x;
+    int stare_y;
+
+    if (!przeciaganie) return;
+
     przeciaganie = 0;
+
+    if (ramka_widoczna) {
+        zmaz_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+        ramka_widoczna = 0;
+    }
+
+    if (!aktywne_okno || !aktywne_okno->otwarte) return;
+
+    stare_x = aktywne_okno->x;
+    stare_y = aktywne_okno->y;
+
+    if (stare_x != ramka_x || stare_y != ramka_y) {
+        odtworz_fragment_tla(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+        aktywne_okno->x = ramka_x;
+        aktywne_okno->y = ramka_y;
+        okno_narysuj(aktywne_okno);
+    }
 }
