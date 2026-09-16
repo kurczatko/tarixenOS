@@ -2,10 +2,10 @@
 #include "czcionka.h"
 #include "rysowanie.h"
 
-#define KOLOR_RAMKI 15
-#define KOLOR_PASKA 7
-#define KOLOR_OKNA 3
-#define KOLOR_X 4
+#define KOLOR_RAMKI 0x00787C82
+#define KOLOR_PASKA 0x00787C82
+#define KOLOR_OKNA  0x00FFFFFF
+#define KOLOR_X     0x00E74C3C
 
 static struct okno *aktywne_okno;
 static uint8_t przeciaganie;
@@ -20,20 +20,20 @@ static void narysuj_przerywana_ramke(int x, int y, int szerokosc, int wysokosc)
     int i;
     for (i = 0; i < szerokosc; i++) {
         if ((i / 4) % 2 == 0) {
-            rysuj_piksel(x + i, y, 0);
-            rysuj_piksel(x + i, y + wysokosc - 1, 0);
+            rysuj_piksel(x + i, y, 0x00000000);
+            rysuj_piksel(x + i, y + wysokosc - 1, 0x00000000);
         } else {
-            rysuj_piksel(x + i, y, 15);
-            rysuj_piksel(x + i, y + wysokosc - 1, 15);
+            rysuj_piksel(x + i, y, 0x00FFFFFF);
+            rysuj_piksel(x + i, y + wysokosc - 1, 0x00FFFFFF);
         }
     }
     for (i = 0; i < wysokosc; i++) {
         if ((i / 4) % 2 == 0) {
-            rysuj_piksel(x, y + i, 0);
-            rysuj_piksel(x + szerokosc - 1, y + i, 0);
+            rysuj_piksel(x, y + i, 0x00000000);
+            rysuj_piksel(x + szerokosc - 1, y + i, 0x00000000);
         } else {
-            rysuj_piksel(x, y + i, 15);
-            rysuj_piksel(x + szerokosc - 1, y + i, 15);
+            rysuj_piksel(x, y + i, 0x00FFFFFF);
+            rysuj_piksel(x + szerokosc - 1, y + i, 0x00FFFFFF);
         }
     }
     odswiez_widok();
@@ -94,9 +94,9 @@ void okno_narysuj(struct okno *okno)
     rysuj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI);
     rysuj_prostokat(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20, KOLOR_PASKA);
     rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
-    rysuj_tekst_8x8(okno->x + 8, okno->y + 8, okno->tytul, 0);
+    rysuj_tekst_8x8(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
     rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
-    rysuj_znak_8x8(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 15);
+    rysuj_znak_8x8(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
     if (okno->rysuj_zawartosc)
         okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
     odswiez_widok();

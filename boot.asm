@@ -6,6 +6,7 @@ KERNEL_LOAD_OFFSET  equ 0x1000
 KERNEL_SECTORS      equ 512
 CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
+VBE_INFO_BUFFER     equ 0x7E00
 
     jmp short boot_start
     nop
@@ -45,7 +46,13 @@ boot_start:
     mov sp, 0x7C00
     mov [boot_drive], dl
 
-    mov ax, 0x0012
+    mov ax, 0x4F01
+    mov cx, 0x0144
+    mov di, VBE_INFO_BUFFER
+    int 0x10
+
+    mov ax, 0x4F02
+    mov bx, 0x4144
     int 0x10
 
     mov cx, KERNEL_SECTORS / 32
@@ -112,12 +119,12 @@ protected_mode:
     mov esp, 0x8F000
 
     mov esi, reloc_code
-    mov edi, 0x8F000
+    mov edi, 0x90000
     mov ecx, reloc_code_end - reloc_code
     cld
     rep movsb
 
-    jmp 0x8F000
+    jmp 0x90000
 
 reloc_code:
     mov esi, 0x10000

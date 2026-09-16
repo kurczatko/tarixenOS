@@ -18,7 +18,10 @@ static struct okno okno_tapeta;
 
 static void obsluz_wybor_tapety(int x, int y)
 {
-    static const uint8_t kolory[] = {1, 2, 4, 5, 9, 10, 12, 14};
+    static const uint32_t kolory[] = {
+        0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
+        0x003B82F6, 0x0010B981, 0x00EF4444, 0x00FBBF24
+    };
     int kolumna;
     int wiersz;
     if (x < 16 || x >= 144 || y < 48 || y >= 112) return;
@@ -30,10 +33,13 @@ static void obsluz_wybor_tapety(int x, int y)
 
 static void rysuj_wybor_tapety(int x, int y, int szerokosc, int wysokosc)
 {
-    static const uint8_t kolory[] = {1, 2, 4, 5, 9, 10, 12, 14};
+    static const uint32_t kolory[] = {
+        0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
+        0x003B82F6, 0x0010B981, 0x00EF4444, 0x00FBBF24
+    };
     (void)szerokosc;
     (void)wysokosc;
-    rysuj_tekst_8x8(x, y, "WYBIERZ TAPETE", 15);
+    rysuj_tekst_8x8(x, y, "WYBIERZ TAPETE", 0x00000000);
     for (int indeks = 0; indeks < 8; indeks++)
         rysuj_prostokat(x + 8 + (indeks % 4) * 32, y + 18 + (indeks / 4) * 32, 24, 24, kolory[indeks]);
 }

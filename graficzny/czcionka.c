@@ -67,7 +67,7 @@ const uint8_t font_8x8[128][8] = {
     [' '] = {0, 0, 0, 0, 0, 0, 0, 0},
 };
 
-void rysuj_znak_8x8(int x, int y, char znak, uint8_t kolor)
+void rysuj_znak_8x8(int x, int y, char znak, uint32_t kolor)
 {
     const uint8_t *wiersze = font_8x8[(uint8_t)znak];
     for (int pion = 0; pion < 8; pion++)
@@ -75,7 +75,7 @@ void rysuj_znak_8x8(int x, int y, char znak, uint8_t kolor)
             if (wiersze[pion] & (0x80 >> poziom)) rysuj_piksel(x + poziom, y + pion, kolor);
 }
 
-void rysuj_tekst_8x8(int x, int y, const char *tekst, uint8_t kolor)
+void rysuj_tekst_8x8(int x, int y, const char *tekst, uint32_t kolor)
 {
     while (*tekst) {
         rysuj_znak_8x8(x, y, *tekst++, kolor);

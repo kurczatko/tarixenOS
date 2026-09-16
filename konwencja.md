@@ -20,7 +20,7 @@ cd build
 
 a nastepnie komenda:
 
-qemu-system-x86_64 -hda tarixenOS.img
+qemu-system-x86_64 -m 2G -boot c -drive file=tarixenOS.img,format=raw -machine pc -display sdl
 
 uwaga musisz mieć qemu!
 

@@ -12,6 +12,10 @@
 #define NOTATNIK_PRZYCISK_Y 300
 #define NOTATNIK_PRZYCISK_OKNA_Y 330
 
+#define KOLOR_TEKST_NOTATKI   0x00334155
+#define KOLOR_PRZYCISKU       0x004A5D6E
+#define KOLOR_TEKST_PRZYCISKU 0x00FFFFFF
+
 static struct okno okno_notatnik;
 static uint8_t notatnik_otwarty;
 static char notatka[NOTATNIK_MAKS + 1];
@@ -41,14 +45,14 @@ static void notatnik_narysuj(int x, int y, int szerokosc, int wysokosc)
             kolumna = 0;
             if (notatka[indeks] == '\n') continue;
         }
-        rysuj_znak_8x8(x + kolumna * 8, y + linia * 8, notatka[indeks], 15);
+        rysuj_znak_8x8(x + kolumna * 8, y + linia * 8, notatka[indeks], KOLOR_TEKST_NOTATKI);
         kolumna++;
     }
-    rysuj_prostokat(x, y + NOTATNIK_PRZYCISK_Y, 88, 24, 7);
-    rysuj_tekst_8x8(x + 8, y + NOTATNIK_PRZYCISK_Y + 8, "ODCZYTAJ", 0);
-    rysuj_prostokat(x + 104, y + NOTATNIK_PRZYCISK_Y, 56, 24, 7);
-    rysuj_tekst_8x8(x + 112, y + NOTATNIK_PRZYCISK_Y + 8, "ZAPISZ", 0);
-    rysuj_tekst_8x8(x + 176, y + NOTATNIK_PRZYCISK_Y + 8, notatnik_status, 15);
+    rysuj_prostokat(x, y + NOTATNIK_PRZYCISK_Y, 88, 24, KOLOR_PRZYCISKU);
+    rysuj_tekst_8x8(x + 8, y + NOTATNIK_PRZYCISK_Y + 8, "ODCZYTAJ", KOLOR_TEKST_PRZYCISKU);
+    rysuj_prostokat(x + 104, y + NOTATNIK_PRZYCISK_Y, 56, 24, KOLOR_PRZYCISKU);
+    rysuj_tekst_8x8(x + 112, y + NOTATNIK_PRZYCISK_Y + 8, "ZAPISZ", KOLOR_TEKST_PRZYCISKU);
+    rysuj_tekst_8x8(x + 176, y + NOTATNIK_PRZYCISK_Y + 8, notatnik_status, KOLOR_TEKST_PRZYCISKU);
 }
 
 static void notatnik_odczytaj(void)
