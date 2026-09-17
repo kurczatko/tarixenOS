@@ -7,7 +7,7 @@
 #define KOLOR_OKNA  0x00FFFFFF
 #define KOLOR_X     0x00E74C3C
 
-static struct okno *aktywne_okno;
+struct okno *aktywne_okno;
 static uint8_t przeciaganie;
 static int przesuniecie_x;
 static int przesuniecie_y;
@@ -168,6 +168,9 @@ void okno_zakoncz_przeciaganie(void)
 {
     int stare_x;
     int stare_y;
+    int szerokosc_napisu;
+    int tekst_x;
+    int tekst_y;
 
     if (!przeciaganie) return;
 
@@ -185,6 +188,16 @@ void okno_zakoncz_przeciaganie(void)
 
     if (stare_x != ramka_x || stare_y != ramka_y) {
         odtworz_fragment_tla(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+        
+        szerokosc_napisu = 27 * 8;
+        tekst_x = EKRAN_SZEROKOSC - szerokosc_napisu - 16;
+        tekst_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16;
+        
+        if (stare_x < tekst_x + szerokosc_napisu && stare_x + aktywne_okno->szerokosc > tekst_x &&
+            stare_y < tekst_y + 8 && stare_y + aktywne_okno->wysokosc > tekst_y) {
+            rysuj_tekst_8x8(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", 0x00FFFFFF);
+        }
+
         aktywne_okno->x = ramka_x;
         aktywne_okno->y = ramka_y;
         okno_narysuj(aktywne_okno);

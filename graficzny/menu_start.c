@@ -1,6 +1,7 @@
 #include "menu_start.h"
 #include "czcionka.h"
 #include "rysowanie.h"
+#include "okno.h"
 #include "../drivers/mouse.h"
 #include "../kernel/shutdown.h"
 #include "../kernel/notatnik.h"
@@ -23,6 +24,8 @@
 
 static uint8_t menu_otwarte;
 
+extern struct okno *aktywne_okno;
+
 void menu_start(void)
 {
     menu_otwarte = 0;
@@ -33,17 +36,86 @@ void menu_start(void)
 
 static void menu_start_narysuj(void)
 {
+    static const uint8_t ikona_wylaczania[12][12] = {
+        {0,0,0,0,0,1,1,0,0,0,0,0},
+        {0,0,1,1,1,1,1,1,1,1,0,0},
+        {0,1,0,0,0,1,1,0,0,0,1,0},
+        {1,0,0,0,0,1,1,0,0,0,0,1},
+        {1,0,0,0,0,1,1,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,1},
+        {1,0,0,0,0,0,0,0,0,0,0,1},
+        {0,1,0,0,0,0,0,0,0,0,1,0},
+        {0,0,1,0,0,0,0,0,0,1,0,0},
+        {0,0,0,1,1,1,1,1,1,0,0,0}
+    };
+
+    static const uint8_t ikona_notatnika[12][12] = {
+        {0,0,0,0,0,0,0,0,0,0,0,1},
+        {0,0,0,0,0,0,0,0,0,0,1,1},
+        {0,0,0,0,0,0,0,0,0,1,1,0},
+        {0,0,0,0,0,0,0,0,1,1,0,0},
+        {0,0,0,0,0,0,0,1,1,0,0,0},
+        {0,0,0,0,0,0,1,1,0,0,0,0},
+        {0,0,0,0,0,1,1,0,0,0,0,0},
+        {0,0,0,0,1,1,0,0,0,0,0,0},
+        {0,0,0,1,1,0,0,0,0,0,0,0},
+        {0,0,1,1,0,0,0,0,0,0,0,0},
+        {0,1,1,0,0,0,0,0,0,0,0,0},
+        {1,1,0,0,0,0,0,0,0,0,0,0}
+    };
+
+    static const uint8_t ikona_eksploratora_plikow[12][12] = {
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,1,1,1,1,0,0,0,0,0,0},
+        {0,1,1,1,1,1,1,0,0,0,0,0},
+        {1,1,1,1,1,1,1,1,1,1,1,0},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1}
+    };
+
     rysuj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, KOLOR_RAMKA_MENU);
     rysuj_prostokat(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, KOLOR_TLO_MENU);
     
     rysuj_prostokat(MENU_X + 6, MENU_Y + 12, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 22, "NOTATNIK", KOLOR_TEKST_BIALY);
+    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 22, "NOTATNIK", KOLOR_TEKST_BIALY);
+
+    for (int iy = 0; iy < 12; iy++) {
+        for (int ix = 0; ix < 12; ix++) {
+            if (ikona_notatnika[iy][ix]) {
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 20 + iy, KOLOR_ZOLTY);
+            }
+        }
+    }
     
     rysuj_prostokat(MENU_X + 6, MENU_Y + 48, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 58, "WYLACZ", KOLOR_TEKST_BIALY);
+    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 58, "WYLACZ", KOLOR_TEKST_BIALY);
+    
+    for (int iy = 0; iy < 12; iy++) {
+        for (int ix = 0; ix < 12; ix++) {
+            if (ikona_wylaczania[iy][ix]) {
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 56 + iy, KOLOR_CZERWONY);
+            }
+        }
+    }
     
     rysuj_prostokat(MENU_X + 6, MENU_Y + 84, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 12, MENU_Y + 94, "PLIKI", KOLOR_TEKST_BIALY);
+    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 94, "PLIKI", KOLOR_TEKST_BIALY);
+
+    for (int iy = 0; iy < 12; iy++) {
+        for (int ix = 0; ix < 12; ix++) {
+            if (ikona_eksploratora_plikow[iy][ix]) {
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 92 + iy, KOLOR_ZOLTY);
+            }
+        }
+    }
     
     odswiez_widok();
 }
@@ -51,6 +123,19 @@ static void menu_start_narysuj(void)
 static void menu_start_wyczysc(void)
 {
     odtworz_fragment_tla(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
+    
+    if (aktywne_okno && aktywne_okno->otwarte) {
+        int ox = aktywne_okno->x;
+        int oy = aktywne_okno->y;
+        int ow = aktywne_okno->szerokosc;
+        int oh = aktywne_okno->wysokosc;
+
+        if (MENU_X < ox + ow && MENU_X + MENU_SZEROKOSC > ox &&
+            MENU_Y < oy + oh && MENU_Y + MENU_WYSOKOSC > oy) {
+            okno_narysuj(aktywne_okno);
+        }
+    }
+    
     odswiez_widok();
 }
 

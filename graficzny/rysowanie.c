@@ -1,9 +1,11 @@
 #include "rysowanie.h"
+#include "czcionka.h"
 
 #define CURSOR_W 12
 #define CURSOR_H 18
 #define KOLOR_TLA 0x0098C74C
 #define KOLOR_PASKA_ZADAN 0x002D3E50
+#define KOLOR_TEKST_BIALY 0x00FFFFFF
 
 static uint32_t *pamiec_graficzna = (uint32_t *)0xFD000000;
 
@@ -23,7 +25,7 @@ static const uint8_t kursor_bitmapa[CURSOR_H][CURSOR_W] = {
     {1, 2, 2, 1, 2, 2, 1, 0, 0, 0, 0, 0},
     {1, 2, 1, 1, 2, 2, 1, 0, 0, 0, 0, 0},
     {1, 1, 0, 1, 2, 2, 1, 0, 0, 0, 0, 0},
-    {1, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0},
+    {1, 0, 0, 1, 1, 2, 2, 1, 0, 0, 0, 0},
     {0, 0, 0, 0, 1, 2, 2, 1, 0, 0, 0, 0},
     {0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0}
 };
@@ -62,6 +64,14 @@ static void odswiez_fragment_z_bufora(int x, int y, int szerokosc, int wysokosc)
         uint32_t offset = (uint32_t)(y + wiersz) * EKRAN_SZEROKOSC + (uint32_t)x;
         kopiuj_pamiec(&pamiec_graficzna[offset], &obraz[offset], szerokosc * 4);
     }
+}
+
+static void narysuj_napis_systemowy(void)
+{
+    int szerokosc_napisu = 27 * 8;
+    int tekst_x = EKRAN_SZEROKOSC - szerokosc_napisu - 16;
+    int tekst_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16;
+    rysuj_tekst_8x8(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", KOLOR_TEKST_BIALY);
 }
 
 void odswiez_widok(void)
@@ -155,6 +165,7 @@ void wypelnij_ekran(uint32_t kolor)
     for (uint32_t i = 0; i < EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
         obraz[i] = kolor_tapety;
     }
+    narysuj_napis_systemowy();
     odswiez_widok();
 }
 
@@ -167,6 +178,7 @@ void ustaw_kolor_tapety(uint32_t kolor)
             obraz[offset + x] = kolor_tapety;
         }
     }
+    narysuj_napis_systemowy();
     odswiez_fragment_z_bufora(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
 }
 
@@ -221,6 +233,8 @@ void rysowanie_init(void)
             obraz[offset + x] = KOLOR_PASKA_ZADAN;
         }
     }
+
+    narysuj_napis_systemowy();
 
     odswiez_widok();
     kursor_graficzny_init();
