@@ -39,7 +39,7 @@ static void rysuj_wybor_tapety(int x, int y, int szerokosc, int wysokosc)
     };
     (void)szerokosc;
     (void)wysokosc;
-    rysuj_tekst_8x8(x, y, "WYBIERZ TAPETE", 0x00000000);
+    rysuj_tekst_8x8(x, y, "WYBIERZ TAPETE", 0x00000000); // tworzenie okna z wyborem tapety (nie powinno sie to znalesc w kernelu ale kto mi zabroni)
     for (int indeks = 0; indeks < 8; indeks++)
         rysuj_prostokat(x + 8 + (indeks % 4) * 32, y + 18 + (indeks / 4) * 32, 24, 24, kolory[indeks]);
 }

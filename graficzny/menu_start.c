@@ -28,9 +28,37 @@ extern struct okno *aktywne_okno;
 
 void menu_start(void)
 {
+    static const uint8_t ikona_menu_start[16][16] = { //bitmapa ikony na menu start
+        {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,1,1,1,1,0,0,0,0,0,0},
+        {0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
+        {0,0,0,0,1,1,0,1,1,0,1,1,0,0,0,0},
+        {0,0,0,1,1,0,0,1,1,0,0,1,1,0,0,0},
+        {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0},
+        {0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
+        {0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0},
+        {0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0},
+        {0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0},
+        {0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0},
+        {0,0,1,1,1,1,1,1,1,1,1,1,1,1,0,0},
+        {0,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0},
+        {0,0,0,0,1,1,1,1,1,1,1,1,0,0,0,0},
+        {0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
+        {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0}
+    };
     menu_otwarte = 0;
     rysuj_prostokat(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC, KOLOR_PRZYCISKU_START);
-    rysuj_tekst_8x8(START_X + 16, START_Y + (START_WYSOKOSC / 2) - 4, "start", KOLOR_TEKST_BIALY);
+    
+    for (int iy = 0; iy < 16; iy++) {
+        for (int ix = 0; ix < 16; ix++) {
+            if (ikona_menu_start[iy][ix]) { 
+                rysuj_piksel(START_X + 6 + ix, START_Y + (START_WYSOKOSC / 2) - 8 + iy, KOLOR_ZOLTY); //rysowanie bitmapowej ikony w lewo od przycisku start
+            }
+        }
+    }
+    
+    rysuj_tekst_8x8(START_X + 26, START_Y + (START_WYSOKOSC / 2) - 4, "start", KOLOR_TEKST_BIALY);
+
     odswiez_widok();
 }
 
@@ -90,7 +118,7 @@ static void menu_start_narysuj(void)
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
             if (ikona_notatnika[iy][ix]) {
-                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 20 + iy, KOLOR_ZOLTY);
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 20 + iy, KOLOR_ZOLTY); //rysowanie ikony notatnika obok przycisku wlaczania notatnika
             }
         }
     }
@@ -100,7 +128,7 @@ static void menu_start_narysuj(void)
     
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
-            if (ikona_wylaczania[iy][ix]) {
+            if (ikona_wylaczania[iy][ix]) { // rysowanie ikony wylaczania obok przycisku wylacz
                 rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 56 + iy, KOLOR_CZERWONY);
             }
         }
@@ -111,7 +139,7 @@ static void menu_start_narysuj(void)
 
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
-            if (ikona_eksploratora_plikow[iy][ix]) {
+            if (ikona_eksploratora_plikow[iy][ix]) { // rysowanie ikony eksploratora plikow obok przycisku wlaczania go
                 rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 92 + iy, KOLOR_ZOLTY);
             }
         }
@@ -122,7 +150,7 @@ static void menu_start_narysuj(void)
 
 static void menu_start_wyczysc(void)
 {
-    odtworz_fragment_tla(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
+    odtworz_fragment_tla(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC); // uzylem tej funkcji bo wczesniej przywarcalo samą tapete zamiast tego co było za tym
     
     if (aktywne_okno && aktywne_okno->otwarte) {
         int ox = aktywne_okno->x;
@@ -146,7 +174,7 @@ void menu_start_mouse_click(void)
 
     mouse_pozycja(&x, &y);
     if (!menu_otwarte && x >= START_X && x < START_X + START_SZEROKOSC &&
-        y >= START_Y && y < START_Y + START_WYSOKOSC) {
+        y >= START_Y && y < START_Y + START_WYSOKOSC) { /*BARDZO NUDNE. w skrocie jesli klikniesz na przycisk menu start to sie ono otworzy*/
         menu_otwarte = 1;
         menu_start_narysuj();
         return;
