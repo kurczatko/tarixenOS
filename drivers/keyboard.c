@@ -10,13 +10,58 @@ uint8_t inb(uint16_t port) {
 
 static uint8_t shift_pressed = 0;
 static uint8_t caps_lock = 0;
+static uint8_t extended_scancode = 0;
 
 void keyboard_init(void) {
     while (inb(0x64) & 2);
 }
 
 uint8_t keyboard_dane_dostepne(void) {
-    return (inb(KEYBOARD_STATUS_PORT) & 1) && !(inb(KEYBOARD_STATUS_PORT) & 0x20);
+    uint8_t status = inb(KEYBOARD_STATUS_PORT);
+    return (status & 1) && !(status & 0x20);
+}
+
+uint8_t keyboard_try_getchar(char *character) {
+    uint8_t status = inb(KEYBOARD_STATUS_PORT);
+    uint8_t scancode;
+    char value;
+
+    if (!(status & 1) || (status & 0x20)) return 0;
+    scancode = inb(KEYBOARD_DATA_PORT);
+
+    if (extended_scancode) {
+        extended_scancode = 0;
+        return 0;
+    }
+    if (scancode == 0xE0) {
+        extended_scancode = 1;
+        return 0;
+    }
+    if (scancode == 0x2A || scancode == 0x36) {
+        shift_pressed = 1;
+        return 0;
+    }
+    if (scancode == 0xAA || scancode == 0xB6) {
+        shift_pressed = 0;
+        return 0;
+    }
+    if (scancode == 0x3A) {
+        caps_lock = !caps_lock;
+        return 0;
+    }
+    if (scancode & 0x80) return 0;
+
+    value = (char)keyboard_scancode_to_char(scancode);
+    if (value >= 'a' && value <= 'z' && (shift_pressed != caps_lock))
+        value = value - 'a' + 'A';
+    if (value == 0) return 0;
+    *character = value;
+    return 1;
+}
+
+void keyboard_discard_pending(void) {
+    char ignored;
+    keyboard_try_getchar(&ignored);
 }
 
 char keyboard_getchar(void) {

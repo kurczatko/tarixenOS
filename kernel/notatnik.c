@@ -19,8 +19,19 @@
 static struct okno okno_notatnik;
 static uint8_t notatnik_otwarty;
 static char notatka[NOTATNIK_MAKS + 1];
+static char notatnik_plik[13] = NOTATNIK_PLIK;
 static int notatka_dlugosc;
 static char notatnik_status[32];
+
+static void notatnik_ustaw_plik(const char *nazwa_pliku)
+{
+    int indeks = 0;
+    while (nazwa_pliku[indeks] && indeks < (int)sizeof(notatnik_plik) - 1) {
+        notatnik_plik[indeks] = nazwa_pliku[indeks];
+        indeks++;
+    }
+    notatnik_plik[indeks] = 0;
+}
 
 static void notatnik_ustaw_status(const char *tekst)
 {
@@ -57,7 +68,7 @@ static void notatnik_narysuj(int x, int y, int szerokosc, int wysokosc)
 
 static void notatnik_odczytaj(void)
 {
-    int odczyt = read_file(NOTATNIK_PLIK, notatka, NOTATNIK_MAKS);
+    int odczyt = read_file(notatnik_plik, notatka, NOTATNIK_MAKS);
     if (odczyt < 0) {
         notatka_dlugosc = 0;
         notatka[0] = 0;
@@ -71,9 +82,9 @@ static void notatnik_odczytaj(void)
 
 static void notatnik_zapisz(void)
 {
-    if (write_file(NOTATNIK_PLIK, notatka, notatka_dlugosc) != 0) {
-        if (create_file(NOTATNIK_PLIK, 0) != 0 ||
-            write_file(NOTATNIK_PLIK, notatka, notatka_dlugosc) != 0) {
+    if (write_file(notatnik_plik, notatka, notatka_dlugosc) != 0) {
+        if (create_file(notatnik_plik, 0) != 0 ||
+            write_file(notatnik_plik, notatka, notatka_dlugosc) != 0) {
             notatnik_ustaw_status("blad zapisu");
             return;
         }
@@ -90,9 +101,14 @@ static void notatnik_klik(int x, int y)
     }
 }
 
-void notatnik_otworz(void)
+static void notatnik_otworz_biezacy_plik(void)
 {
-    if (notatnik_otwarty) return;
+    if (notatnik_otwarty && okno_notatnik.otwarte) {
+        notatka_dlugosc = 0;
+        notatnik_odczytaj();
+        okno_narysuj(&okno_notatnik);
+        return;
+    }
     notatnik_otwarty = 1;
     notatka_dlugosc = 0;
     notatka[0] = 0;
@@ -103,6 +119,18 @@ void notatnik_otworz(void)
     okno_ustaw_obsluge_klikniecia(&okno_notatnik, notatnik_klik);
 }
 
+void notatnik_otworz(void)
+{
+    notatnik_ustaw_plik(NOTATNIK_PLIK);
+    notatnik_otworz_biezacy_plik();
+}
+
+void notatnik_otworz_plik(const char *nazwa_pliku)
+{
+    notatnik_ustaw_plik(nazwa_pliku);
+    notatnik_otworz_biezacy_plik();
+}
+
 void notatnik_obsluz_klawiature(void)
 {
     char znak;
@@ -111,8 +139,8 @@ void notatnik_obsluz_klawiature(void)
         notatnik_otwarty = 0;
         return;
     }
-    if (!keyboard_dane_dostepne()) return;
-    znak = keyboard_getchar();
+    if (!okno_czy_aktywne(&okno_notatnik)) return;
+    if (!keyboard_try_getchar(&znak)) return;
     if (znak == '\b') {
         if (notatka_dlugosc > 0) notatka_dlugosc--;
     } else if ((znak == '\n' || znak == '\r') && notatka_dlugosc < NOTATNIK_MAKS) {

@@ -26,7 +26,11 @@ void kursor_graficzny_init(void);
 void kursor_graficzny_przesun(int delta_x, int delta_y);
 void kursor_graficzny_pozycja(int *x, int *y);
 void odswiez_widok(void);
+void odswiez_fragment_widoku(int x, int y, int szerokosc, int wysokosc);
 void odtworz_fragment_tla(int x, int y, int szerokosc, int wysokosc);
+void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc);
 void ustaw_kolor_tapety(uint32_t kolor);
+void ustaw_status_internetu(uint8_t dostepny);
+void ustaw_czas_paska(const char *czas);
 
 #endif

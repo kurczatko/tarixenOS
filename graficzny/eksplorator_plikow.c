@@ -4,138 +4,148 @@
 #include "czcionka.h"
 #include "../system_plikow/system_plikow.h"
 #include "../kernel/apps/installer.h"
-
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
+#include "../kernel/notatnik.h"
+#include "../drivers/keyboard.h"
 
 struct okno pliki;
 static int wybrany_element = -1;
-static char lista_plikow[16][13];
-static int liczba_plikow = 0;
+static struct fs_entry_info lista_plikow[24];
+static int liczba_plikow;
+static uint8_t tryb_tworz;
+static char nazwa_nowego[9];
+static int dlugosc_nazwy;
+static char status_plikow[24];
 
-extern void read_sector(uint32_t sector, char *buffer);
-
-struct fat32_bpb_local {
-    uint8_t jump[3];
-    char oem[8];
-    uint16_t bytes_per_sector;
-    uint8_t sectors_per_cluster;
-    uint16_t reserved_sectors;
-    uint8_t fat_count;
-    uint16_t root_entries;
-    uint16_t small_sectors;
-    uint8_t media;
-    uint16_t small_fat_size;
-    uint16_t sectors_per_track;
-    uint16_t heads;
-    uint32_t hidden_sectors;
-    uint32_t sectors;
-    uint32_t fat_size;
-    uint16_t flags;
-    uint16_t version;
-    uint32_t root_cluster;
-} __attribute__((packed));
-
-struct fat32_entry_local {
-    char name[11]; 
-    uint8_t attributes; 
-    uint8_t reserved; 
-    uint8_t create_time_tenth;
-    uint16_t create_time; 
-    uint16_t create_date; 
-    uint16_t access_date;
-    uint16_t cluster_high; 
-    uint16_t modify_time; 
-    uint16_t modify_date;
-    uint16_t cluster_low; 
-    uint32_t size;
-} __attribute__((packed));
-
-static uint32_t pobierz_sektor_klastra(uint32_t cluster) {
-    char bpb_sector[512];
-    read_sector(0, bpb_sector);
-    struct fat32_bpb_local *bpb = (struct fat32_bpb_local *)bpb_sector;
-    uint32_t first_data_sector = bpb->reserved_sectors + (bpb->fat_count * bpb->fat_size);
-    return first_data_sector + (cluster - 2) * bpb->sectors_per_cluster;
+static int ma_rozszerzenie(const char *nazwa, const char *rozszerzenie)
+{
+    int dlugosc = 0;
+    int rozszerzenie_dlugosc = 0;
+    while (nazwa[dlugosc]) dlugosc++;
+    while (rozszerzenie[rozszerzenie_dlugosc]) rozszerzenie_dlugosc++;
+    if (dlugosc < rozszerzenie_dlugosc) return 0;
+    for (int i = 0; i < rozszerzenie_dlugosc; i++) {
+        char znak = nazwa[dlugosc - rozszerzenie_dlugosc + i];
+        char oczekiwany = rozszerzenie[i];
+        if (znak >= 'a' && znak <= 'z') znak -= 'a' - 'A';
+        if (oczekiwany >= 'a' && oczekiwany <= 'z') oczekiwany -= 'a' - 'A';
+        if (znak != oczekiwany) return 0;
+    }
+    return 1;
 }
 
-static int pobierz_pliki_lokalnie(char nazwy[][13], int max_plikow) {
-    char sector[512];
-    struct fat32_entry_local *entries;
-    int licznik = 0;
-    
-    read_sector(pobierz_sektor_klastra(2), sector);
-    entries = (struct fat32_entry_local *)sector;
-    
-    for (uint32_t i = 0; i < 512 / sizeof(struct fat32_entry_local); i++) {
-        if (entries[i].name[0] == 0) break;
-        if (entries[i].name[0] != '.' && entries[i].attributes != 0x0F && (uint8_t)entries[i].name[0] != 0xE5) {
-            if (licznik < max_plikow) {
-                int idx = 0;
-                for (int j = 0; j < 11; j++) {
-                    if (entries[i].name[j] != ' ') {
-                        nazwy[licznik][idx++] = entries[i].name[j];
-                    }
-                }
-                nazwy[licznik][idx] = '\0';
-                licznik++;
-            }
-        }
-    }
-    return licznik;
-}
-
-static int czy_to_tsi(const char *nazwa) {
-    int len = 0;
-    while (nazwa[len] != '\0') {
-        len++;
-    }
-    if (len > 4 && nazwa[len - 4] == '.' && 
-        (nazwa[len - 3] == 't' || nazwa[len - 3] == 'T') &&
-        (nazwa[len - 2] == 's' || nazwa[len - 2] == 'S') &&
-        (nazwa[len - 1] == 'i' || nazwa[len - 1] == 'I')) {
-        return 1;
-    }
-    return 0;
-}
-
-static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc) {
+static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
+{
     (void)szerokosc;
-    (void)wysokosc;
-    liczba_plikow = pobierz_pliki_lokalnie(lista_plikow, 16);
-    
-    rysuj_tekst_8x8(x, y, "Pliki na dysku:", 0x00000000);
-    
+    liczba_plikow = fs_list_current(lista_plikow, 24);
+
+    rysuj_tekst_8x8(x, y, "PLIKI", 0x00000000);
+    rysuj_prostokat(x, y + 14, 78, 20, 0x00334155);
+    rysuj_tekst_8x8(x + 8, y + 20, "FOLDER+", 0x00FFFFFF);
+    rysuj_prostokat(x + 84, y + 14, 78, 20, 0x00334155);
+    rysuj_tekst_8x8(x + 100, y + 20, "TXT+", 0x00FFFFFF);
+    rysuj_prostokat(x + 168, y + 14, 62, 20, 0x00334155);
+    rysuj_tekst_8x8(x + 184, y + 20, "WROC", 0x00FFFFFF);
+
+    if (tryb_tworz) {
+        rysuj_tekst_8x8(x, y + 40, "NAZWA:", 0x00000000);
+        rysuj_tekst_8x8(x + 56, y + 40, nazwa_nowego, 0x00000000);
+    } else {
+        rysuj_tekst_8x8(x, y + 40, status_plikow, 0x00000000);
+    }
+
     for (int i = 0; i < liczba_plikow; i++) {
+        int row_y = y + 58 + i * 16;
+        if (row_y + 8 > y + wysokosc) break;
         if (i == wybrany_element) {
-            rysuj_prostokat(x, y + 20 + (i * 16), 250, 14, 0x003B82F6);
-            rysuj_tekst_8x8(x, y + 20 + (i * 16), lista_plikow[i], 0x00FFFFFF);
+            rysuj_prostokat(x, row_y, 250, 14, 0x003B82F6);
+            rysuj_tekst_8x8(x, row_y, lista_plikow[i].name, 0x00FFFFFF);
         } else {
-            rysuj_tekst_8x8(x, y + 20 + (i * 16), lista_plikow[i], 0x00000000);
+            rysuj_tekst_8x8(x, row_y, lista_plikow[i].name, 0x00000000);
         }
+        if (lista_plikow[i].is_directory) rysuj_tekst_8x8(x + 176, row_y, "<DIR>", 0x00000000);
     }
 }
 
-static void obsluz_klik_plikow(int x, int y) {
-    (void)x;
-    int klikniety_index = (y - 20) / 16;
+static void obsluz_klik_plikow(int x, int y)
+{
+    if (tryb_tworz) return;
+    if (y >= 52 && y < 72) {
+        if (x >= 16 && x < 94) tryb_tworz = 1;
+        else if (x >= 100 && x < 178) tryb_tworz = 2;
+        else if (x >= 184 && x < 246) fs_parent_directory();
+        nazwa_nowego[0] = 0;
+        dlugosc_nazwy = 0;
+        wybrany_element = -1;
+        okno_narysuj(&pliki);
+        return;
+    }
+
+    int klikniety_index = (y - 96) / 16;
     if (klikniety_index >= 0 && klikniety_index < liczba_plikow) {
         if (wybrany_element == klikniety_index) {
-            if (czy_to_tsi(lista_plikow[klikniety_index])) {
-                zainstaluj_pakiet_tsi(lista_plikow[klikniety_index]);
+            if (lista_plikow[klikniety_index].is_directory) {
+                if (cd(lista_plikow[klikniety_index].name) == 0) wybrany_element = -1;
+            } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".TXT")) {
+                notatnik_otworz_plik(lista_plikow[klikniety_index].name);
+            } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".TSI")) {
+                zainstaluj_pakiet_tsi(lista_plikow[klikniety_index].name);
             }
         } else {
             wybrany_element = klikniety_index;
-            okno_narysuj(&pliki);
         }
     } else {
         wybrany_element = -1;
-        okno_narysuj(&pliki);
     }
+    okno_narysuj(&pliki);
 }
 
-void eksplorator_plikow() {
+void eksplorator_plikow(void)
+{
+    fs_reset_directory();
+    wybrany_element = -1;
+    tryb_tworz = 0;
+    status_plikow[0] = 0;
     okno_stworz(&pliki, 300, 300, 300, 300, "Pliki", rysuj_zawartosc_plikow);
     okno_ustaw_obsluge_klikniecia(&pliki, obsluz_klik_plikow);
+}
+
+void eksplorator_plikow_obsluz_klawiature(void)
+{
+    char znak;
+    if (!tryb_tworz || !okno_czy_aktywne(&pliki) || !keyboard_try_getchar(&znak)) return;
+    if (znak == '\b') {
+        if (dlugosc_nazwy > 0) nazwa_nowego[--dlugosc_nazwy] = 0;
+    } else if (znak == '\n' || znak == '\r') {
+        if (dlugosc_nazwy > 0) {
+            if (tryb_tworz == 1) {
+                const char *status = create_dir(nazwa_nowego) == 0 ? "OK" : "BLAD";
+                int j = 0;
+                while (status[j]) { status_plikow[j] = status[j]; j++; }
+                status_plikow[j] = 0;
+            } else {
+                char nazwa_pliku[13];
+                int i;
+                for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
+                nazwa_pliku[i++] = '.';
+                nazwa_pliku[i++] = 'T';
+                nazwa_pliku[i++] = 'X';
+                nazwa_pliku[i++] = 'T';
+                nazwa_pliku[i] = 0;
+                const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
+                int j = 0;
+                while (status[j]) { status_plikow[j] = status[j]; j++; }
+                status_plikow[j] = 0;
+            }
+        }
+        tryb_tworz = 0;
+        dlugosc_nazwy = 0;
+        nazwa_nowego[0] = 0;
+    } else {
+        if (znak >= 'A' && znak <= 'Z') znak += 'a' - 'A';
+        if (((znak >= 'a' && znak <= 'z') || (znak >= '0' && znak <= '9')) && dlugosc_nazwy < 8) {
+            nazwa_nowego[dlugosc_nazwy++] = znak;
+            nazwa_nowego[dlugosc_nazwy] = 0;
+        }
+    }
+    okno_narysuj(&pliki);
 }

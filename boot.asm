@@ -7,6 +7,8 @@ KERNEL_SECTORS      equ 512
 CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
 VBE_INFO_BUFFER     equ 0x7E00
+VBE_CONTROLLER_BUFFER equ 0x8000
+VBE_HANDOFF_BUFFER  equ 0x50000
 
     jmp short boot_start
     nop
@@ -46,14 +48,87 @@ boot_start:
     mov sp, 0x7C00
     mov [boot_drive], dl
 
-    mov ax, 0x4F01
-    mov cx, 0x0144
-    mov di, VBE_INFO_BUFFER
+    mov dword [VBE_CONTROLLER_BUFFER], 0x32454256
+    mov word [VBE_CONTROLLER_BUFFER + 4], 0
+    mov ax, 0x4F00
+    mov di, VBE_CONTROLLER_BUFFER
+    push ds
+    pop es
     int 0x10
 
-    mov ax, 0x4F02
-    mov bx, 0x4144
+    mov si, video_modes
+video_mode_loop:
+    mov cx, [si]
+    cmp cx, 0xFFFF
+    je video_mode_error
+    mov ax, 0x4F01
+    mov di, VBE_INFO_BUFFER
+    push ds
+    pop es
     int 0x10
+    cmp ax, 0x004F
+    jne video_mode_next
+    mov ax, [VBE_INFO_BUFFER]
+    and ax, 0x0091
+    cmp ax, 0x0091
+    jne video_mode_next
+    cmp word [VBE_INFO_BUFFER + 0x12], 1024
+    jne video_mode_next
+    cmp word [VBE_INFO_BUFFER + 0x14], 768
+    jne video_mode_next
+    cmp byte [VBE_INFO_BUFFER + 0x19], 24
+    je video_mode_depth_ok
+    cmp byte [VBE_INFO_BUFFER + 0x19], 32
+    jne video_mode_next
+video_mode_depth_ok:
+    cmp byte [VBE_INFO_BUFFER + 0x1B], 6
+    jne video_mode_next
+    cmp dword [VBE_INFO_BUFFER + 0x28], 0
+    je video_mode_next
+    push si
+    mov si, VBE_INFO_BUFFER
+    mov ax, 0x5000
+    mov es, ax
+    xor di, di
+    mov cx, 64
+    cld
+    rep movsd
+    mov al, [VBE_CONTROLLER_BUFFER + 5]
+    mov [es:0x00FF], al
+    pop si
+    mov ax, 0x4F02
+    mov bx, [si]
+    or bx, 0x4000
+    push si
+    int 0x10
+    pop si
+    cmp ax, 0x004F
+    je video_mode_ready
+video_mode_next:
+    add si, 2
+    jmp video_mode_loop
+
+video_mode_error:
+    mov ax, 0x0003
+    int 0x10
+    mov si, video_error_message
+video_error_print:
+    lodsb
+    test al, al
+    jz video_error_halt
+    mov ah, 0x0E
+    int 0x10
+    jmp video_error_print
+video_error_halt:
+    cli
+    hlt
+    jmp video_error_halt
+
+video_modes:
+    dw 0x0144, 0x0118, 0xFFFF
+video_error_message:
+    db 'No supported 1024x768 VBE mode', 0
+video_mode_ready:
 
     mov cx, KERNEL_SECTORS / 32
     mov word [dap_segment], 0x1000

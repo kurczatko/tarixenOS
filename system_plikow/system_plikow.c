@@ -26,6 +26,8 @@ struct fat32_entry {
 
 static struct fat32_bpb bpb;
 static uint32_t current_dir = FAT32_ROOT_CLUSTER;
+static uint32_t directory_stack[16];
+static uint8_t directory_depth;
 static uint32_t first_data_sector;
 static uint32_t fat_start;
 
@@ -115,7 +117,7 @@ static struct fat32_entry *find_entry(const char *name, uint32_t directory, char
 void init_fs(void) {
     read_sector(0, (char *)&bpb);
     if (bpb.bytes_per_sector != 512 || bpb.root_cluster < 2) { printf("Blad: brak systemu FAT32\n"); return; }
-    fat_start = bpb.reserved_sectors; first_data_sector = fat_start + bpb.fat_count * bpb.fat_size; current_dir = bpb.root_cluster;
+    fat_start = bpb.reserved_sectors; first_data_sector = fat_start + bpb.fat_count * bpb.fat_size; current_dir = bpb.root_cluster; directory_depth = 0;
 }
 
 static struct fat32_entry *new_entry(const char *name, uint8_t attributes, char *sector) {
@@ -158,4 +160,78 @@ int ls(const char *dir) {
     read_sector(cluster_sector(directory), sector); for (uint32_t i = 0; i < 512 / sizeof(struct fat32_entry); i++) { struct fat32_entry *entry = ((struct fat32_entry *)sector) + i; if (entry->name[0] == 0) break; if (entry->name[0] != '.' && entry->attributes != 0x0F && (uint8_t)entry->name[0] != 0xE5) printf("%s\n", entry->name); } return 0;
 }
 
-int cd(const char *dir) { char sector[512]; uint32_t sector_number; struct fat32_entry *entry; if (dir[0] == '.' && dir[1] == '.') { current_dir = bpb.root_cluster; return 0; } entry = find_entry(dir, current_dir, sector, &sector_number); if (!entry || !(entry->attributes & 0x10)) return -1; current_dir = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low; return 0; }
+int cd(const char *dir) {
+    char sector[512];
+    uint32_t sector_number;
+    struct fat32_entry *entry;
+
+    if (dir[0] == '/' || (dir[0] == '.' && dir[1] == '.' && directory_depth == 0)) {
+        current_dir = bpb.root_cluster;
+        directory_depth = 0;
+        return 0;
+    }
+    if (dir[0] == '.' && dir[1] == '.') {
+        current_dir = directory_stack[--directory_depth];
+        return 0;
+    }
+
+    entry = find_entry(dir, current_dir, sector, &sector_number);
+    if (!entry || !(entry->attributes & 0x10) || directory_depth >= 16) return -1;
+    directory_stack[directory_depth++] = current_dir;
+    current_dir = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low;
+    return 0;
+}
+
+void fs_reset_directory(void) {
+    current_dir = bpb.root_cluster;
+    directory_depth = 0;
+}
+
+int fs_parent_directory(void) {
+    return cd("..");
+}
+
+static void format_short_name(const char short_name[11], char name[13]) {
+    uint32_t base_length = 8;
+    uint32_t extension_length = 3;
+    uint32_t position = 0;
+
+    while (base_length > 0 && short_name[base_length - 1] == ' ') base_length--;
+    while (extension_length > 0 && short_name[8 + extension_length - 1] == ' ') extension_length--;
+
+    for (uint32_t i = 0; i < base_length; i++) name[position++] = short_name[i];
+    if (extension_length > 0) {
+        name[position++] = '.';
+        for (uint32_t i = 0; i < extension_length; i++) name[position++] = short_name[8 + i];
+    }
+    name[position] = '\0';
+}
+
+int fs_list_current(struct fs_entry_info *entries, int capacity) {
+    char sector[512];
+    uint32_t cluster = current_dir;
+    int count = 0;
+    uint8_t finished = 0;
+
+    while (cluster >= 2 && cluster < FAT32_EOC && !finished) {
+        for (uint32_t sector_index = 0; sector_index < bpb.sectors_per_cluster && !finished; sector_index++) {
+            read_sector(cluster_sector(cluster) + sector_index, sector);
+            struct fat32_entry *directory_entries = (struct fat32_entry *)sector;
+            for (uint32_t i = 0; i < FAT32_SECTOR_SIZE / sizeof(struct fat32_entry); i++) {
+                struct fat32_entry *entry = &directory_entries[i];
+                if (entry->name[0] == 0) {
+                    finished = 1;
+                    break;
+                }
+                if ((uint8_t)entry->name[0] == 0xE5 || entry->name[0] == '.' ||
+                    entry->attributes == 0x0F || (entry->attributes & 0x08)) continue;
+                if (count >= capacity) return count;
+                format_short_name(entry->name, entries[count].name);
+                entries[count].is_directory = (entry->attributes & 0x10) != 0;
+                count++;
+            }
+        }
+        if (!finished) cluster = fat_entry(cluster);
+    }
+    return count;
+}

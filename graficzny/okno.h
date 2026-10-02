@@ -21,10 +21,11 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
                  const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc);
 void okno_narysuj(struct okno *okno);
 void okno_zamknij(struct okno *okno);
-void okno_obsluz_klikniecie(int x, int y);
+int okno_obsluz_klikniecie(int x, int y);
 void okno_obsluz_ruch(int x, int y);
 void okno_zakoncz_przeciaganie(void);
 void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_klik);
 void okno_ustaw_aktywne(struct okno *okno);
+int okno_czy_aktywne(const struct okno *okno);
 
 #endif

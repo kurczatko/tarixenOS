@@ -16,6 +16,8 @@
 void keyboard_init(void);
 uint8_t keyboard_dane_dostepne(void);
 char keyboard_getchar(void);
+uint8_t keyboard_try_getchar(char *character);
+void keyboard_discard_pending(void);
 uint8_t keyboard_scancode_to_char(uint8_t scancode);
 
 // mapa klawiszy chińska, a nie sory, znaczy angielska (czy tam USAńska)
@@ -23,7 +25,7 @@ static const char keyboard_us[128] = {
     0,  0,  '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', '\b',   // klawisze 0-15
     '\t', 'q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p', '[', ']', '\n', 0,  // klawisze 16-31
     'a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';', '\'', '`', 0, '\\',       // klawisze 32-47
-    'z', 'x', 'c', 'v', 'b', 'n', 'm', '^', '{', '}', 0, '*', 0, ' ', 0         // klawisze 48-63
+    'z', 'x', 'c', 'v', 'b', 'n', 'm', '^', '.', '}', 0, '*', 0, ' ', 0         // klawisze 48-63
 };
 
 // ten uklad tez zostanie wywalony

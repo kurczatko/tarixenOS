@@ -7,7 +7,17 @@
 #define KOLOR_PASKA_ZADAN 0x002D3E50
 #define KOLOR_TEKST_BIALY 0x00FFFFFF
 
-static uint32_t *pamiec_graficzna = (uint32_t *)0xFD000000;
+static volatile uint8_t *pamiec_graficzna = (volatile uint8_t *)0xFD000000;
+static uint32_t framebuffer_pitch = EKRAN_SZEROKOSC * 4;
+static uint8_t framebuffer_bytes_per_pixel = 4;
+static uint8_t red_mask_size = 8;
+static uint8_t red_field_position = 16;
+static uint8_t green_mask_size = 8;
+static uint8_t green_field_position = 8;
+static uint8_t blue_mask_size = 8;
+static uint8_t blue_field_position;
+static uint8_t internet_dostepny;
+static char czas_paska[9] = "--:--:--";
 
 static const uint8_t kursor_bitmapa[CURSOR_H][CURSOR_W] = {
     {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
@@ -33,8 +43,65 @@ static const uint8_t kursor_bitmapa[CURSOR_H][CURSOR_W] = {
 static int kursor_x;
 static int kursor_y;
 
+static void narysuj_kursor_bitmapa(int x, int y);
+
 uint32_t *obraz = (uint32_t *)0x00400000;
 static uint32_t kolor_tapety = KOLOR_TLA;
+static int tapeta_gradientowa = 1;
+
+static uint32_t kolor_tla_dla_x(int x)
+{
+    uint32_t niebieski = (uint32_t)x * 255 / (EKRAN_SZEROKOSC - 1);
+    uint32_t zielony = 255 - niebieski;
+    return (zielony << 8) | niebieski;
+}
+
+static void narysuj_ikone_internetu(void)
+{
+    static const uint16_t bitmapa[14] = {
+        0x03F0, 0x0C0C, 0x1002, 0x23C1, 0x2C31, 0x3019, 0x3019,
+        0x3019, 0x2C31, 0x23C1, 0x1002, 0x0C0C, 0x03F0, 0x0000
+    };
+    uint32_t kolor = internet_dostepny ? KOLOR_BIALY : KOLOR_SZARY;
+    int x = EKRAN_SZEROKOSC - 22;
+    int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 8;
+    for (int pion = 0; pion < 14; pion++) {
+        for (int poziom = 0; poziom < 12; poziom++) {
+            if (bitmapa[pion] & (0x0800 >> poziom))
+                rysuj_piksel(x + poziom, y + pion, kolor);
+        }
+    }
+}
+
+static void narysuj_czas_paska(void)
+{
+    int x = EKRAN_SZEROKOSC - 108;
+    int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 11;
+    rysuj_prostokat(x - 4, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
+                    84, PASEK_ZADAN_WYSOKOSC, KOLOR_PASKA_ZADAN);
+    rysuj_tekst_8x8(x, y, czas_paska, KOLOR_BIALY);
+}
+
+void ustaw_czas_paska(const char *czas)
+{
+    int i = 0;
+    while (czas[i] && i < 8) { czas_paska[i] = czas[i]; i++; }
+    czas_paska[i] = 0;
+    while (i < 8) czas_paska[i++] = ' ';
+    narysuj_czas_paska();
+    odswiez_fragment_widoku(EKRAN_SZEROKOSC - 112,
+                            EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
+                            88, PASEK_ZADAN_WYSOKOSC);
+}
+
+void ustaw_status_internetu(uint8_t dostepny)
+{
+    internet_dostepny = dostepny != 0;
+    narysuj_ikone_internetu();
+    odswiez_fragment_widoku(EKRAN_SZEROKOSC - 24,
+                            EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
+                            24, PASEK_ZADAN_WYSOKOSC);
+}
 
 static void kopiuj_pamiec(void *dst, const void *src, uint32_t bajty)
 {
@@ -46,7 +113,32 @@ static void kopiuj_pamiec(void *dst, const void *src, uint32_t bajty)
     }
 }
 
-static void odswiez_fragment_z_bufora(int x, int y, int szerokosc, int wysokosc)
+static void zapisz_piksel_framebuffera(int x, int y, uint32_t kolor)
+{
+    uint32_t czerwony = (kolor >> 16) & 0xFF;
+    uint32_t zielony = (kolor >> 8) & 0xFF;
+    uint32_t niebieski = kolor & 0xFF;
+    uint32_t wartosc = 0;
+    volatile uint8_t *piksel = pamiec_graficzna + (uint32_t)y * framebuffer_pitch +
+                               (uint32_t)x * framebuffer_bytes_per_pixel;
+
+    if (red_mask_size) wartosc |= (czerwony >> (8 - red_mask_size)) << red_field_position;
+    if (green_mask_size) wartosc |= (zielony >> (8 - green_mask_size)) << green_field_position;
+    if (blue_mask_size) wartosc |= (niebieski >> (8 - blue_mask_size)) << blue_field_position;
+    for (uint8_t bajt = 0; bajt < framebuffer_bytes_per_pixel; bajt++)
+        piksel[bajt] = (uint8_t)(wartosc >> (bajt * 8));
+}
+
+    static int framebuffer_ma_szybki_format(void)
+    {
+        return framebuffer_bytes_per_pixel == 4 &&
+           framebuffer_pitch == EKRAN_SZEROKOSC * 4 &&
+           red_mask_size == 8 && red_field_position == 16 &&
+           green_mask_size == 8 && green_field_position == 8 &&
+           blue_mask_size == 8 && blue_field_position == 0;
+    }
+
+void odswiez_fragment_widoku(int x, int y, int szerokosc, int wysokosc)
 {
     if (x < 0) {
         szerokosc += x;
@@ -62,8 +154,14 @@ static void odswiez_fragment_z_bufora(int x, int y, int szerokosc, int wysokosc)
 
     for (int wiersz = 0; wiersz < wysokosc; wiersz++) {
         uint32_t offset = (uint32_t)(y + wiersz) * EKRAN_SZEROKOSC + (uint32_t)x;
-        kopiuj_pamiec(&pamiec_graficzna[offset], &obraz[offset], szerokosc * 4);
+        if (framebuffer_ma_szybki_format()) {
+            kopiuj_pamiec((void *)&pamiec_graficzna[offset * 4], &obraz[offset], szerokosc * 4);
+        } else {
+            for (int kolumna = 0; kolumna < szerokosc; kolumna++)
+                zapisz_piksel_framebuffera(x + kolumna, y + wiersz, obraz[offset + kolumna]);
+        }
     }
+    narysuj_kursor_bitmapa(kursor_x, kursor_y);
 }
 
 static void narysuj_napis_systemowy(void)
@@ -76,10 +174,19 @@ static void narysuj_napis_systemowy(void)
 
 void odswiez_widok(void)
 {
-    kopiuj_pamiec(pamiec_graficzna, obraz, EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4);
+    if (framebuffer_ma_szybki_format()) {
+        kopiuj_pamiec((void *)pamiec_graficzna, obraz, EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4);
+    } else {
+        for (int y = 0; y < EKRAN_WYSOKOSC; y++) {
+            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+            for (int x = 0; x < EKRAN_SZEROKOSC; x++)
+                zapisz_piksel_framebuffera(x, y, obraz[offset + x]);
+        }
+    }
+    narysuj_kursor_bitmapa(kursor_x, kursor_y);
 }
 
-void odtworz_fragment_tla(int x, int y, int szerokosc, int wysokosc)
+void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
 {
     if (x < 0) {
         szerokosc += x;
@@ -94,13 +201,21 @@ void odtworz_fragment_tla(int x, int y, int szerokosc, int wysokosc)
     if (szerokosc <= 0 || wysokosc <= 0) return;
 
     for (int py = y; py < y + wysokosc; py++) {
-        uint32_t kolor = (py >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) ? KOLOR_PASKA_ZADAN : kolor_tapety;
         uint32_t offset = (uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)x;
         for (int px = 0; px < szerokosc; px++) {
-            obraz[offset + px] = kolor;
+            if (py >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) {
+                obraz[offset + px] = KOLOR_PASKA_ZADAN;
+            } else {
+                obraz[offset + px] = tapeta_gradientowa ? kolor_tla_dla_x(x + px) : kolor_tapety;
+            }
         }
     }
-    odswiez_fragment_z_bufora(x, y, szerokosc, wysokosc);
+}
+
+void odtworz_fragment_tla(int x, int y, int szerokosc, int wysokosc)
+{
+    odtworz_fragment_tla_bufor(x, y, szerokosc, wysokosc);
+    odswiez_fragment_widoku(x, y, szerokosc, wysokosc);
 }
 
 void rysuj_piksel(int x, int y, uint32_t kolor)
@@ -134,7 +249,6 @@ static void narysuj_kursor_bitmapa(int x, int y)
     for (int cy = 0; cy < CURSOR_H; cy++) {
         int py = y + cy;
         if (py < 0 || py >= EKRAN_WYSOKOSC) continue;
-        uint32_t offset = (uint32_t)py * EKRAN_SZEROKOSC;
 
         for (int cx = 0; cx < CURSOR_W; cx++) {
             uint8_t typ = kursor_bitmapa[cy][cx];
@@ -144,7 +258,7 @@ static void narysuj_kursor_bitmapa(int x, int y)
             if (px < 0 || px >= EKRAN_SZEROKOSC) continue;
 
             uint32_t kolor = (typ == 1) ? 0x00000000 : 0x00FFFFFF;
-            pamiec_graficzna[offset + px] = kolor;
+            zapisz_piksel_framebuffera(px, py, kolor);
         }
     }
 }
@@ -156,15 +270,19 @@ void narysuj_pasek_zadan(void)
     for (uint32_t i = 0; i < size; i++) {
         obraz[start + i] = KOLOR_PASKA_ZADAN;
     }
-    odswiez_fragment_z_bufora(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
+    narysuj_czas_paska();
+    narysuj_ikone_internetu();
+    odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
 }
 
 void wypelnij_ekran(uint32_t kolor)
 {
     kolor_tapety = kolor;
+    tapeta_gradientowa = 0;
     for (uint32_t i = 0; i < EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
         obraz[i] = kolor_tapety;
     }
+    narysuj_pasek_zadan();
     narysuj_napis_systemowy();
     odswiez_widok();
 }
@@ -172,6 +290,7 @@ void wypelnij_ekran(uint32_t kolor)
 void ustaw_kolor_tapety(uint32_t kolor)
 {
     kolor_tapety = kolor;
+    tapeta_gradientowa = 0;
     for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
         uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
         for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
@@ -179,14 +298,14 @@ void ustaw_kolor_tapety(uint32_t kolor)
         }
     }
     narysuj_napis_systemowy();
-    odswiez_fragment_z_bufora(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
 }
 
 void kursor_graficzny_init(void)
 {
     kursor_x = EKRAN_SZEROKOSC / 2;
     kursor_y = EKRAN_WYSOKOSC / 2;
-    narysuj_kursor_bitmapa(kursor_x, kursor_y);
+    odswiez_widok();
 }
 
 void kursor_graficzny_przesun(int delta_x, int delta_y)
@@ -205,8 +324,7 @@ void kursor_graficzny_przesun(int delta_x, int delta_y)
 
     if (kursor_x == stary_x && kursor_y == stary_y) return;
 
-    odswiez_fragment_z_bufora(stary_x, stary_y, CURSOR_W, CURSOR_H);
-    narysuj_kursor_bitmapa(kursor_x, kursor_y);
+    odswiez_fragment_widoku(stary_x, stary_y, CURSOR_W, CURSOR_H);
 }
 
 void kursor_graficzny_pozycja(int *x, int *y)
@@ -217,14 +335,45 @@ void kursor_graficzny_pozycja(int *x, int *y)
 
 void rysowanie_init(void)
 {
-    uint32_t lfb_address = *(uint32_t *)0x7E28;
+    volatile uint8_t *mode_info = (volatile uint8_t *)0x50000;
+    uint32_t lfb_address = *(volatile uint32_t *)(mode_info + 0x28);
 
     if (lfb_address != 0) {
-        pamiec_graficzna = (uint32_t *)lfb_address;
+        uint8_t wersja_vbe = *(volatile uint8_t *)0x500FF;
+        uint16_t liniowy_pitch = 0;
+        pamiec_graficzna = (volatile uint8_t *)lfb_address;
+        framebuffer_pitch = *(volatile uint16_t *)(mode_info + 0x10);
+        framebuffer_bytes_per_pixel = (mode_info[0x19] + 7) / 8;
+        red_mask_size = mode_info[0x1F];
+        red_field_position = mode_info[0x20];
+        green_mask_size = mode_info[0x21];
+        green_field_position = mode_info[0x22];
+        blue_mask_size = mode_info[0x23];
+        blue_field_position = mode_info[0x24];
+        if (wersja_vbe >= 3) {
+            liniowy_pitch = *(volatile uint16_t *)(mode_info + 0x32);
+            if (liniowy_pitch) framebuffer_pitch = liniowy_pitch;
+            if (mode_info[0x36]) {
+                red_mask_size = mode_info[0x36];
+                red_field_position = mode_info[0x37];
+            }
+            if (mode_info[0x38]) {
+                green_mask_size = mode_info[0x38];
+                green_field_position = mode_info[0x39];
+            }
+            if (mode_info[0x3A]) {
+                blue_mask_size = mode_info[0x3A];
+                blue_field_position = mode_info[0x3B];
+            }
+        }
     }
 
-    for (uint32_t i = 0; i < EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
-        obraz[i] = KOLOR_TLA;
+    tapeta_gradientowa = 1;
+    for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
+        uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+            obraz[offset + x] = kolor_tla_dla_x(x);
+        }
     }
 
     for (int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y < EKRAN_WYSOKOSC; y++) {
@@ -233,6 +382,10 @@ void rysowanie_init(void)
             obraz[offset + x] = KOLOR_PASKA_ZADAN;
         }
     }
+
+    internet_dostepny = 0;
+    narysuj_czas_paska();
+    narysuj_ikone_internetu();
 
     narysuj_napis_systemowy();
 

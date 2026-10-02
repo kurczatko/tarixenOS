@@ -4,13 +4,15 @@
 #include "../graficzny/rysowanie.h"
 #include "../graficzny/okno.h"
 #include "../graficzny/menu_start.h"
+#include "../kernel/browser.h"
 
 #define MOUSE_DATA_PORT 0x60
 #define MOUSE_STATUS_PORT 0x64
 #define MOUSE_COMMAND_PORT 0x64
 
-static uint8_t packet[3];
+static uint8_t packet[4];
 static uint8_t packet_index = 0;
+static uint8_t packet_size = 3;
 static int accumulated_x = 0;
 static int accumulated_y = 0;
 static uint8_t left_button_pressed = 0;
@@ -46,14 +48,34 @@ static void mouse_write(uint8_t value) {
     mouse_outb(MOUSE_DATA_PORT, value);
 }
 
+static uint8_t mouse_write_and_read_ack(uint8_t value)
+{
+    mouse_write(value);
+    mouse_wait_output();
+    return mouse_inb(MOUSE_DATA_PORT);
+}
+
 void mouse_init(void) {
     uint8_t response;
 
     mouse_wait_input();
     mouse_outb(MOUSE_COMMAND_PORT, 0xA8);
-    mouse_write(0xF4);
+    mouse_write_and_read_ack(0xF5);
+    mouse_write_and_read_ack(0xF3);
+    mouse_write_and_read_ack(200);
+    mouse_write_and_read_ack(0xF3);
+    mouse_write_and_read_ack(100);
+    mouse_write_and_read_ack(0xF3);
+    mouse_write_and_read_ack(80);
+    mouse_write(0xF2);
     mouse_wait_output();
     response = mouse_inb(MOUSE_DATA_PORT);
+    if (response == 0xFA) {
+        mouse_wait_output();
+        response = mouse_inb(MOUSE_DATA_PORT);
+        if (response == 0x03 || response == 0x04) packet_size = 4;
+    }
+    mouse_write_and_read_ack(0xF4);
     (void)response;
     kursor_graficzny_init();
 }
@@ -74,7 +96,7 @@ void mouse_poll(void) {
         return;
     }
     packet[packet_index++] = packet_byte;
-    if (packet_index < 3) {
+    if (packet_index < packet_size) {
         return;
     }
     packet_index = 0;
@@ -83,14 +105,19 @@ void mouse_poll(void) {
         return;
     }
 
+    if (packet_size == 4) {
+        int wheel = packet[3] & 0x0F;
+        if (wheel & 0x08) wheel -= 16;
+        if (wheel) browser_scroll_wheel(wheel);
+    }
+
     if ((packet[0] & 1) && !left_button_pressed) {
         left_button_pressed = 1;
         {
             int x;
             int y;
             mouse_pozycja(&x, &y);
-            okno_obsluz_klikniecie(x, y);
-            menu_start_mouse_click();
+            if (!okno_obsluz_klikniecie(x, y)) menu_start_mouse_click();
         }
     }
     if (!(packet[0] & 1)) {

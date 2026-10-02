@@ -4,10 +4,14 @@
 
 #define KOLOR_RAMKI 0x00787C82
 #define KOLOR_PASKA 0x00787C82
+#define KOLOR_PASKA_AKTYWNE 0x003B82F6
 #define KOLOR_OKNA  0x00FFFFFF
 #define KOLOR_X     0x00E74C3C
+#define OKNA_MAKS 8
 
 struct okno *aktywne_okno;
+static struct okno *okna[OKNA_MAKS];
+static int liczba_okien;
 static uint8_t przeciaganie;
 static int przesuniecie_x;
 static int przesuniecie_y;
@@ -15,57 +19,125 @@ static int ramka_x;
 static int ramka_y;
 static uint8_t ramka_widoczna;
 
-static void narysuj_przerywana_ramke(int x, int y, int szerokosc, int wysokosc)
+static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
-    int i;
-    for (i = 0; i < szerokosc; i++) {
-        if ((i / 4) % 2 == 0) {
-            rysuj_piksel(x + i, y, 0x00000000);
-            rysuj_piksel(x + i, y + wysokosc - 1, 0x00000000);
-        } else {
-            rysuj_piksel(x + i, y, 0x00FFFFFF);
-            rysuj_piksel(x + i, y + wysokosc - 1, 0x00FFFFFF);
-        }
+    if (!okno || !okno->otwarte) return;
+    rysuj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI);
+    rysuj_prostokat(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
+                    okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
+    rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
+    rysuj_tekst_8x8(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
+    rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
+    rysuj_znak_8x8(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
+    if (okno->rysuj_zawartosc)
+        okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
+}
+
+static void okno_przenies_na_wierzch(struct okno *okno)
+{
+    int indeks;
+    for (indeks = 0; indeks < liczba_okien; indeks++) {
+        if (okna[indeks] == okno) break;
     }
-    for (i = 0; i < wysokosc; i++) {
-        if ((i / 4) % 2 == 0) {
-            rysuj_piksel(x, y + i, 0x00000000);
-            rysuj_piksel(x + szerokosc - 1, y + i, 0x00000000);
-        } else {
-            rysuj_piksel(x, y + i, 0x00FFFFFF);
-            rysuj_piksel(x + szerokosc - 1, y + i, 0x00FFFFFF);
-        }
+    if (indeks == liczba_okien) {
+        if (liczba_okien == OKNA_MAKS) return;
+        okna[liczba_okien++] = okno;
+        indeks = liczba_okien - 1;
     }
+    for (; indeks < liczba_okien - 1; indeks++) okna[indeks] = okna[indeks + 1];
+    okna[liczba_okien - 1] = okno;
+    aktywne_okno = okno;
+}
+
+static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc)
+{
+    odtworz_fragment_tla_bufor(x, y, szerokosc, wysokosc);
+    for (int indeks = 0; indeks < liczba_okien; indeks++) {
+        struct okno *okno = okna[indeks];
+        if (!okno || !okno->otwarte || okno->x >= x + szerokosc ||
+            okno->x + okno->szerokosc <= x || okno->y >= y + wysokosc ||
+            okno->y + okno->wysokosc <= y) continue;
+        narysuj_okno_bez_odswiezania(okno);
+    }
+}
+
+static void okno_odrysuj_scene(int x1, int y1, int szerokosc1, int wysokosc1,
+                               int x2, int y2, int szerokosc2, int wysokosc2)
+{
+    int lewy = x1 < x2 ? x1 : x2;
+    int gora = y1 < y2 ? y1 : y2;
+    int prawy1 = x1 + szerokosc1;
+    int prawy2 = x2 + szerokosc2;
+    int dol1 = y1 + wysokosc1;
+    int dol2 = y2 + wysokosc2;
+    int prawy;
+    int dol;
+
+    if (szerokosc1 <= 0 || wysokosc1 <= 0) {
+        lewy = x2;
+        gora = y2;
+        prawy1 = x2 + szerokosc2;
+        dol1 = y2 + wysokosc2;
+        prawy2 = prawy1;
+        dol2 = dol1;
+    } else if (szerokosc2 <= 0 || wysokosc2 <= 0) {
+        prawy2 = prawy1;
+        dol2 = dol1;
+    }
+    prawy = prawy1 > prawy2 ? prawy1 : prawy2;
+    dol = dol1 > dol2 ? dol1 : dol2;
+    if (prawy <= lewy || dol <= gora) return;
+
+    odrysuj_okna_w_obszarze(lewy, gora, prawy - lewy, dol - gora);
+    odswiez_fragment_widoku(lewy, gora, prawy - lewy, dol - gora);
+}
+
+static void okno_odrysuj_wszystkie(void)
+{
+    for (int indeks = 0; indeks < liczba_okien; indeks++) {
+        struct okno *okno = okna[indeks];
+        if (okno && okno->otwarte)
+            odtworz_fragment_tla_bufor(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
+    }
+    for (int indeks = 0; indeks < liczba_okien; indeks++)
+        narysuj_okno_bez_odswiezania(okna[indeks]);
     odswiez_widok();
 }
 
-static void zmaz_przerywana_ramke(int x, int y, int szerokosc, int wysokosc)
+static void narysuj_przerywana_ramke(int x, int y, int poprzedni_x, int poprzedni_y,
+                                     int szerokosc, int wysokosc)
 {
-    int ox;
-    int oy;
-    int ow;
-    int oh;
-
-    odtworz_fragment_tla(x, y, szerokosc, 1);
-    odtworz_fragment_tla(x, y + wysokosc - 1, szerokosc, 1);
-    odtworz_fragment_tla(x, y, 1, wysokosc);
-    odtworz_fragment_tla(x + szerokosc - 1, y, 1, wysokosc);
-
-    if (aktywne_okno && aktywne_okno->otwarte) {
-        ox = aktywne_okno->x;
-        oy = aktywne_okno->y;
-        ow = aktywne_okno->szerokosc;
-        oh = aktywne_okno->wysokosc;
-
-        if (x < ox + ow && x + szerokosc > ox && y < oy + oh && y + wysokosc > oy) {
-            okno_narysuj(aktywne_okno);
-        }
+    int obszar_x = poprzedni_x < x ? poprzedni_x : x;
+    int obszar_y = poprzedni_y < y ? poprzedni_y : y;
+    int obszar_prawy = (poprzedni_x + szerokosc) > (x + szerokosc) ?
+                       poprzedni_x + szerokosc : x + szerokosc;
+    int obszar_dol = (poprzedni_y + wysokosc) > (y + wysokosc) ?
+                     poprzedni_y + wysokosc : y + wysokosc;
+    odrysuj_okna_w_obszarze(obszar_x, obszar_y, obszar_prawy - obszar_x,
+                            obszar_dol - obszar_y);
+    for (int i = 0; i < szerokosc; i++) {
+        uint32_t kolor = ((i / 4) % 2 == 0) ? 0x00000000 : 0x00FFFFFF;
+        rysuj_piksel(x + i, y, kolor);
+        rysuj_piksel(x + i, y + wysokosc - 1, kolor);
     }
+    for (int i = 0; i < wysokosc; i++) {
+        uint32_t kolor = ((i / 4) % 2 == 0) ? 0x00000000 : 0x00FFFFFF;
+        rysuj_piksel(x, y + i, kolor);
+        rysuj_piksel(x + szerokosc - 1, y + i, kolor);
+    }
+    odswiez_fragment_widoku(obszar_x, obszar_y, obszar_prawy - obszar_x,
+                            obszar_dol - obszar_y);
 }
 
 void okno_ustaw_aktywne(struct okno *okno)
 {
-    aktywne_okno = okno;
+    if (okno && okno->otwarte) okno_przenies_na_wierzch(okno);
+    else aktywne_okno = okno;
+}
+
+int okno_czy_aktywne(const struct okno *okno)
+{
+    return okno && okno == aktywne_okno && okno->otwarte;
 }
 
 void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
@@ -79,8 +151,8 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->rysuj_zawartosc = rysuj_zawartosc;
     okno->obsluz_klik = 0;
     okno->otwarte = 1;
-    aktywne_okno = okno;
-    okno_narysuj(okno);
+    okno_przenies_na_wierzch(okno);
+    okno_odrysuj_wszystkie();
 }
 
 void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_klik)
@@ -91,15 +163,7 @@ void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_kl
 void okno_narysuj(struct okno *okno)
 {
     if (!okno || !okno->otwarte) return;
-    rysuj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI);
-    rysuj_prostokat(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20, KOLOR_PASKA);
-    rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
-    rysuj_tekst_8x8(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
-    rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
-    rysuj_znak_8x8(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
-    if (okno->rysuj_zawartosc)
-        okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
-    odswiez_widok();
+    okno_odrysuj_wszystkie();
 }
 
 void okno_zamknij(struct okno *okno)
@@ -109,30 +173,59 @@ void okno_zamknij(struct okno *okno)
         okno_zakoncz_przeciaganie();
     }
     okno->otwarte = 0;
-    odtworz_fragment_tla(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
-    odswiez_widok();
-    if (aktywne_okno == okno) aktywne_okno = 0;
+    for (int indeks = 0; indeks < liczba_okien; indeks++) {
+        if (okna[indeks] == okno) {
+            for (int pozostale = indeks; pozostale < liczba_okien - 1; pozostale++)
+                okna[pozostale] = okna[pozostale + 1];
+            okna[--liczba_okien] = 0;
+            break;
+        }
+    }
+    if (aktywne_okno == okno)
+        aktywne_okno = liczba_okien ? okna[liczba_okien - 1] : 0;
+    okno_odrysuj_wszystkie();
 }
 
-void okno_obsluz_klikniecie(int x, int y)
+int okno_obsluz_klikniecie(int x, int y)
 {
-    if (!aktywne_okno || !aktywne_okno->otwarte) return;
-    if (x >= aktywne_okno->x + aktywne_okno->szerokosc - 22 &&
-        x < aktywne_okno->x + aktywne_okno->szerokosc - 6 &&
-        y >= aktywne_okno->y + 4 && y < aktywne_okno->y + 20)
-        okno_zamknij(aktywne_okno);
-    else if (x >= aktywne_okno->x + 2 && x < aktywne_okno->x + aktywne_okno->szerokosc - 22 &&
-             y >= aktywne_okno->y + 2 && y < aktywne_okno->y + 22) {
-        przeciaganie = 1;
-        przesuniecie_x = x - aktywne_okno->x;
-        przesuniecie_y = y - aktywne_okno->y;
-        ramka_x = aktywne_okno->x;
-        ramka_y = aktywne_okno->y;
-        ramka_widoczna = 1;
-        narysuj_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
-    } else if (aktywne_okno->obsluz_klik) {
-        aktywne_okno->obsluz_klik(x - aktywne_okno->x, y - aktywne_okno->y);
+    struct okno *trafione = 0;
+    for (int indeks = liczba_okien - 1; indeks >= 0; indeks--) {
+        struct okno *kandydat = okna[indeks];
+        if (kandydat && kandydat->otwarte && x >= kandydat->x &&
+            x < kandydat->x + kandydat->szerokosc && y >= kandydat->y &&
+            y < kandydat->y + kandydat->wysokosc) {
+            trafione = kandydat;
+            break;
+        }
     }
+    if (!trafione) return 0;
+
+    if (trafione != aktywne_okno) {
+        okno_przenies_na_wierzch(trafione);
+        okno_odrysuj_wszystkie();
+    }
+
+    if (x >= trafione->x + trafione->szerokosc - 22 &&
+        x < trafione->x + trafione->szerokosc - 6 &&
+        y >= trafione->y + 4 && y < trafione->y + 20) {
+        okno_zamknij(trafione);
+        return 1;
+    }
+    if (x >= trafione->x + 2 && x < trafione->x + trafione->szerokosc - 22 &&
+        y >= trafione->y + 2 && y < trafione->y + 22) {
+        aktywne_okno = trafione;
+        przeciaganie = 1;
+        przesuniecie_x = x - trafione->x;
+        przesuniecie_y = y - trafione->y;
+        ramka_x = trafione->x;
+        ramka_y = trafione->y;
+        ramka_widoczna = 1;
+        narysuj_przerywana_ramke(ramka_x, ramka_y, ramka_x, ramka_y,
+                     trafione->szerokosc, trafione->wysokosc);
+        return 1;
+    }
+    if (trafione->obsluz_klik) trafione->obsluz_klik(x - trafione->x, y - trafione->y);
+    return 1;
 }
 
 void okno_obsluz_ruch(int x, int y)
@@ -153,53 +246,36 @@ void okno_obsluz_ruch(int x, int y)
 
     if (nx == ramka_x && ny == ramka_y) return;
 
-    if (ramka_widoczna) {
-        zmaz_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
-    }
-
+    int stara_ramka_x = ramka_x;
+    int stara_ramka_y = ramka_y;
     ramka_x = nx;
     ramka_y = ny;
     ramka_widoczna = 1;
 
-    narysuj_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+    narysuj_przerywana_ramke(ramka_x, ramka_y, stara_ramka_x, stara_ramka_y,
+                             aktywne_okno->szerokosc, aktywne_okno->wysokosc);
 }
 
 void okno_zakoncz_przeciaganie(void)
 {
     int stare_x;
     int stare_y;
-    int szerokosc_napisu;
-    int tekst_x;
-    int tekst_y;
+    int szerokosc;
+    int wysokosc;
 
     if (!przeciaganie) return;
 
     przeciaganie = 0;
 
-    if (ramka_widoczna) {
-        zmaz_przerywana_ramke(ramka_x, ramka_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
-        ramka_widoczna = 0;
-    }
-
     if (!aktywne_okno || !aktywne_okno->otwarte) return;
 
     stare_x = aktywne_okno->x;
     stare_y = aktywne_okno->y;
-
-    if (stare_x != ramka_x || stare_y != ramka_y) {
-        odtworz_fragment_tla(stare_x, stare_y, aktywne_okno->szerokosc, aktywne_okno->wysokosc);
-        
-        szerokosc_napisu = 27 * 8;
-        tekst_x = EKRAN_SZEROKOSC - szerokosc_napisu - 16;
-        tekst_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16;
-        
-        if (stare_x < tekst_x + szerokosc_napisu && stare_x + aktywne_okno->szerokosc > tekst_x &&
-            stare_y < tekst_y + 8 && stare_y + aktywne_okno->wysokosc > tekst_y) {
-            rysuj_tekst_8x8(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", 0x00FFFFFF);
-        }
-
-        aktywne_okno->x = ramka_x;
-        aktywne_okno->y = ramka_y;
-        okno_narysuj(aktywne_okno);
-    }
+    szerokosc = aktywne_okno->szerokosc;
+    wysokosc = aktywne_okno->wysokosc;
+    aktywne_okno->x = ramka_x;
+    aktywne_okno->y = ramka_y;
+    ramka_widoczna = 0;
+    okno_odrysuj_scene(stare_x, stare_y, szerokosc, wysokosc,
+                       ramka_x, ramka_y, szerokosc, wysokosc);
 }
