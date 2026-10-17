@@ -18,6 +18,8 @@ static int przesuniecie_y;
 static int ramka_x;
 static int ramka_y;
 static uint8_t ramka_widoczna;
+static uint8_t zmienianie_rozmiaru;
+static int kierunek_zmiany;
 
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
@@ -27,8 +29,15 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
                     okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
     rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
     rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
+    rysuj_prostokat(okno->x + okno->szerokosc - 64, okno->y + 4, 16, 16, 0x004A5D6E);
+    rysuj_prostokat(okno->x + okno->szerokosc - 60, okno->y + 10, 8, 2, 0x00FFFFFF);
     rysuj_prostokat(okno->x + okno->szerokosc - 42, okno->y + 4, 16, 16, 0x004A5D6E);
-    rysuj_prostokat(okno->x + okno->szerokosc - 38, okno->y + 10, 8, 2, 0x00FFFFFF);
+    if (!okno->zmaksymalizowane) {
+        rysuj_prostokat(okno->x + okno->szerokosc - 38, okno->y + 8, 8, 8, 0x00FFFFFF);
+    } else {
+        rysuj_prostokat(okno->x + okno->szerokosc - 40, okno->y + 6, 8, 8, 0x00FFFFFF);
+        rysuj_prostokat(okno->x + okno->szerokosc - 34, okno->y + 12, 8, 8, 0x00FFFFFF);
+    }
     rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
     rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
     if (okno->rysuj_zawartosc)
@@ -151,10 +160,16 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->y = y;
     okno->szerokosc = szerokosc;
     okno->wysokosc = wysokosc;
+    okno->x_poprzednie = x;
+    okno->y_poprzednie = y;
+    okno->szerokosc_poprzednia = szerokosc;
+    okno->wysokosc_poprzednia = wysokosc;
     okno->tytul = tytul;
     okno->rysuj_zawartosc = rysuj_zawartosc;
     okno->obsluz_klik = 0;
     okno->otwarte = 1;
+    okno->zminimalizowane = 0;
+    okno->zmaksymalizowane = 0;
     okno_przenies_na_wierzch(okno);
     okno_odrysuj_wszystkie();
 }
@@ -175,6 +190,9 @@ void okno_zamknij(struct okno *okno)
     if (!okno || !okno->otwarte) return;
     if (przeciaganie && aktywne_okno == okno) {
         okno_zakoncz_przeciaganie();
+    }
+    if (zmienianie_rozmiaru && aktywne_okno == okno) {
+        zmienianie_rozmiaru = 0;
     }
     okno->otwarte = 0;
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
@@ -218,10 +236,18 @@ int okno_obsluz_klikniecie(int x, int y)
     if (x >= trafione->x + trafione->szerokosc - 42 &&
         x < trafione->x + trafione->szerokosc - 26 &&
         y >= trafione->y + 4 && y < trafione->y + 20) {
+        if (trafione->zmaksymalizowane) okno_przywroc_rozmiar(trafione);
+        else okno_maksymalizuj(trafione);
+        return 1;
+    }
+    if (x >= trafione->x + trafione->szerokosc - 64 &&
+        x < trafione->x + trafione->szerokosc - 48 &&
+        y >= trafione->y + 4 && y < trafione->y + 20) {
         okno_zminimalizuj(trafione);
         return 1;
     }
-    if (x >= trafione->x + 2 && x < trafione->x + trafione->szerokosc - 22 &&
+    if (!trafione->zmaksymalizowane &&
+        x >= trafione->x + 2 && x < trafione->x + trafione->szerokosc - 64 &&
         y >= trafione->y + 2 && y < trafione->y + 22) {
         aktywne_okno = trafione;
         przeciaganie = 1;
@@ -231,8 +257,31 @@ int okno_obsluz_klikniecie(int x, int y)
         ramka_y = trafione->y;
         ramka_widoczna = 1;
         narysuj_przerywana_ramke(ramka_x, ramka_y, ramka_x, ramka_y,
-                     trafione->szerokosc, trafione->wysokosc);
+                         trafione->szerokosc, trafione->wysokosc);
         return 1;
+    }
+    if (!trafione->zmaksymalizowane) {
+        if (x >= trafione->x + trafione->szerokosc - 4 &&
+            y >= trafione->y + trafione->wysokosc - 4) {
+            aktywne_okno = trafione;
+            zmienianie_rozmiaru = 1;
+            kierunek_zmiany = 3;
+            return 1;
+        }
+        if (x >= trafione->x + trafione->szerokosc - 4 &&
+            y > trafione->y + 20 && y < trafione->y + trafione->wysokosc - 4) {
+            aktywne_okno = trafione;
+            zmienianie_rozmiaru = 1;
+            kierunek_zmiany = 1;
+            return 1;
+        }
+        if (y >= trafione->y + trafione->wysokosc - 4 &&
+            x > trafione->x + 4 && x < trafione->x + trafione->szerokosc - 4) {
+            aktywne_okno = trafione;
+            zmienianie_rozmiaru = 1;
+            kierunek_zmiany = 2;
+            return 1;
+        }
     }
     if (trafione->obsluz_klik) trafione->obsluz_klik(x - trafione->x, y - trafione->y);
     return 1;
@@ -242,28 +291,51 @@ void okno_obsluz_ruch(int x, int y)
 {
     int nx;
     int ny;
-    if (!przeciaganie || !aktywne_okno || !aktywne_okno->otwarte) return;
+    if (!przeciaganie && !zmienianie_rozmiaru) return;
+    if (!aktywne_okno || !aktywne_okno->otwarte) return;
 
-    nx = x - przesuniecie_x;
-    ny = y - przesuniecie_y;
+    if (przeciaganie) {
+        nx = x - przesuniecie_x;
+        ny = y - przesuniecie_y;
 
-    if (nx < 0) nx = 0;
-    if (ny < 0) ny = 0;
-    if (nx + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
-        nx = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
-    if (ny + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
-        ny = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
+        if (nx < 0) nx = 0;
+        if (ny < 0) ny = 0;
+        if (nx + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
+            nx = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
+        if (ny + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
+            ny = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
 
-    if (nx == ramka_x && ny == ramka_y) return;
+        if (nx == ramka_x && ny == ramka_y) return;
 
-    int stara_ramka_x = ramka_x;
-    int stara_ramka_y = ramka_y;
-    ramka_x = nx;
-    ramka_y = ny;
-    ramka_widoczna = 1;
+        int stara_ramka_x = ramka_x;
+        int stara_ramka_y = ramka_y;
+        ramka_x = nx;
+        ramka_y = ny;
+        ramka_widoczna = 1;
 
-    narysuj_przerywana_ramke(ramka_x, ramka_y, stara_ramka_x, stara_ramka_y,
-                             aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+        narysuj_przerywana_ramke(ramka_x, ramka_y, stara_ramka_x, stara_ramka_y,
+                                 aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+    }
+
+    if (zmienianie_rozmiaru) {
+        int stare_x = aktywne_okno->x;
+        int stare_y = aktywne_okno->y;
+        int stare_w = aktywne_okno->szerokosc;
+        int stare_h = aktywne_okno->wysokosc;
+        int nowy_w = stare_w;
+        int nowy_h = stare_h;
+        if (kierunek_zmiany & 1) nowy_w = x - aktywne_okno->x;
+        if (kierunek_zmiany & 2) nowy_h = y - aktywne_okno->y;
+        if (nowy_w < 100) nowy_w = 100;
+        if (nowy_h < 100) nowy_h = 100;
+        if (aktywne_okno->x + nowy_w > EKRAN_SZEROKOSC) nowy_w = EKRAN_SZEROKOSC - aktywne_okno->x;
+        if (aktywne_okno->y + nowy_h > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) nowy_h = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->y;
+        if (nowy_w == stare_w && nowy_h == stare_h) return;
+        okno_odrysuj_scene(stare_x, stare_y, stare_w, stare_h, stare_x, stare_y, nowy_w, nowy_h);
+        aktywne_okno->szerokosc = nowy_w;
+        aktywne_okno->wysokosc = nowy_h;
+        okno_odrysuj_scene(stare_x, stare_y, stare_w, stare_h, stare_x, stare_y, nowy_w, nowy_h);
+    }
 }
 
 void okno_zakoncz_przeciaganie(void)
@@ -273,9 +345,10 @@ void okno_zakoncz_przeciaganie(void)
     int szerokosc;
     int wysokosc;
 
-    if (!przeciaganie) return;
+    if (!przeciaganie && !zmienianie_rozmiaru) return;
 
     przeciaganie = 0;
+    zmienianie_rozmiaru = 0;
 
     if (!aktywne_okno || !aktywne_okno->otwarte) return;
 
@@ -314,9 +387,42 @@ void okno_przywroc(struct okno *okno)
     okno_odrysuj_wszystkie();
 }
 
+void okno_maksymalizuj(struct okno *okno)
+{
+    if (!okno || !okno->otwarte || okno->zminimalizowane || okno->zmaksymalizowane) return;
+    okno->x_poprzednie = okno->x;
+    okno->y_poprzednie = okno->y;
+    okno->szerokosc_poprzednia = okno->szerokosc;
+    okno->wysokosc_poprzednia = okno->wysokosc;
+    okno->x = 0;
+    okno->y = 0;
+    okno->szerokosc = EKRAN_SZEROKOSC;
+    okno->wysokosc = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    okno->zmaksymalizowane = 1;
+    okno_przenies_na_wierzch(okno);
+    okno_odrysuj_wszystkie();
+}
+
+void okno_przywroc_rozmiar(struct okno *okno)
+{
+    if (!okno || !okno->otwarte || !okno->zmaksymalizowane) return;
+    okno->x = okno->x_poprzednie;
+    okno->y = okno->y_poprzednie;
+    okno->szerokosc = okno->szerokosc_poprzednia;
+    okno->wysokosc = okno->wysokosc_poprzednia;
+    okno->zmaksymalizowane = 0;
+    okno_przenies_na_wierzch(okno);
+    okno_odrysuj_wszystkie();
+}
+
 int okno_czy_zminimalizowane(const struct okno *okno)
 {
     return okno && okno->zminimalizowane;
+}
+
+int okno_czy_zmaksymalizowane(const struct okno *okno)
+{
+    return okno && okno->zmaksymalizowane;
 }
 
 int okno_liczba_okien(void)
