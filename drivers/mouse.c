@@ -120,7 +120,16 @@ void mouse_poll(void) {
             mouse_pozycja(&x, &y);
             if (!okno_obsluz_klikniecie(x, y)) {
                 if (!pulp_mouse_press(x, y)) {
-                    menu_start_mouse_click();
+                    if (y >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC && x >= PASEK_ICON_START_X) {
+                        struct okno *ikona_okno = pasek_zadan_ikona_na_pozycji(x, y);
+                        if (ikona_okno) {
+                            okno_przywroc(ikona_okno);
+                        } else {
+                            menu_start_mouse_click();
+                        }
+                    } else {
+                        menu_start_mouse_click();
+                    }
                 }
             }
         }

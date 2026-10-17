@@ -21,12 +21,14 @@ static uint8_t ramka_widoczna;
 
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
-    if (!okno || !okno->otwarte) return;
+    if (!okno || !okno->otwarte || okno->zminimalizowane) return;
     rysuj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI);
     rysuj_prostokat(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
                     okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
     rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
     rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
+    rysuj_prostokat(okno->x + okno->szerokosc - 42, okno->y + 4, 16, 16, 0x004A5D6E);
+    rysuj_prostokat(okno->x + okno->szerokosc - 38, okno->y + 10, 8, 2, 0x00FFFFFF);
     rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
     rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
     if (okno->rysuj_zawartosc)
@@ -54,7 +56,7 @@ static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc)
     odtworz_fragment_tla_bufor(x, y, szerokosc, wysokosc);
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         struct okno *okno = okna[indeks];
-        if (!okno || !okno->otwarte || okno->x >= x + szerokosc ||
+        if (!okno || !okno->otwarte || okno->zminimalizowane || okno->x >= x + szerokosc ||
             okno->x + okno->szerokosc <= x || okno->y >= y + wysokosc ||
             okno->y + okno->wysokosc <= y) continue;
         narysuj_okno_bez_odswiezania(okno);
@@ -100,7 +102,9 @@ static void okno_odrysuj_wszystkie(void)
             odtworz_fragment_tla_bufor(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
     }
     for (int indeks = 0; indeks < liczba_okien; indeks++)
-        narysuj_okno_bez_odswiezania(okna[indeks]);
+        if (okna[indeks] && okna[indeks]->otwarte && !okna[indeks]->zminimalizowane)
+            narysuj_okno_bez_odswiezania(okna[indeks]);
+    pasek_zadan_rysuj_ikony_minimalizowanych();
     odswiez_widok();
 }
 
@@ -211,6 +215,12 @@ int okno_obsluz_klikniecie(int x, int y)
         okno_zamknij(trafione);
         return 1;
     }
+    if (x >= trafione->x + trafione->szerokosc - 42 &&
+        x < trafione->x + trafione->szerokosc - 26 &&
+        y >= trafione->y + 4 && y < trafione->y + 20) {
+        okno_zminimalizuj(trafione);
+        return 1;
+    }
     if (x >= trafione->x + 2 && x < trafione->x + trafione->szerokosc - 22 &&
         y >= trafione->y + 2 && y < trafione->y + 22) {
         aktywne_okno = trafione;
@@ -278,4 +288,44 @@ void okno_zakoncz_przeciaganie(void)
     ramka_widoczna = 0;
     okno_odrysuj_scene(stare_x, stare_y, szerokosc, wysokosc,
                        ramka_x, ramka_y, szerokosc, wysokosc);
+}
+
+void okno_zminimalizuj(struct okno *okno)
+{
+    if (!okno || !okno->otwarte || okno->zminimalizowane) return;
+    okno->zminimalizowane = 1;
+    if (aktywne_okno == okno) {
+        aktywne_okno = 0;
+        for (int i = liczba_okien - 1; i >= 0; i--) {
+            if (okna[i] && okna[i]->otwarte && !okna[i]->zminimalizowane && okna[i] != okno) {
+                aktywne_okno = okna[i];
+                break;
+            }
+        }
+    }
+    okno_odrysuj_wszystkie();
+}
+
+void okno_przywroc(struct okno *okno)
+{
+    if (!okno || !okno->otwarte || !okno->zminimalizowane) return;
+    okno->zminimalizowane = 0;
+    okno_przenies_na_wierzch(okno);
+    okno_odrysuj_wszystkie();
+}
+
+int okno_czy_zminimalizowane(const struct okno *okno)
+{
+    return okno && okno->zminimalizowane;
+}
+
+int okno_liczba_okien(void)
+{
+    return liczba_okien;
+}
+
+struct okno *okno_pobierz_okno(int indeks)
+{
+    if (indeks >= 0 && indeks < liczba_okien) return okna[indeks];
+    return 0;
 }

@@ -1,5 +1,6 @@
 #include "rysowanie.h"
 #include "czcionka.h"
+#include "okno.h"
 #include "../system_plikow/system_plikow.h"
 
 #define CURSOR_W 12
@@ -102,6 +103,134 @@ void ustaw_status_internetu(uint8_t dostepny)
     odswiez_fragment_widoku(EKRAN_SZEROKOSC - 24,
                             EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
                             24, PASEK_ZADAN_WYSOKOSC);
+}
+
+#define PASEK_ICON_W 24
+#define PASEK_ICON_H 24
+#define PASEK_ICON_SPACJE 4
+#define PASEK_ICON_START_X 80
+
+static int tekst_rowne(const char *a, const char *b)
+{
+    while (*a && *b) {
+        if (*a++ != *b++) return 0;
+    }
+    return *a == *b;
+}
+
+static const uint8_t ikona_notatnik_pasek[12][12] = {
+    {0,0,0,0,0,0,0,0,0,0,0,1},
+    {0,0,0,0,0,0,0,0,0,0,1,1},
+    {0,0,0,0,0,0,0,0,0,1,1,0},
+    {0,0,0,0,0,0,0,0,1,1,0,0},
+    {0,0,0,0,0,0,0,1,1,0,0,0},
+    {0,0,0,0,0,0,1,1,0,0,0,0},
+    {0,0,0,0,0,1,1,0,0,0,0,0},
+    {0,0,0,0,1,1,0,0,0,0,0,0},
+    {0,0,0,1,1,0,0,0,0,0,0,0},
+    {0,0,1,1,0,0,0,0,0,0,0,0},
+    {0,1,1,0,0,0,0,0,0,0,0,0},
+    {1,1,0,0,0,0,0,0,0,0,0,0}
+};
+
+static const uint8_t ikona_pliki_pasek[12][12] = {
+    {0,0,0,0,0,0,0,0,0,0,0,0},
+    {0,0,1,1,1,1,0,0,0,0,0,0},
+    {0,1,1,1,1,1,1,0,0,0,0,0},
+    {1,1,1,1,1,1,1,1,1,1,1,0},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1}
+};
+
+static const uint8_t ikona_www_pasek[12][12] = {
+    {0,0,0,0,1,1,1,1,0,0,0,0},
+    {0,0,1,1,1,2,2,1,1,1,0,0},
+    {0,1,1,2,1,2,2,1,2,1,1,0},
+    {1,1,2,1,1,2,2,1,1,2,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,2,2,2,2,2,2,2,2,1,1},
+    {1,1,1,1,1,1,1,1,1,1,1,1},
+    {1,1,2,1,1,2,2,1,1,2,1,1},
+    {0,1,1,2,1,2,2,1,2,1,1,0},
+    {0,0,1,1,1,2,2,1,1,1,0,0},
+    {0,0,0,0,1,1,1,1,0,0,0,0},
+    {0,0,0,0,0,0,0,0,0,0,0,0}
+};
+
+static void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul)
+{
+    rysuj_prostokat(x, y, PASEK_ICON_W, PASEK_ICON_H, 0x003A4B5C);
+    int ix = x + (PASEK_ICON_W - 12) / 2;
+    int iy = y + (PASEK_ICON_H - 12) / 2;
+    if (tekst_rowne(tytul, "NOTATNIK")) {
+        for (int i = 0; i < 12; i++) {
+            for (int j = 0; j < 12; j++) {
+                if (ikona_notatnik_pasek[i][j])
+                    rysuj_piksel(ix + j, iy + i, KOLOR_ZOLTY);
+            }
+        }
+    } else if (tekst_rowne(tytul, "Pliki")) {
+        for (int i = 0; i < 12; i++) {
+            for (int j = 0; j < 12; j++) {
+                if (ikona_pliki_pasek[i][j])
+                    rysuj_piksel(ix + j, iy + i, KOLOR_ZOLTY);
+            }
+        }
+    } else if (tekst_rowne(tytul, "PRZEGLADARKA HTTP/HTTPS")) {
+        for (int i = 0; i < 12; i++) {
+            for (int j = 0; j < 12; j++) {
+                uint8_t p = ikona_www_pasek[i][j];
+                if (p)
+                    rysuj_piksel(ix + j, iy + i, p == 1 ? KOLOR_NIEBIESKI : 0x0068B8FF);
+            }
+        }
+    } else {
+        rysuj_prostokat(ix + 2, iy + 2, 8, 8, KOLOR_BIALY);
+        rysuj_prostokat(ix + 4, iy + 4, 4, 4, KOLOR_CZARNY);
+    }
+    rysuj_prostokat(x, y, PASEK_ICON_W, 1, KOLOR_BIALY);
+    rysuj_prostokat(x, y, 1, PASEK_ICON_H, KOLOR_BIALY);
+    rysuj_prostokat(x + PASEK_ICON_W - 1, y, 1, PASEK_ICON_H, KOLOR_BIALY);
+    rysuj_prostokat(x, y + PASEK_ICON_H - 1, PASEK_ICON_W, 1, KOLOR_BIALY);
+}
+
+void pasek_zadan_rysuj_ikony_minimalizowanych(void)
+{
+    int x = PASEK_ICON_START_X;
+    int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 3;
+    int koniec_x = EKRAN_SZEROKOSC - 120;
+    for (int cx = x; cx < koniec_x; cx++) {
+        for (int cy = y; cy < y + PASEK_ICON_H; cy++) {
+            rysuj_piksel(cx, cy, KOLOR_PASKA_ZADAN);
+        }
+    }
+    x = PASEK_ICON_START_X;
+    for (int i = 0; i < okno_liczba_okien(); i++) {
+        struct okno *okno = okno_pobierz_okno(i);
+        if (!okno || !okno->otwarte || !okno->zminimalizowane) continue;
+        pasek_zadan_rysuj_ikone(x, y, okno->tytul);
+        x += PASEK_ICON_W + PASEK_ICON_SPACJE;
+    }
+}
+
+struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
+{
+    int start_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 3;
+    if (y < start_y || y > start_y + PASEK_ICON_H) return 0;
+    int ix = PASEK_ICON_START_X;
+    for (int i = 0; i < okno_liczba_okien(); i++) {
+        struct okno *okno = okno_pobierz_okno(i);
+        if (!okno || !okno->otwarte || !okno->zminimalizowane) continue;
+        if (x >= ix && x < ix + PASEK_ICON_W) return okno;
+        ix += PASEK_ICON_W + PASEK_ICON_SPACJE;
+    }
+    return 0;
 }
 
 static void kopiuj_pamiec(void *dst, const void *src, uint32_t bajty)
@@ -271,6 +400,7 @@ void narysuj_pasek_zadan(void)
     for (uint32_t i = 0; i < size; i++) {
         obraz[start + i] = KOLOR_PASKA_ZADAN;
     }
+    pasek_zadan_rysuj_ikony_minimalizowanych();
     narysuj_czas_paska();
     narysuj_ikone_internetu();
     odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
@@ -307,7 +437,7 @@ void ustaw_kolor_tapety(uint32_t kolor)
 static uint32_t parsuj_hex(char **p)
 {
     uint32_t v = 0;
-    if (*p[0] == '0' && (*p[1] == 'x' || *p[1] == 'X')) {
+    if ((*p)[0] == '0' && ((*p)[1] == 'x' || (*p)[1] == 'X')) {
         *p += 2;
     }
     while (**p) {

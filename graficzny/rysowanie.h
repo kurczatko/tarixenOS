@@ -3,6 +3,10 @@
 
 #include "../include/printf/types.h"
 
+struct okno;
+
+#define PASEK_ICON_START_X 80
+
 #define EKRAN_SZEROKOSC 1024
 #define EKRAN_WYSOKOSC 768
 #define PASEK_ZADAN_WYSOKOSC 30
@@ -34,5 +38,7 @@ void ustaw_status_internetu(uint8_t dostepny);
 void ustaw_czas_paska(const char *czas);
 int tapeta_wczytaj(void);
 void tapeta_zapisz(void);
+void pasek_zadan_rysuj_ikony_minimalizowanych(void);
+struct okno *pasek_zadan_ikona_na_pozycji(int x, int y);
 
 #endif

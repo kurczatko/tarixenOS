@@ -56,31 +56,31 @@ static void rysuj_wybor_tapety(int x, int y, int szerokosc, int wysokosc)
 
 void __attribute__((section(".text.entry"))) kernel_main(void)
 {
-    __asm__ volatile ("movb $'A', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'A', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     rysowanie_init();
-    __asm__ volatile ("movb $'B', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'B', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     zegar_init();
-    __asm__ volatile ("movb $'C', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'C', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     {
         char tekst_czasu[9];
         zegar_pobierz(tekst_czasu);
         ustaw_czas_paska(tekst_czasu);
     }
-    __asm__ volatile ("movb $'D', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'D', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     init_fs();
-    __asm__ volatile ("movb $'E', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     tapeta_wczytaj();
     okno_stworz(&okno_tapeta, 248, 80, 360, 170, "TAPETA", rysuj_wybor_tapety);
     okno_ustaw_obsluge_klikniecia(&okno_tapeta, obsluz_wybor_tapety);
-    __asm__ volatile ("movb $'F', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'F', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     menu_start();
-    __asm__ volatile ("movb $'G', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     mouse_init();
-    __asm__ volatile ("movb $'H', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     keyboard_init();
-    __asm__ volatile ("movb $'I', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     net_init();
-    __asm__ volatile ("movb $'J', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     ustaw_status_internetu((uint8_t)net_ready());
     if (net_ready()) {
         int dlugosc_odpowiedzi = net_http_get("info.cern.ch", "/", odpowiedz_czasu_http,
@@ -88,11 +88,11 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         if (dlugosc_odpowiedzi > 0)
             zegar_synchronizuj_http(odpowiedz_czasu_http, (uint32_t)dlugosc_odpowiedzi);
     }
-    __asm__ volatile ("movb $'K', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     init_intel_hda();
-    __asm__ volatile ("movb $'L', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
-    __asm__ volatile ("movb $'M', %%al; outb %%al, $0x3F8" ::: "eax");
+    __asm__ volatile ("movb $'M', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     while(1) {
         char tekst_czasu[9];
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);

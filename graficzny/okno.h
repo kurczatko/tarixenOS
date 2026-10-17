@@ -12,6 +12,7 @@ struct okno {
     int szerokosc;
     int wysokosc;
     uint8_t otwarte;
+    uint8_t zminimalizowane;
     const char *tytul;
     okno_rysuj_zawartosc rysuj_zawartosc;
     okno_obsluz_klik obsluz_klik;
@@ -27,5 +28,10 @@ void okno_zakoncz_przeciaganie(void);
 void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_klik);
 void okno_ustaw_aktywne(struct okno *okno);
 int okno_czy_aktywne(const struct okno *okno);
+void okno_zminimalizuj(struct okno *okno);
+void okno_przywroc(struct okno *okno);
+int okno_czy_zminimalizowane(const struct okno *okno);
+int okno_liczba_okien(void);
+struct okno *okno_pobierz_okno(int indeks);
 
 #endif
