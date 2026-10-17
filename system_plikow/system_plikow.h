@@ -25,3 +25,5 @@ void fs_reset_directory(void);
 int fs_parent_directory(void);
 
 #endif
+uint32_t fs_get_current_dir(void);
+void fs_set_current_dir(uint32_t dir);

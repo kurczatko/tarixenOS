@@ -1,11 +1,12 @@
 #ifndef CZCIONKA_H
 #define CZCIONKA_H
 
-#include "../include/printf/types.h"
+extern const unsigned char font_olivetti_8x8[128][8][8];
+extern const unsigned char font_olivetti_12x16[128][16][12];
 
-extern const uint8_t font_8x8[128][8];
-
-void rysuj_tekst_8x8(int x, int y, const char *tekst, uint32_t kolor);
-void rysuj_znak_8x8(int x, int y, char znak, uint32_t kolor);
+void rysuj_znak_chicago(int x, int y, char znak, unsigned int kolor);
+void rysuj_tekst_chicago(int x, int y, const char *tekst, unsigned int kolor);
+void rysuj_znak_8x8(int x, int y, char znak, unsigned int kolor);
+void rysuj_tekst_8x8(int x, int y, const char *tekst, unsigned int kolor);
 
 #endif

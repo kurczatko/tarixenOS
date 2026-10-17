@@ -235,3 +235,12 @@ int fs_list_current(struct fs_entry_info *entries, int capacity) {
     }
     return count;
 }
+
+uint32_t fs_get_current_dir(void) {
+    return current_dir;
+}
+
+void fs_set_current_dir(uint32_t dir) {
+    current_dir = dir;
+    directory_depth = 0;
+}

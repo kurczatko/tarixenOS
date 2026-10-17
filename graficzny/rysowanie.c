@@ -79,7 +79,7 @@ static void narysuj_czas_paska(void)
     int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 11;
     rysuj_prostokat(x - 4, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
                     84, PASEK_ZADAN_WYSOKOSC, KOLOR_PASKA_ZADAN);
-    rysuj_tekst_8x8(x, y, czas_paska, KOLOR_BIALY);
+    rysuj_tekst_chicago(x, y, czas_paska, KOLOR_BIALY);
 }
 
 void ustaw_czas_paska(const char *czas)
@@ -169,7 +169,7 @@ static void narysuj_napis_systemowy(void)
     int szerokosc_napisu = 27 * 8;
     int tekst_x = EKRAN_SZEROKOSC - szerokosc_napisu - 16;
     int tekst_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16;
-    rysuj_tekst_8x8(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", KOLOR_TEKST_BIALY);
 }
 
 void odswiez_widok(void)

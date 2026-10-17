@@ -327,15 +327,25 @@ int net_tcp_connect(struct net_tcp_connection *connection, const char *host, uin
     connection->sequence++;
     make_tcp_packet(frame, connection->remote_mac, connection->remote_ip, connection->local_port, port,
                     connection->sequence, connection->acknowledgement, 0x10, 0, 0);
+    for (uint32_t tries = 0; tries < 1000000000; tries++) {
+        if ((tries & 0x3FF) == 0) { __asm__ volatile("pause" ::: "memory"); }
+        if (e1000_send(frame, 54)) break;
+    }
     connection->connected = 1;
     return 1;
 }
 
 int net_tcp_send(struct net_tcp_connection *connection, const uint8_t *data, uint16_t length)
 {
+    uint16_t packet_length;
     if (!connection || !connection->connected || (!data && length) || length > FRAME_MAX - 54) return -1;
     make_tcp_packet(frame, connection->remote_mac, connection->remote_ip, connection->local_port,
                     connection->remote_port, connection->sequence, connection->acknowledgement, 0x18, data, length);
+    packet_length = (uint16_t)(14 + 20 + 20 + length);
+    for (uint32_t tries = 0; tries < 1000000000; tries++) {
+        if ((tries & 0x3FF) == 0) { __asm__ volatile("pause" ::: "memory"); }
+        if (e1000_send(frame, packet_length)) break;
+    }
     connection->sequence += length;
     return 1;
 }
@@ -345,7 +355,9 @@ int net_tcp_receive(struct net_tcp_connection *connection, uint8_t *data, uint16
     uint8_t *tcp;
     uint16_t payload_length;
     if (!connection || !connection->connected || !data || !capacity) return -1;
-    for (uint32_t tries = 0; tries < attempts; tries++) {
+    (void)attempts;
+    for (uint32_t tries = 0; tries < 1000000000; tries++) {
+        if ((tries & 0x3FF) == 0) { __asm__ volatile("pause" ::: "memory"); }
         int length = tcp_wait(frame, &tcp, &payload_length, connection->remote_ip, connection->remote_port,
                               connection->local_port, 1);
         if (!length) continue;

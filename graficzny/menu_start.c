@@ -58,7 +58,7 @@ void menu_start(void)
         }
     }
     
-    rysuj_tekst_8x8(START_X + 26, START_Y + (START_WYSOKOSC / 2) - 4, "start", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(START_X + 26, START_Y + (START_WYSOKOSC / 2) - 4, "start", KOLOR_TEKST_BIALY);
 
     odswiez_widok();
 }
@@ -114,7 +114,7 @@ static void menu_start_narysuj(void)
     rysuj_prostokat(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, KOLOR_TLO_MENU);
     
     rysuj_prostokat(MENU_X + 6, MENU_Y + 12, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 22, "NOTATNIK", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 22, "NOTATNIK", KOLOR_TEKST_BIALY);
 
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
@@ -125,7 +125,7 @@ static void menu_start_narysuj(void)
     }
     
     rysuj_prostokat(MENU_X + 6, MENU_Y + 48, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 58, "WYLACZ", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 58, "WYLACZ", KOLOR_TEKST_BIALY);
     
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
@@ -136,7 +136,7 @@ static void menu_start_narysuj(void)
     }
     
     rysuj_prostokat(MENU_X + 6, MENU_Y + 84, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 94, "PLIKI", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 94, "PLIKI", KOLOR_TEKST_BIALY);
 
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
@@ -162,7 +162,7 @@ static void menu_start_narysuj(void)
     };
 
     rysuj_prostokat(MENU_X + 6, MENU_Y + 120, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
-    rysuj_tekst_8x8(MENU_X + 26, MENU_Y + 130, "WWW", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 130, "WWW", KOLOR_TEKST_BIALY);
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
             uint8_t piksel = ikona_globu[iy][ix];
@@ -192,6 +192,17 @@ static void menu_start_wyczysc(void)
     }
     
     odswiez_widok();
+}
+
+void menu_start_przełącz(void)
+{
+    if (menu_otwarte) {
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+    } else {
+        menu_otwarte = 1;
+        menu_start_narysuj();
+    }
 }
 
 void menu_start_mouse_click(void)

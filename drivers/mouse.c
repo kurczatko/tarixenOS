@@ -4,6 +4,7 @@
 #include "../graficzny/rysowanie.h"
 #include "../graficzny/okno.h"
 #include "../graficzny/menu_start.h"
+#include "../graficzny/pulpit.h"
 #include "../kernel/browser.h"
 
 #define MOUSE_DATA_PORT 0x60
@@ -117,7 +118,10 @@ void mouse_poll(void) {
             int x;
             int y;
             mouse_pozycja(&x, &y);
-            if (!okno_obsluz_klikniecie(x, y)) menu_start_mouse_click();
+            if (!okno_obsluz_klikniecie(x, y)) {
+                pulp_obsluz_klik(x, y);
+                menu_start_mouse_click();
+            }
         }
     }
     if (!(packet[0] & 1)) {

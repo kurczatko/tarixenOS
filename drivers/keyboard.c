@@ -11,6 +11,7 @@ uint8_t inb(uint16_t port) {
 static uint8_t shift_pressed = 0;
 static uint8_t caps_lock = 0;
 static uint8_t extended_scancode = 0;
+static uint8_t windows_key_pressed = 0;
 
 void keyboard_init(void) {
     while (inb(0x64) & 2);
@@ -31,6 +32,9 @@ uint8_t keyboard_try_getchar(char *character) {
 
     if (extended_scancode) {
         extended_scancode = 0;
+        if (scancode == 0x5B || scancode == 0x5C) {
+            windows_key_pressed = 1;
+        }
         return 0;
     }
     if (scancode == 0xE0) {
@@ -62,6 +66,12 @@ uint8_t keyboard_try_getchar(char *character) {
 void keyboard_discard_pending(void) {
     char ignored;
     keyboard_try_getchar(&ignored);
+}
+
+uint8_t keyboard_windows_pressed(void) {
+    uint8_t tmp = windows_key_pressed;
+    windows_key_pressed = 0;
+    return tmp;
 }
 
 char keyboard_getchar(void) {

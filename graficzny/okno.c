@@ -26,9 +26,9 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
     rysuj_prostokat(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
                     okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
     rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
-    rysuj_tekst_8x8(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
+    rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
     rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
-    rysuj_znak_8x8(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
+    rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
     if (okno->rysuj_zawartosc)
         okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
 }

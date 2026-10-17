@@ -19,7 +19,7 @@
 static struct okno okno_notatnik;
 static uint8_t notatnik_otwarty;
 static char notatka[NOTATNIK_MAKS + 1];
-static char notatnik_plik[13] = NOTATNIK_PLIK;
+static char notatnik_plik[16] = NOTATNIK_PLIK;
 static int notatka_dlugosc;
 static char notatnik_status[32];
 
@@ -56,19 +56,23 @@ static void notatnik_narysuj(int x, int y, int szerokosc, int wysokosc)
             kolumna = 0;
             if (notatka[indeks] == '\n') continue;
         }
-        rysuj_znak_8x8(x + kolumna * 8, y + linia * 8, notatka[indeks], KOLOR_TEKST_NOTATKI);
+        rysuj_znak_chicago(x + kolumna * 12, y + linia * 16, notatka[indeks], KOLOR_TEKST_NOTATKI);
         kolumna++;
     }
     rysuj_prostokat(x, y + NOTATNIK_PRZYCISK_Y, 88, 24, KOLOR_PRZYCISKU);
-    rysuj_tekst_8x8(x + 8, y + NOTATNIK_PRZYCISK_Y + 8, "ODCZYTAJ", KOLOR_TEKST_PRZYCISKU);
+    rysuj_tekst_chicago(x + 8, y + NOTATNIK_PRZYCISK_Y + 8, "ODCZYTAJ", KOLOR_TEKST_PRZYCISKU);
     rysuj_prostokat(x + 104, y + NOTATNIK_PRZYCISK_Y, 56, 24, KOLOR_PRZYCISKU);
-    rysuj_tekst_8x8(x + 112, y + NOTATNIK_PRZYCISK_Y + 8, "ZAPISZ", KOLOR_TEKST_PRZYCISKU);
-    rysuj_tekst_8x8(x + 176, y + NOTATNIK_PRZYCISK_Y + 8, notatnik_status, KOLOR_TEKST_PRZYCISKU);
+    rysuj_tekst_chicago(x + 112, y + NOTATNIK_PRZYCISK_Y + 8, "ZAPISZ", KOLOR_TEKST_PRZYCISKU);
+    rysuj_tekst_chicago(x + 176, y + NOTATNIK_PRZYCISK_Y + 8, notatnik_status, KOLOR_TEKST_PRZYCISKU);
 }
 
 static void notatnik_odczytaj(void)
 {
-    int odczyt = read_file(notatnik_plik, notatka, NOTATNIK_MAKS);
+    int i;
+    int odczyt;
+    for (i = 0; i <= NOTATNIK_MAKS; i++) notatka[i] = 0;
+    notatka_dlugosc = 0;
+    odczyt = read_file(notatnik_plik, notatka, NOTATNIK_MAKS);
     if (odczyt < 0) {
         notatka_dlugosc = 0;
         notatka[0] = 0;
@@ -82,9 +86,10 @@ static void notatnik_odczytaj(void)
 
 static void notatnik_zapisz(void)
 {
-    if (write_file(notatnik_plik, notatka, notatka_dlugosc) != 0) {
-        if (create_file(notatnik_plik, 0) != 0 ||
-            write_file(notatnik_plik, notatka, notatka_dlugosc) != 0) {
+    notatka[notatka_dlugosc] = 0;
+    if (write_file(notatnik_plik, notatka, (uint32_t)notatka_dlugosc) != 0) {
+        if (create_file(notatnik_plik, (uint32_t)notatka_dlugosc) != 0 ||
+            write_file(notatnik_plik, notatka, (uint32_t)notatka_dlugosc) != 0) {
             notatnik_ustaw_status("blad zapisu");
             return;
         }

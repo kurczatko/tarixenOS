@@ -5,7 +5,6 @@
 #include "../include/blue.h"
 
 void panika() {
-    blue();
     vga_init();
     keyboard_init();
     printf(" !!!!!!!!!!!!!!!!!!!\n");

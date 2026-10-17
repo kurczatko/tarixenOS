@@ -38,19 +38,19 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
     (void)szerokosc;
     liczba_plikow = fs_list_current(lista_plikow, 24);
 
-    rysuj_tekst_8x8(x, y, "PLIKI", 0x00000000);
+    rysuj_tekst_chicago(x, y, "PLIKI", 0x00000000);
     rysuj_prostokat(x, y + 14, 78, 20, 0x00334155);
-    rysuj_tekst_8x8(x + 8, y + 20, "FOLDER+", 0x00FFFFFF);
+    rysuj_tekst_chicago(x + 8, y + 20, "FOLDER+", 0x00FFFFFF);
     rysuj_prostokat(x + 84, y + 14, 78, 20, 0x00334155);
-    rysuj_tekst_8x8(x + 100, y + 20, "TXT+", 0x00FFFFFF);
+    rysuj_tekst_chicago(x + 100, y + 20, "TXT+", 0x00FFFFFF);
     rysuj_prostokat(x + 168, y + 14, 62, 20, 0x00334155);
-    rysuj_tekst_8x8(x + 184, y + 20, "WROC", 0x00FFFFFF);
+    rysuj_tekst_chicago(x + 184, y + 20, "WROC", 0x00FFFFFF);
 
     if (tryb_tworz) {
-        rysuj_tekst_8x8(x, y + 40, "NAZWA:", 0x00000000);
-        rysuj_tekst_8x8(x + 56, y + 40, nazwa_nowego, 0x00000000);
+        rysuj_tekst_chicago(x, y + 40, "NAZWA:", 0x00000000);
+        rysuj_tekst_chicago(x + 56, y + 40, nazwa_nowego, 0x00000000);
     } else {
-        rysuj_tekst_8x8(x, y + 40, status_plikow, 0x00000000);
+        rysuj_tekst_chicago(x, y + 40, status_plikow, 0x00000000);
     }
 
     for (int i = 0; i < liczba_plikow; i++) {
@@ -58,11 +58,11 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
         if (row_y + 8 > y + wysokosc) break;
         if (i == wybrany_element) {
             rysuj_prostokat(x, row_y, 250, 14, 0x003B82F6);
-            rysuj_tekst_8x8(x, row_y, lista_plikow[i].name, 0x00FFFFFF);
+            rysuj_tekst_chicago(x, row_y, lista_plikow[i].name, 0x00FFFFFF);
         } else {
-            rysuj_tekst_8x8(x, row_y, lista_plikow[i].name, 0x00000000);
+            rysuj_tekst_chicago(x, row_y, lista_plikow[i].name, 0x00000000);
         }
-        if (lista_plikow[i].is_directory) rysuj_tekst_8x8(x + 176, row_y, "<DIR>", 0x00000000);
+        if (lista_plikow[i].is_directory) rysuj_tekst_chicago(x + 176, row_y, "<DIR>", 0x00000000);
     }
 }
 
