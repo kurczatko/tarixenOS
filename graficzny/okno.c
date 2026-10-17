@@ -20,6 +20,8 @@ static int ramka_y;
 static uint8_t ramka_widoczna;
 static uint8_t zmienianie_rozmiaru;
 static int kierunek_zmiany;
+static char schowek[512];
+static int schowek_dlugosc;
 
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
@@ -167,9 +169,19 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->tytul = tytul;
     okno->rysuj_zawartosc = rysuj_zawartosc;
     okno->obsluz_klik = 0;
+    okno->pole_tekstowe_enter = 0;
+    okno->pole_tekstowe_wyjdz = 0;
+    okno->pole_tekstowe_znak = 0;
     okno->otwarte = 1;
     okno->zminimalizowane = 0;
     okno->zmaksymalizowane = 0;
+    okno->w_polu_tekstowym = 0;
+    okno->kursor_pozycja = 0;
+    okno->zaznacz_poczatek = -1;
+    okno->zaznacz_koniec = -1;
+    okno->tekst_bufor = 0;
+    okno->tekst_dlugosc = 0;
+    okno->tekst_maks = 0;
     okno_przenies_na_wierzch(okno);
     okno_odrysuj_wszystkie();
 }
@@ -220,7 +232,12 @@ int okno_obsluz_klikniecie(int x, int y)
             break;
         }
     }
-    if (!trafione) return 0;
+    if (!trafione) {
+        if (aktywne_okno && aktywne_okno->otwarte && aktywne_okno->w_polu_tekstowym) {
+            okno_wyjdz_z_pola_tekstowego(aktywne_okno);
+        }
+        return 0;
+    }
 
     if (trafione != aktywne_okno) {
         okno_przenies_na_wierzch(trafione);
@@ -282,6 +299,13 @@ int okno_obsluz_klikniecie(int x, int y)
             kierunek_zmiany = 2;
             return 1;
         }
+    }
+    if (!trafione->zmaksymalizowane &&
+        y >= trafione->y + 22 && y < trafione->y + trafione->wysokosc - 2 &&
+        x >= trafione->x + 4 && x < trafione->x + trafione->szerokosc - 4 &&
+        trafione->pole_tekstowe_enter) {
+        okno_wejdz_do_pola_tekstowego(trafione);
+        return 1;
     }
     if (trafione->obsluz_klik) trafione->obsluz_klik(x - trafione->x, y - trafione->y);
     return 1;
@@ -423,6 +447,123 @@ int okno_czy_zminimalizowane(const struct okno *okno)
 int okno_czy_zmaksymalizowane(const struct okno *okno)
 {
     return okno && okno->zmaksymalizowane;
+}
+
+void okno_ustaw_pole_tekstowe_enter(struct okno *okno, okno_pole_tekstowe fn)
+{
+    if (okno) okno->pole_tekstowe_enter = fn;
+}
+
+void okno_ustaw_pole_tekstowe_wyjdz(struct okno *okno, okno_pole_tekstowe fn)
+{
+    if (okno) okno->pole_tekstowe_wyjdz = fn;
+}
+
+void okno_ustaw_pole_tekstowe_znak(struct okno *okno, okno_pole_tekstowe_znak fn)
+{
+    if (okno) okno->pole_tekstowe_znak = fn;
+}
+
+void okno_wejdz_do_pola_tekstowego(struct okno *okno)
+{
+    if (!okno || !okno->otwarte || okno->w_polu_tekstowym) return;
+    okno->w_polu_tekstowym = 1;
+    okno->kursor_pozycja = 0;
+    okno->zaznacz_poczatek = -1;
+    okno->zaznacz_koniec = -1;
+    if (okno->pole_tekstowe_enter) okno->pole_tekstowe_enter(okno);
+}
+
+void okno_wyjdz_z_pola_tekstowego(struct okno *okno)
+{
+    if (!okno || !okno->otwarte || !okno->w_polu_tekstowym) return;
+    okno->w_polu_tekstowym = 0;
+    okno->kursor_pozycja = 0;
+    okno->zaznacz_poczatek = -1;
+    okno->zaznacz_koniec = -1;
+    if (okno->pole_tekstowe_wyjdz) okno->pole_tekstowe_wyjdz(okno);
+}
+
+int okno_czy_w_polu_tekstowym(const struct okno *okno)
+{
+    return okno && okno->w_polu_tekstowym;
+}
+
+int okno_pobierz_kursor(const struct okno *okno)
+{
+    return okno ? okno->kursor_pozycja : 0;
+}
+
+void okno_ustaw_kursor(struct okno *okno, int pozycja)
+{
+    if (okno) okno->kursor_pozycja = pozycja;
+}
+
+void okno_zaznacz_tekst(struct okno *okno, int poczatek, int koniec)
+{
+    if (!okno) return;
+    okno->zaznacz_poczatek = poczatek;
+    okno->zaznacz_koniec = koniec;
+}
+
+void okno_pobierz_zaznaczenie(const struct okno *okno, int *poczatek, int *koniec)
+{
+    if (!okno) return;
+    if (poczatek) *poczatek = okno->zaznacz_poczatek;
+    if (koniec) *koniec = okno->zaznacz_koniec;
+}
+
+int okno_skopiuj_zaznaczenie(struct okno *okno)
+{
+    if (!okno || !okno->tekst_bufor) return 0;
+    int poczatek = okno->zaznacz_poczatek;
+    int koniec = okno->zaznacz_koniec;
+    if (poczatek < 0 || koniec < 0 || poczatek >= koniec) return 0;
+    if (poczatek >= okno->tekst_dlugosc) return 0;
+    if (koniec > okno->tekst_dlugosc) koniec = okno->tekst_dlugosc;
+    int dlugosc = koniec - poczatek;
+    if (dlugosc > 511) dlugosc = 511;
+    for (int i = 0; i < dlugosc; i++) schowek[i] = okno->tekst_bufor[poczatek + i];
+    schowek[dlugosc] = 0;
+    schowek_dlugosc = dlugosc;
+    return 1;
+}
+
+int okno_wklej_schowek(struct okno *okno)
+{
+    if (!okno || !okno->tekst_bufor || schowek_dlugosc <= 0) return 0;
+    int pozycja = okno->kursor_pozycja;
+    if (pozycja < 0) pozycja = 0;
+    if (pozycja > okno->tekst_dlugosc) pozycja = okno->tekst_dlugosc;
+    int dostepne = okno->tekst_maks - okno->tekst_dlugosc;
+    if (dostepne <= 0) return 0;
+    int wstaw = schowek_dlugosc;
+    if (wstaw > dostepne) wstaw = dostepne;
+    for (int i = okno->tekst_dlugosc; i >= pozycja; i--) {
+        okno->tekst_bufor[i + wstaw] = okno->tekst_bufor[i];
+    }
+    for (int i = 0; i < wstaw; i++) {
+        okno->tekst_bufor[pozycja + i] = schowek[i];
+    }
+    okno->tekst_dlugosc += wstaw;
+    okno->tekst_bufor[okno->tekst_dlugosc] = 0;
+    okno->kursor_pozycja = pozycja + wstaw;
+    return 1;
+}
+
+void okno_ustaw_bufor_tekstu(struct okno *okno, char *bufor, int dlugosc, int maks)
+{
+    if (!okno) return;
+    okno->tekst_bufor = bufor;
+    okno->tekst_dlugosc = dlugosc;
+    okno->tekst_maks = maks;
+}
+
+void okno_pobierz_bufor_tekstu(struct okno *okno, char **bufor, int *dlugosc)
+{
+    if (!okno) return;
+    if (bufor) *bufor = okno->tekst_bufor;
+    if (dlugosc) *dlugosc = okno->tekst_dlugosc;
 }
 
 int okno_liczba_okien(void)

@@ -64,6 +64,10 @@ static void notatnik_narysuj(int x, int y, int szerokosc, int wysokosc)
     rysuj_prostokat(x + 104, y + NOTATNIK_PRZYCISK_Y, 56, 24, KOLOR_PRZYCISKU);
     rysuj_tekst_chicago(x + 112, y + NOTATNIK_PRZYCISK_Y + 8, "ZAPISZ", KOLOR_TEKST_PRZYCISKU);
     rysuj_tekst_chicago(x + 176, y + NOTATNIK_PRZYCISK_Y + 8, notatnik_status, KOLOR_TEKST_PRZYCISKU);
+    if (okno_notatnik.w_polu_tekstowym && kursor_tekstowy_widoczny()) {
+        int cx = x + 8 + okno_notatnik.kursor_pozycja * 12;
+        kursor_tekstowy_rysuj(cx, y);
+    }
 }
 
 static void notatnik_odczytaj(void)
@@ -106,6 +110,10 @@ static void notatnik_klik(int x, int y)
     }
 }
 
+static void notatnik_pole_tekstowe_enter(struct okno *okno);
+static void notatnik_pole_tekstowe_wyjdz(struct okno *okno);
+static int notatnik_pole_tekstowe_znak(struct okno *okno, char znak, uint8_t ctrl);
+
 static void notatnik_otworz_biezacy_plik(void)
 {
     if (notatnik_otwarty && okno_notatnik.otwarte) {
@@ -122,6 +130,10 @@ static void notatnik_otworz_biezacy_plik(void)
     okno_stworz(&okno_notatnik, 56, 50, NOTATNIK_SZEROKOSC,
                 NOTATNIK_WYSOKOSC, "NOTATNIK", notatnik_narysuj);
     okno_ustaw_obsluge_klikniecia(&okno_notatnik, notatnik_klik);
+    okno_ustaw_pole_tekstowe_enter(&okno_notatnik, (okno_pole_tekstowe)notatnik_pole_tekstowe_enter);
+    okno_ustaw_pole_tekstowe_wyjdz(&okno_notatnik, (okno_pole_tekstowe)notatnik_pole_tekstowe_wyjdz);
+    okno_ustaw_pole_tekstowe_znak(&okno_notatnik, (okno_pole_tekstowe_znak)notatnik_pole_tekstowe_znak);
+    okno_ustaw_bufor_tekstu(&okno_notatnik, notatka, notatka_dlugosc, NOTATNIK_MAKS);
 }
 
 void notatnik_otworz(void)
@@ -144,6 +156,7 @@ void notatnik_obsluz_klawiature(void)
         notatnik_otwarty = 0;
         return;
     }
+    if (okno_notatnik.w_polu_tekstowym) return;
     if (!okno_czy_aktywne(&okno_notatnik)) return;
     if (!keyboard_try_getchar(&znak)) return;
     if (znak == '\b') {
@@ -157,4 +170,62 @@ void notatnik_obsluz_klawiature(void)
     }
     notatka[notatka_dlugosc] = 0;
     okno_narysuj(&okno_notatnik);
+}
+
+static void notatnik_pole_tekstowe_enter(struct okno *okno)
+{
+    (void)okno;
+    notatnik_ustaw_status("tryb edycji");
+}
+
+static void notatnik_pole_tekstowe_wyjdz(struct okno *okno)
+{
+    (void)okno;
+    notatnik_ustaw_status("edytor zakonczony");
+}
+
+static int notatnik_pole_tekstowe_znak(struct okno *okno, char znak, uint8_t ctrl)
+{
+    (void)okno;
+    if (ctrl) {
+        if (znak == 'c') {
+            okno_skopiuj_zaznaczenie(&okno_notatnik);
+            return 1;
+        }
+        if (znak == 'v') {
+            okno_wklej_schowek(&okno_notatnik);
+            notatka[notatka_dlugosc] = 0;
+            okno_narysuj(&okno_notatnik);
+            return 1;
+        }
+        return 1;
+    }
+    if (znak == '\b') {
+        if (notatka_dlugosc > 0 && okno_notatnik.kursor_pozycja > 0) {
+            for (int i = okno_notatnik.kursor_pozycja - 1; i < notatka_dlugosc - 1; i++) {
+                notatka[i] = notatka[i + 1];
+            }
+            notatka_dlugosc--;
+            okno_notatnik.kursor_pozycja--;
+        }
+    } else if ((znak == '\n' || znak == '\r') && notatka_dlugosc < NOTATNIK_MAKS) {
+        for (int i = notatka_dlugosc; i >= okno_notatnik.kursor_pozycja; i--) {
+            notatka[i + 1] = notatka[i];
+        }
+        notatka[okno_notatnik.kursor_pozycja] = '\n';
+        notatka_dlugosc++;
+        okno_notatnik.kursor_pozycja++;
+    } else if (znak >= 32 && znak <= 126 && notatka_dlugosc < NOTATNIK_MAKS) {
+        for (int i = notatka_dlugosc; i >= okno_notatnik.kursor_pozycja; i--) {
+            notatka[i + 1] = notatka[i];
+        }
+        notatka[okno_notatnik.kursor_pozycja] = znak;
+        notatka_dlugosc++;
+        okno_notatnik.kursor_pozycja++;
+    } else {
+        return 1;
+    }
+    notatka[notatka_dlugosc] = 0;
+    okno_narysuj(&okno_notatnik);
+    return 1;
 }

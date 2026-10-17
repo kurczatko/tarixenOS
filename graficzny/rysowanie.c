@@ -604,3 +604,26 @@ void rysowanie_init(void)
     odswiez_widok();
     kursor_graficzny_init();
 }
+
+static uint8_t kursor_tekstowy_stan = 0;
+static int kursor_tekstowy_licznik = 0;
+
+void kursor_tekstowy_tick(void)
+{
+    kursor_tekstowy_licznik++;
+    if (kursor_tekstowy_licznik >= 8) {
+        kursor_tekstowy_licznik = 0;
+        kursor_tekstowy_stan = !kursor_tekstowy_stan;
+    }
+}
+
+uint8_t kursor_tekstowy_widoczny(void)
+{
+    return kursor_tekstowy_stan;
+}
+
+void kursor_tekstowy_rysuj(int x, int y)
+{
+    if (!kursor_tekstowy_stan) return;
+    rysuj_prostokat(x, y, 2, 16, 0x00000000);
+}

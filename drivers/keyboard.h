@@ -20,6 +20,7 @@ uint8_t keyboard_try_getchar(char *character);
 void keyboard_discard_pending(void);
 uint8_t keyboard_scancode_to_char(uint8_t scancode);
 uint8_t keyboard_windows_pressed(void);
+uint8_t keyboard_ctrl_pressed(void);
 
 // mapa klawiszy chińska, a nie sory, znaczy angielska (czy tam USAńska)
 static const char keyboard_us[128] = {

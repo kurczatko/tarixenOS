@@ -79,7 +79,6 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     __asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     keyboard_init();
     __asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    net_init();
     __asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     ustaw_status_internetu((uint8_t)net_ready());
     if (net_ready()) {
@@ -97,9 +96,20 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         char tekst_czasu[9];
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
         mouse_poll();
-        browser_handle_keyboard();
-        eksplorator_plikow_obsluz_klawiature();
-        notatnik_obsluz_klawiature();
+        kursor_tekstowy_tick();
+        if (aktywne_okno && aktywne_okno->otwarte && aktywne_okno->w_polu_tekstowym) {
+            char znak;
+            while (keyboard_try_getchar(&znak)) {
+                uint8_t ctrl = keyboard_ctrl_pressed();
+                if (aktywne_okno->pole_tekstowe_znak) {
+                    if (!aktywne_okno->pole_tekstowe_znak(aktywne_okno, znak, ctrl)) break;
+                }
+            }
+        } else {
+            browser_handle_keyboard();
+            eksplorator_plikow_obsluz_klawiature();
+            notatnik_obsluz_klawiature();
+        }
         if (keyboard_windows_pressed()) {
             menu_start_przełącz();
         }

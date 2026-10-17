@@ -40,5 +40,8 @@ int tapeta_wczytaj(void);
 void tapeta_zapisz(void);
 void pasek_zadan_rysuj_ikony_minimalizowanych(void);
 struct okno *pasek_zadan_ikona_na_pozycji(int x, int y);
+void kursor_tekstowy_tick(void);
+uint8_t kursor_tekstowy_widoczny(void);
+void kursor_tekstowy_rysuj(int x, int y);
 
 #endif
