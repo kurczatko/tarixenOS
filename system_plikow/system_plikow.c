@@ -149,7 +149,12 @@ int write_file(const char *name, const char *data, uint32_t size) {
     if (!entry || (entry->attributes & 0x10)) return -1;
     cluster = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low;
     while (done < size && cluster >= 2 && cluster < FAT32_EOC) { for (uint32_t i = 0; i < 512; i++) data_sector[i] = done + i < size ? data[done + i] : 0; write_sector(cluster_sector(cluster), data_sector); done += 512; if (done < size && fat_entry(cluster) >= FAT32_EOC) set_fat_entry(cluster, alloc_cluster()); cluster = fat_entry(cluster); }
-    entry->size = size; write_sector(sector_number, directory_sector); return done >= size ? 0 : -1;
+    if (done >= size) {
+        entry->size = size;
+        write_sector(sector_number, directory_sector);
+        return 0;
+    }
+    return -1;
 }
 
 int create_dir(const char *name) { char sector[512]; uint32_t sector_number; struct fat32_entry *entry = find_entry(name, current_dir, sector, &sector_number); if (entry) return -1; entry = new_entry(name, 0x10, sector); if (!entry || !entry->cluster_low) return -1; write_sector(cluster_sector(current_dir), sector); return 0; }

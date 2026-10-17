@@ -38,6 +38,7 @@ static void obsluz_wybor_tapety(int x, int y)
     wiersz = (y - 48) / 32;
     if (kolumna < 0 || kolumna >= 4 || wiersz < 0 || wiersz >= 2) return;
     ustaw_kolor_tapety(kolory[wiersz * 4 + kolumna]);
+    tapeta_zapisz();
 }
 
 static void rysuj_wybor_tapety(int x, int y, int szerokosc, int wysokosc)
@@ -68,6 +69,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     __asm__ volatile ("movb $'D', %%al; outb %%al, $0x3F8" ::: "eax");
     init_fs();
     __asm__ volatile ("movb $'E', %%al; outb %%al, $0x3F8" ::: "eax");
+    tapeta_wczytaj();
     okno_stworz(&okno_tapeta, 248, 80, 360, 170, "TAPETA", rysuj_wybor_tapety);
     okno_ustaw_obsluge_klikniecia(&okno_tapeta, obsluz_wybor_tapety);
     __asm__ volatile ("movb $'F', %%al; outb %%al, $0x3F8" ::: "eax");

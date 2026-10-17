@@ -9,6 +9,10 @@
 
 #define HS_MESSAGE_FINISHED 20
 
+static uint8_t hs_message_buffer[TLS_BUFFER_SIZE];
+static uint32_t hs_message_start;
+static uint32_t hs_message_end;
+
 struct tls13_connection {
     struct net_tcp_connection tcp;
     uint8_t receive[TLS_BUFFER_SIZE];
@@ -139,13 +143,12 @@ static int tls_build_client_hello(struct tls13_connection *connection, const cha
     write16(handshake + p, 0); p += 2; write16(handshake + p, (uint16_t)(host_length + 5)); p += 2;
     write16(handshake + p, (uint16_t)(host_length + 3)); p += 2; handshake[p++] = 0; write16(handshake + p, (uint16_t)host_length); p += 2;
     copy_bytes(handshake + p, (const uint8_t *)host, host_length); p += host_length;
-    write16(handshake + p, 10); p += 2; write16(handshake + p, 4); p += 2; write16(handshake + p, 2); p += 2; write16(handshake + p, 29); p += 2;
-    write16(handshake + p, 13); p += 2; write16(handshake + p, 10); p += 2; write16(handshake + p, 8); p += 2;
-    write16(handshake + p, 0x0804); p += 2; write16(handshake + p, 0x0805); p += 2; write16(handshake + p, 0x0403); p += 2; write16(handshake + p, 0x0401); p += 2;
-    write16(handshake + p, 43); p += 2; write16(handshake + p, 3); p += 2; write16(handshake + p, 1); p += 2; write16(handshake + p, 0x0304); p += 2;
+    write16(handshake + p, 10); p += 2; write16(handshake + p, 2); p += 2; write16(handshake + p, 29); p += 2;
+    write16(handshake + p, 13); p += 2; write16(handshake + p, 8); p += 2; write16(handshake + p, 0x0804); p += 2; write16(handshake + p, 0x0805); p += 2; write16(handshake + p, 0x0403); p += 2; write16(handshake + p, 0x0401); p += 2;
+    write16(handshake + p, 43); p += 2; write16(handshake + p, 3); p += 2; handshake[p++] = 1; write16(handshake + p, 0x0304); p += 2;
     write16(handshake + p, 45); p += 2; write16(handshake + p, 2); p += 2; handshake[p++] = 1; handshake[p++] = 1;
-    write16(handshake + p, 51); p += 2; write16(handshake + p, 36); p += 2; write16(handshake + p, 29); p += 2;
-    write16(handshake + p, 29); p += 2; write16(handshake + p, 32); p += 2; copy_bytes(handshake + p, connection->public_key, 32); p += 32;
+    write16(handshake + p, 51); p += 2; write16(handshake + p, 38); p += 2; write16(handshake + p, 29); p += 2;
+    write16(handshake + p, 36); p += 2; copy_bytes(handshake + p, connection->public_key, 32); p += 32;
     write16(handshake + extensions, (uint16_t)(p - extensions - 2));
     uint32_t body_length = p - 4;
     handshake[1] = (uint8_t)(body_length >> 16); handshake[2] = (uint8_t)(body_length >> 8); handshake[3] = (uint8_t)body_length;
@@ -237,6 +240,48 @@ static int tls_decrypt_handshake_record(struct tls13_connection *connection, uin
     return 1;
 }
 
+static int tls_read_handshake_message(struct tls13_connection *connection, int encrypted,
+                                      uint8_t *message_type, uint8_t **message, uint16_t *message_length)
+{
+    for (;;) {
+        uint32_t available = hs_message_end - hs_message_start;
+        if (available >= 4) {
+            uint32_t body_length = ((uint32_t)hs_message_buffer[hs_message_start + 1] << 16) |
+                                   ((uint32_t)hs_message_buffer[hs_message_start + 2] << 8) |
+                                   hs_message_buffer[hs_message_start + 3];
+            uint32_t total = 4 + body_length;
+            if (available >= total) {
+                *message_type = hs_message_buffer[hs_message_start];
+                *message = hs_message_buffer + hs_message_start;
+                *message_length = (uint16_t)total;
+                hs_message_start += total;
+                return 1;
+            }
+        }
+        if (hs_message_start > 0) {
+            uint32_t remaining = hs_message_end - hs_message_start;
+            for (uint32_t i = 0; i < remaining; i++) hs_message_buffer[i] = hs_message_buffer[hs_message_start + i];
+            hs_message_start = 0;
+            hs_message_end = remaining;
+        }
+        if (hs_message_end >= TLS_BUFFER_SIZE) return 0;
+        uint8_t record_type;
+        uint16_t record_length;
+        if (!tls_read_record(connection, &record_type, hs_message_buffer + hs_message_end,
+                             (uint16_t)(TLS_BUFFER_SIZE - hs_message_end), &record_length)) return 0;
+        if (record_type != TLS_RECORD_HANDSHAKE) return 0;
+        if (encrypted) {
+            uint8_t inner_type;
+            uint16_t inner_length;
+            if (!tls_decrypt_handshake_record(connection, hs_message_buffer + hs_message_end, record_length,
+                                              &inner_type, &inner_length)) return 0;
+            hs_message_end += inner_length;
+        } else {
+            hs_message_end += record_length;
+        }
+    }
+}
+
 static int tls_derive_app_keys(struct tls13_connection *connection, const uint8_t transcript_hash[32])
 {
     uint8_t client_app_secret[32], server_app_secret[32];
@@ -321,7 +366,6 @@ int tls13_https_get(const char *host, const char *path, char *response, uint32_t
     static uint8_t record[TLS_BUFFER_SIZE];
     static uint8_t app_data[TLS_BUFFER_SIZE];
     static uint8_t out[TLS_BUFFER_SIZE];
-    uint8_t type;
     uint16_t record_length;
     int result = -1;
     uint32_t used = 0;
@@ -332,10 +376,19 @@ int tls13_https_get(const char *host, const char *path, char *response, uint32_t
     for (uint32_t i = 0; i < sizeof(connection); i++) ((uint8_t *)&connection)[i] = 0;
 
     if (net_tcp_connect(&connection.tcp, host, 443) < 0) return -1;
+    hs_message_start = 0;
+    hs_message_end = 0;
     if (!tls_build_client_hello(&connection, host, record, &record_length) || !tls_send(&connection, record, record_length)) { net_tcp_close(&connection.tcp); return -2; }
-    if (!tls_read_record(&connection, &type, connection.server_hello, sizeof(connection.server_hello), &record_length) || type != TLS_RECORD_HANDSHAKE) { net_tcp_close(&connection.tcp); return -3; }
-    connection.server_hello_length = record_length;
-    if (!tls_parse_server_hello(&connection, connection.server_hello, record_length)) { net_tcp_close(&connection.tcp); return -4; }
+    {
+        uint8_t *server_hello_message;
+        uint16_t server_hello_message_length;
+        uint8_t server_hello_type;
+        if (!tls_read_handshake_message(&connection, 0, &server_hello_type, &server_hello_message, &server_hello_message_length) || server_hello_type != 2) { net_tcp_close(&connection.tcp); return -3; }
+        if (server_hello_message_length > sizeof(connection.server_hello)) { net_tcp_close(&connection.tcp); return -4; }
+        copy_bytes(connection.server_hello, server_hello_message, server_hello_message_length);
+        connection.server_hello_length = server_hello_message_length;
+        if (!tls_parse_server_hello(&connection, connection.server_hello, server_hello_message_length)) { net_tcp_close(&connection.tcp); return -4; }
+    }
     if (!tls_handshake_keys(&connection)) { net_tcp_close(&connection.tcp); return -5; }
 
     sha256_init(&hash);
@@ -343,25 +396,13 @@ int tls13_https_get(const char *host, const char *path, char *response, uint32_t
     sha256_update(&hash, connection.server_hello, connection.server_hello_length);
 
     int handshake_complete = 0;
-    uint16_t record_consumed = 1;
-    uint16_t record_inner_length = 0;
     for (;;) {
-        if (record_consumed >= record_inner_length) {
-            if (!tls_read_record(&connection, &type, record, sizeof(record), &record_length)) { result = -6; goto done; }
-            if (type != TLS_RECORD_APPLICATION) { result = -6; goto done; }
-            uint8_t inner_type;
-            if (!tls_decrypt_handshake_record(&connection, record, record_length, &inner_type, &record_inner_length)) { result = -7; goto done; }
-            if (record_inner_length < 2 || record[0] != TLS_RECORD_HANDSHAKE) { result = -7; goto done; }
-            record_consumed = 1;
-        }
-        if (record_inner_length - record_consumed < 4) { result = -7; goto done; }
-        uint8_t msg_type = record[record_consumed];
-        uint32_t msg_length = ((uint32_t)record[record_consumed + 1] << 16) | ((uint32_t)record[record_consumed + 2] << 8) | record[record_consumed + 3];
-        uint32_t msg_total = 4 + msg_length;
-        if ((uint32_t)(record_inner_length - record_consumed) < msg_total) { result = -7; goto done; }
-        sha256_update(&hash, record + record_consumed, msg_total);
-        record_consumed += (uint16_t)msg_total;
-        if (msg_type == HS_MESSAGE_FINISHED) {
+        uint8_t *handshake_message;
+        uint16_t handshake_message_length;
+        uint8_t handshake_message_type;
+        if (!tls_read_handshake_message(&connection, 1, &handshake_message_type, &handshake_message, &handshake_message_length)) { result = -6; goto done; }
+        sha256_update(&hash, handshake_message, handshake_message_length);
+        if (handshake_message_type == HS_MESSAGE_FINISHED) {
             handshake_complete = 1;
             break;
         }

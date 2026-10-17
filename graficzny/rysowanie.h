@@ -32,5 +32,7 @@ void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc);
 void ustaw_kolor_tapety(uint32_t kolor);
 void ustaw_status_internetu(uint8_t dostepny);
 void ustaw_czas_paska(const char *czas);
+int tapeta_wczytaj(void);
+void tapeta_zapisz(void);
 
 #endif

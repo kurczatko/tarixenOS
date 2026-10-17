@@ -119,14 +119,21 @@ void mouse_poll(void) {
             int y;
             mouse_pozycja(&x, &y);
             if (!okno_obsluz_klikniecie(x, y)) {
-                pulp_obsluz_klik(x, y);
-                menu_start_mouse_click();
+                if (!pulp_mouse_press(x, y)) {
+                    menu_start_mouse_click();
+                }
             }
         }
     }
     if (!(packet[0] & 1)) {
         left_button_pressed = 0;
         okno_zakoncz_przeciaganie();
+        {
+            int x;
+            int y;
+            mouse_pozycja(&x, &y);
+            pulp_mouse_release(x, y);
+        }
     }
 
     delta_x = (int)packet[1];
@@ -147,7 +154,10 @@ void mouse_poll(void) {
             int x;
             int y;
             mouse_pozycja(&x, &y);
-            if (left_button_pressed) okno_obsluz_ruch(x, y);
+            if (left_button_pressed) {
+                okno_obsluz_ruch(x, y);
+                pulp_mouse_ruch(x, y);
+            }
         }
     }
 }

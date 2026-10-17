@@ -1,5 +1,6 @@
 #include "rysowanie.h"
 #include "czcionka.h"
+#include "../system_plikow/system_plikow.h"
 
 #define CURSOR_W 12
 #define CURSOR_H 18
@@ -299,6 +300,87 @@ void ustaw_kolor_tapety(uint32_t kolor)
     }
     narysuj_napis_systemowy();
     odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+}
+
+#define PLIK_TAPETA "TAPETA.CFG"
+
+static uint32_t parsuj_hex(char **p)
+{
+    uint32_t v = 0;
+    if (*p[0] == '0' && (*p[1] == 'x' || *p[1] == 'X')) {
+        *p += 2;
+    }
+    while (**p) {
+        char c = **p;
+        uint32_t cyfra;
+        if (c >= '0' && c <= '9') cyfra = (uint32_t)(c - '0');
+        else if (c >= 'a' && c <= 'f') cyfra = (uint32_t)(c - 'a' + 10);
+        else if (c >= 'A' && c <= 'F') cyfra = (uint32_t)(c - 'A' + 10);
+        else break;
+        v = (v << 4) | cyfra;
+        (*p)++;
+    }
+    return v;
+}
+
+static void narysuj_tapete_tlo(void)
+{
+    if (tapeta_gradientowa) {
+        for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
+            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+            for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+                obraz[offset + x] = kolor_tla_dla_x(x);
+            }
+        }
+    } else {
+        for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
+            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+            for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+                obraz[offset + x] = kolor_tapety;
+            }
+        }
+    }
+    narysuj_napis_systemowy();
+    odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+}
+
+int tapeta_wczytaj(void)
+{
+    fs_reset_directory();
+    char buf[64];
+    int n = read_file(PLIK_TAPETA, buf, sizeof(buf) - 1);
+    if (n <= 0) return 0;
+    buf[n] = 0;
+    char *p = buf;
+    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
+    kolor_tapety = parsuj_hex(&p);
+    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
+    tapeta_gradientowa = (*p == '1') ? 1u : 0u;
+    narysuj_tapete_tlo();
+    return 1;
+}
+
+void tapeta_zapisz(void)
+{
+    char buf[32];
+    int pos = 0;
+    uint32_t v = kolor_tapety;
+    buf[pos++] = '0';
+    buf[pos++] = 'x';
+    for (int i = 0; i < 8; i++) {
+        buf[pos++] = "0123456789ABCDEF"[(v >> (28 - i * 4)) & 0xF];
+    }
+    buf[pos++] = ' ';
+    buf[pos++] = tapeta_gradientowa ? '1' : '0';
+    buf[pos++] = '\n';
+    buf[pos] = 0;
+    fs_reset_directory();
+    if (write_file(PLIK_TAPETA, buf, (uint32_t)pos) != 0) {
+        if (create_file(PLIK_TAPETA, (uint32_t)pos) != 0 ||
+            write_file(PLIK_TAPETA, buf, (uint32_t)pos) != 0) {
+            return;
+        }
+    }
 }
 
 void kursor_graficzny_init(void)
