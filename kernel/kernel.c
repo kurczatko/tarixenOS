@@ -24,6 +24,7 @@
 #include "idt.h"
 #include "syscall.h"
 #include "../user_land/tapeta.h"
+#include "paging.h"
 
 extern struct okno *aktywne_okno;
 

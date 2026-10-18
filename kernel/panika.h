@@ -1,6 +1,6 @@
 #ifndef PANIKA_H
 #define PANIKA_H
 
-void panika();
+void panika(const char *powod);
 
 #endif

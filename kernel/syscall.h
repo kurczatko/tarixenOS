@@ -2,6 +2,7 @@
 #define SYSCALL_H
 
 #include "../include/printf/types.h"
+#include "userspace.h"
 
 #define SYSCALL_TAPETA_ZMIEŃ 0
 #define SYSCALL_TAPETA_POBIERZ 1
@@ -20,5 +21,11 @@ struct rejestry {
 };
 extern struct rejestry biezace_rejestry;
 uint32_t syscall_handler(void);
+
+/* Sprawdza, czy wskaznik lezy w przestrzeni uzytkownika (ponizej granicy jadra). */
+static inline int wskaznik_uzytkownika_prawidlowy(const void *ptr)
+{
+    return (uint32_t)ptr < GRANICA_PAMIEC_UZYTKOWNIKA;
+}
 
 #endif

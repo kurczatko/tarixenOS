@@ -7,7 +7,6 @@
 struct rejestry biezace_rejestry;
 
 static struct okno okno_tapeta_user;
-
 #define KOLO_SRODEK_X 250
 #define KOLO_SRODEK_Y 80
 #define KOLO_PROMIEN 40
@@ -126,8 +125,6 @@ static void obsluz_wybor_tapety_user(int x, int y)
     tapeta_zapisz();
 }
 
-struct rejestry biezace_rejestry;
-
 uint32_t syscall_handler(void)
 {
     uint32_t eax = biezace_rejestry.eax;
@@ -154,10 +151,14 @@ uint32_t syscall_handler(void)
             rysuj_prostokat((int)ebx, (int)ecx, (int)edx, (int)esi, (uint32_t)edi);
             return 0;
         case SYSCALL_TEKST_RYSUJ:
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)edx))
+                return 0xFFFFFFFF;
             rysuj_tekst_chicago((int)ebx, (int)ecx, (const char *)edx, (uint32_t)esi);
             return 0;
         case SYSCALL_OKNO_STWÓRZ:
-            okno_stworz(&okno_tapeta_user, (int)ebx, (int)ecx, (int)edx, (int)esi, "TAPETA", rysuj_wybor_tapety_user);
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)edi))
+                return 0xFFFFFFFF;
+            okno_stworz(&okno_tapeta_user, (int)ebx, (int)ecx, (int)edx, (int)esi, (const char *)edi, rysuj_wybor_tapety_user);
             okno_ustaw_obsluge_klikniecia(&okno_tapeta_user, obsluz_wybor_tapety_user);
             return 0;
         case SYSCALL_OKNO_RYSUJ:
@@ -166,6 +167,8 @@ uint32_t syscall_handler(void)
         case SYSCALL_MYSZ_POZYCJA:
             return 0;
         case SYSCALL_DRUKUJ:
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
+                return 0xFFFFFFFF;
             printf((const char *)ebx);
             return 0;
         default:
