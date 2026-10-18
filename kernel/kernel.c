@@ -20,6 +20,7 @@
 #include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
+#include "kalkulator.h"
 #include "gdt.h"
 #include "idt.h"
 #include "syscall.h"
@@ -78,6 +79,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             browser_handle_keyboard();
             eksplorator_plikow_obsluz_klawiature();
             notatnik_obsluz_klawiature();
+            kalkulator_obsluz_klawiature();
         }
         if (keyboard_windows_pressed()) {
             menu_start_przełącz();

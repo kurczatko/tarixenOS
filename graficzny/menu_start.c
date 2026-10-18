@@ -7,13 +7,14 @@
 #include "../kernel/notatnik.h"
 #include "eksplorator_plikow.h"
 #include "../kernel/browser.h"
+#include "../kernel/kalkulator.h"
 
 #define START_X 0
 #define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
 #define START_SZEROKOSC 72
 #define START_WYSOKOSC PASEK_ZADAN_WYSOKOSC
 #define MENU_X 0
-#define MENU_SZEROKOSC 104
+#define MENU_SZEROKOSC 150
 #define MENU_WYSOKOSC 224
 #define MENU_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - MENU_WYSOKOSC)
 
@@ -171,7 +172,34 @@ static void menu_start_narysuj(void)
                              piksel == 1 ? KOLOR_NIEBIESKI : 0x0068B8FF);
         }
     }
-    
+
+    rysuj_prostokat(MENU_X + 6, MENU_Y + 156, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 166, "KALKULATOR", KOLOR_TEKST_BIALY);
+
+    static const uint8_t ikona_kalkulatora[12][12] = {
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,1,1,1,1,1,1,1,1,1,0,0},
+        {0,1,2,2,2,1,1,2,2,1,0,0},
+        {0,1,2,1,2,1,1,2,1,1,0,0},
+        {0,1,2,1,2,1,1,2,1,1,0,0},
+        {0,1,2,2,2,1,1,2,2,1,0,0},
+        {0,1,1,1,1,1,1,1,1,1,0,0},
+        {0,1,1,1,1,1,1,1,1,1,0,0},
+        {0,1,2,2,2,1,1,2,2,1,0,0},
+        {0,1,2,1,2,1,1,2,1,1,0,0},
+        {0,1,2,2,2,1,1,2,2,1,0,0},
+        {0,0,0,0,0,0,0,0,0,0,0,0}
+    };
+    for (int iy = 0; iy < 12; iy++) {
+        for (int ix = 0; ix < 12; ix++) {
+            uint8_t piksel = ikona_kalkulatora[iy][ix];
+            if (piksel == 1)
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 164 + iy, KOLOR_SZARY);
+            else if (piksel == 2)
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 164 + iy, KOLOR_BIALY);
+        }
+    }
+
     odswiez_widok();
 }
 
@@ -238,6 +266,13 @@ void menu_start_mouse_click(void)
         menu_otwarte = 0;
         menu_start_wyczysc();
         browser_open();
+        return;
+    }
+    if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+        y >= MENU_Y + 156 && y < MENU_Y + 184) {
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+        kalkulator_otworz();
         return;
     }
     if (menu_otwarte && (x < MENU_X || x >= MENU_X + MENU_SZEROKOSC ||
