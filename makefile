@@ -24,9 +24,9 @@ CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wex
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(wildcard kernel/*.c) $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/sound/*.c) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c)
-KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(KERNEL_SOURCES))
-KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(KERNEL_SOURCES))
+KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/syscall_asm.S kernel/default_irq.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/sound/*.c) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c)
+KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES)))
+KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
 
 .PHONY: all image iso clean
 
@@ -50,6 +50,14 @@ $(UEFI_BIN): uefi64.asm | $(BUILD_DIR)
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC32) $(CFLAGS32) -c $< -o $@
+
+$(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c $< -o $@
+
+$(BUILD_DIR)/%64.o: %.S | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CC64) $(CFLAGS64) -c $< -o $@ || touch $@
 
 $(BUILD_DIR)/%64.o: %.c | $(BUILD_DIR)
 	mkdir -p $(dir $@)

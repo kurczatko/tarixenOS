@@ -20,39 +20,12 @@
 #include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
+#include "gdt.h"
+#include "idt.h"
+#include "syscall.h"
+#include "../user_land/tapeta.h"
 
-static struct okno okno_tapeta;
-static char odpowiedz_czasu_http[768];
 extern struct okno *aktywne_okno;
-
-static void obsluz_wybor_tapety(int x, int y)
-{
-    static const uint32_t kolory[] = {
-        0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
-        0x003B82F6, 0x0010B981, 0x00EF4444, 0x00FBBF24
-    };
-    int kolumna;
-    int wiersz;
-    if (x < 16 || x >= 144 || y < 48 || y >= 112) return;
-    kolumna = (x - 16) / 32;
-    wiersz = (y - 48) / 32;
-    if (kolumna < 0 || kolumna >= 4 || wiersz < 0 || wiersz >= 2) return;
-    ustaw_kolor_tapety(kolory[wiersz * 4 + kolumna]);
-    tapeta_zapisz();
-}
-
-static void rysuj_wybor_tapety(int x, int y, int szerokosc, int wysokosc)
-{
-    static const uint32_t kolory[] = {
-        0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
-        0x003B82F6, 0x0010B981, 0x00EF4444, 0x00FBBF24
-    };
-    (void)szerokosc;
-    (void)wysokosc;
-    rysuj_tekst_chicago(x, y, "WYBIERZ TAPETE", 0x00000000);
-    for (int indeks = 0; indeks < 8; indeks++)
-        rysuj_prostokat(x + 8 + (indeks % 4) * 32, y + 18 + (indeks / 4) * 32, 24, 24, kolory[indeks]);
-}
 
 void __attribute__((section(".text.entry"))) kernel_main(void)
 {
@@ -70,23 +43,18 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     init_fs();
     __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     tapeta_wczytaj();
-    okno_stworz(&okno_tapeta, 248, 80, 360, 170, "TAPETA", rysuj_wybor_tapety);
-    okno_ustaw_obsluge_klikniecia(&okno_tapeta, obsluz_wybor_tapety);
-    __asm__ volatile ("movb $'F', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    menu_start();
+    gdt_install();
+    idt_install();
+    syscall_install();
+    pulp_init();
+    tapeta_app();
     __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    mouse_init();
+    menu_start();
     __asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    keyboard_init();
+    mouse_init();
     __asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    keyboard_init();
     __asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    ustaw_status_internetu((uint8_t)net_ready());
-    if (net_ready()) {
-        int dlugosc_odpowiedzi = net_http_get("info.cern.ch", "/", odpowiedz_czasu_http,
-                                               sizeof(odpowiedz_czasu_http));
-        if (dlugosc_odpowiedzi > 0)
-            zegar_synchronizuj_http(odpowiedz_czasu_http, (uint32_t)dlugosc_odpowiedzi);
-    }
     __asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     init_intel_hda();
     __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
