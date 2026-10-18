@@ -8,17 +8,94 @@ struct rejestry biezace_rejestry;
 
 static struct okno okno_tapeta_user;
 
+#define KOLO_SRODEK_X 250
+#define KOLO_SRODEK_Y 80
+#define KOLO_PROMIEN 40
+
+static uint32_t pierwiastkuj(uint32_t n)
+{
+    if (n == 0) return 0;
+    uint32_t x = n;
+    uint32_t y = (x + 1) / 2;
+    while (y < x) {
+        x = y;
+        y = (x + n / x) / 2;
+    }
+    return x;
+}
+
+static int kat_xy(int dx, int dy)
+{
+    if (dx == 0 && dy == 0) return 0;
+    int ax = dx < 0 ? -dx : dx;
+    int ay = dy < 0 ? -dy : dy;
+    int kat;
+    if (ax >= ay) {
+        int baza = (ay * 45) / ax;
+        if (dx >= 0 && dy >= 0) kat = baza;
+        else if (dx < 0 && dy >= 0) kat = 180 - baza;
+        else if (dx < 0 && dy < 0) kat = 180 + baza;
+        else kat = 360 - baza;
+    } else {
+        int baza = 90 - (ax * 45) / ay;
+        if (dx >= 0 && dy >= 0) kat = baza;
+        else if (dx < 0 && dy >= 0) kat = 180 - baza;
+        else if (dx < 0 && dy < 0) kat = 180 + baza;
+        else kat = 360 - baza;
+    }
+    if (kat == 360) kat = 0;
+    return kat;
+}
+
+static uint32_t hsv_na_xrgb(int h, uint32_t s, uint32_t v)
+{
+    uint32_t c = (v * s) / 255;
+    uint32_t sektor = (uint32_t)h / 60;
+    uint32_t f = (uint32_t)h % 60;
+    uint32_t r, g, b;
+    switch (sektor) {
+    case 0: r = c; g = (c * f) / 60; b = 0; break;
+    case 1: r = (c * (60 - f)) / 60; g = c; b = 0; break;
+    case 2: r = 0; g = c; b = (c * f) / 60; break;
+    case 3: r = 0; g = (c * (60 - f)) / 60; b = c; break;
+    case 4: r = (c * f) / 60; g = 0; b = c; break;
+    default: r = c; g = 0; b = (c * (60 - f)) / 60; break;
+    }
+    uint32_t m = v - c;
+    r += m;
+    g += m;
+    b += m;
+    return (r << 16) | (g << 8) | b;
+}
+
 static void rysuj_wybor_tapety_user(int x, int y, int szerokosc, int wysokosc)
 {
     static const uint32_t kolory[] = {
         0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
         0x003B82F6, 0x0010B981, 0x00EF4444, 0x00FBBF24
     };
+    int srodek_x = x + KOLO_SRODEK_X - 8;
+    int srodek_y = y + KOLO_SRODEK_Y - 30;
+    int granica = (KOLO_PROMIEN - 1) * (KOLO_PROMIEN - 1);
     (void)szerokosc;
     (void)wysokosc;
     rysuj_tekst_chicago(x, y, "WYBIERZ TAPETE", 0x00000000);
     for (int indeks = 0; indeks < 8; indeks++)
         rysuj_prostokat(x + 8 + (indeks % 4) * 32, y + 18 + (indeks / 4) * 32, 24, 24, kolory[indeks]);
+    for (int dy = -KOLO_PROMIEN; dy <= KOLO_PROMIEN; dy++) {
+        for (int dx = -KOLO_PROMIEN; dx <= KOLO_PROMIEN; dx++) {
+            uint32_t r2 = (uint32_t)(dx * dx + dy * dy);
+            if (r2 > (uint32_t)(KOLO_PROMIEN * KOLO_PROMIEN)) continue;
+            if (r2 > (uint32_t)granica) {
+                rysuj_piksel(srodek_x + dx, srodek_y + dy, 0x00000000);
+                continue;
+            }
+            uint32_t r = pierwiastkuj(r2);
+            int h = kat_xy(dx, dy);
+            uint32_t nasycenie = r * 255 / KOLO_PROMIEN;
+            rysuj_piksel(srodek_x + dx, srodek_y + dy, hsv_na_xrgb(h, nasycenie, 255));
+        }
+    }
 }
 
 static void obsluz_wybor_tapety_user(int x, int y)
@@ -29,11 +106,23 @@ static void obsluz_wybor_tapety_user(int x, int y)
     };
     int kolumna;
     int wiersz;
-    if (x < 16 || x >= 144 || y < 48 || y >= 112) return;
-    kolumna = (x - 16) / 32;
-    wiersz = (y - 48) / 32;
-    if (kolumna < 0 || kolumna >= 4 || wiersz < 0 || wiersz >= 2) return;
-    ustaw_kolor_tapety(kolory[wiersz * 4 + kolumna]);
+    if (x >= 16 && x < 144 && y >= 48 && y < 112) {
+        kolumna = (x - 16) / 32;
+        wiersz = (y - 48) / 32;
+        if (kolumna >= 0 && kolumna < 4 && wiersz >= 0 && wiersz < 2) {
+            ustaw_kolor_tapety(kolory[wiersz * 4 + kolumna]);
+            tapeta_zapisz();
+        }
+        return;
+    }
+    int dx = x - KOLO_SRODEK_X;
+    int dy = y - KOLO_SRODEK_Y;
+    uint32_t r2 = (uint32_t)(dx * dx + dy * dy);
+    if (r2 > (uint32_t)(KOLO_PROMIEN * KOLO_PROMIEN)) return;
+    uint32_t r = pierwiastkuj(r2);
+    int h = kat_xy(dx, dy);
+    uint32_t nasycenie = r * 255 / KOLO_PROMIEN;
+    ustaw_kolor_tapety(hsv_na_xrgb(h, nasycenie, 255));
     tapeta_zapisz();
 }
 
