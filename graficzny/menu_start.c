@@ -8,6 +8,7 @@
 #include "eksplorator_plikow.h"
 #include "../kernel/browser.h"
 #include "../kernel/kalkulator.h"
+#include "../kernel/apps/gra.h"
 
 #define START_X 0
 #define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
@@ -176,6 +177,9 @@ static void menu_start_narysuj(void)
     rysuj_prostokat(MENU_X + 6, MENU_Y + 156, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 166, "KALKULATOR", KOLOR_TEKST_BIALY);
 
+    rysuj_prostokat(MENU_X + 6, MENU_Y + 192, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 202, "GRA", KOLOR_TEKST_BIALY);
+
     static const uint8_t ikona_kalkulatora[12][12] = {
         {0,0,0,0,0,0,0,0,0,0,0,0},
         {0,1,1,1,1,1,1,1,1,1,0,0},
@@ -274,6 +278,12 @@ void menu_start_mouse_click(void)
         menu_start_wyczysc();
         kalkulator_otworz();
         return;
+    }
+    if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+        y >= MENU_Y + 192 && y < MENU_Y + 220) {
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+        gra();
     }
     if (menu_otwarte && (x < MENU_X || x >= MENU_X + MENU_SZEROKOSC ||
                          y < MENU_Y || y >= MENU_Y + MENU_WYSOKOSC)) {
