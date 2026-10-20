@@ -91,19 +91,18 @@ static void notatnik_odczytaj(void)
 static void notatnik_zapisz(void)
 {
     notatka[notatka_dlugosc] = 0;
+    /* Upewnij sie ze plik istnieje (create_file zwraca -1 jesli juz istnieje - to OK) */
+    create_file(notatnik_plik, (uint32_t)notatka_dlugosc);
     if (write_file(notatnik_plik, notatka, (uint32_t)notatka_dlugosc) != 0) {
-        if (create_file(notatnik_plik, (uint32_t)notatka_dlugosc) != 0 ||
-            write_file(notatnik_plik, notatka, (uint32_t)notatka_dlugosc) != 0) {
-            notatnik_ustaw_status("blad zapisu");
-            return;
-        }
+        notatnik_ustaw_status("blad zapisu");
+        return;
     }
     notatnik_ustaw_status("zapisano");
 }
 
 static void notatnik_klik(int x, int y)
 {
-    if (y >= NOTATNIK_PRZYCISK_OKNA_Y && y < NOTATNIK_PRZYCISK_OKNA_Y + 24) {
+    if (y >= NOTATNIK_PRZYCISK_Y && y < NOTATNIK_PRZYCISK_Y + 24) {
         if (x >= 8 && x < 96) notatnik_odczytaj();
         if (x >= 112 && x < 168) notatnik_zapisz();
         okno_narysuj(&okno_notatnik);

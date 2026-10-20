@@ -64,7 +64,7 @@ uint8_t keyboard_try_getchar(char *character) {
     }
     if (scancode & 0x80) return 0;
 
-    value = (char)keyboard_scancode_to_char(scancode);
+    value = (char)keyboard_scancode_to_char(scancode, shift_pressed);
     if (value >= 'a' && value <= 'z' && (shift_pressed != caps_lock))
         value = value - 'a' + 'A';
     if (value == 0) return 0;
@@ -125,7 +125,7 @@ char keyboard_getchar(void) {
         }
 
         if (scancode < 0x80) {
-            char character = keyboard_scancode_to_char(scancode);
+            char character = keyboard_scancode_to_char(scancode, shift_pressed);
 
             if (character >= 'a' && character <= 'z' &&
                 (shift_pressed != caps_lock)) {
@@ -136,9 +136,20 @@ char keyboard_getchar(void) {
     }
 }
 
-uint8_t keyboard_scancode_to_char(uint8_t scancode) {
+static const char keyboard_us_shift[128] = {
+    0,  0,  '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',   // klawisze 0-15
+    '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0,  // klawisze 16-31
+    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|',        // klawisze 32-47
+    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0         // klawisze 48-63
+};
+
+uint8_t keyboard_scancode_to_char(uint8_t scancode, uint8_t shift) {
     if (scancode < 128) {
-        return keyboard_us[scancode];
+        char c = keyboard_us[scancode];
+        if (shift && !(c >= 'a' && c <= 'z')) {
+            c = keyboard_us_shift[scancode];
+        }
+        return (uint8_t)c;
     }
     return 0;
 }

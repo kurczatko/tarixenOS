@@ -17,12 +17,6 @@ struct fat32_bpb {
     char label[11]; char type[8];
 } __attribute__((packed));
 
-struct fat32_entry {
-    char name[11]; uint8_t attributes; uint8_t reserved; uint8_t create_time_tenth;
-    uint16_t create_time; uint16_t create_date; uint16_t access_date;
-    uint16_t cluster_high; uint16_t modify_time; uint16_t modify_date;
-    uint16_t cluster_low; uint32_t size;
-} __attribute__((packed));
 
 static struct fat32_bpb bpb;
 static uint32_t current_dir = FAT32_ROOT_CLUSTER;
@@ -148,7 +142,25 @@ int write_file(const char *name, const char *data, uint32_t size) {
     char directory_sector[512]; char data_sector[512]; uint32_t sector_number, cluster, done = 0; struct fat32_entry *entry = find_entry(name, current_dir, directory_sector, &sector_number);
     if (!entry || (entry->attributes & 0x10)) return -1;
     cluster = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low;
-    while (done < size && cluster >= 2 && cluster < FAT32_EOC) { for (uint32_t i = 0; i < 512; i++) data_sector[i] = done + i < size ? data[done + i] : 0; write_sector(cluster_sector(cluster), data_sector); done += 512; if (done < size && fat_entry(cluster) >= FAT32_EOC) set_fat_entry(cluster, alloc_cluster()); cluster = fat_entry(cluster); }
+    if (cluster < 2) {
+        cluster = alloc_cluster();
+        if (!cluster) return -1;
+        entry->cluster_low = cluster;
+        entry->cluster_high = 0;
+    }
+    while (done < size && cluster >= 2 && cluster < FAT32_EOC) {
+        for (uint32_t i = 0; i < 512; i++) data_sector[i] = done + i < size ? data[done + i] : 0;
+        write_sector(cluster_sector(cluster), data_sector);
+        done += 512;
+        if (done < size && fat_entry(cluster) >= FAT32_EOC) {
+            uint32_t next = alloc_cluster();
+            if (!next) return -1;
+            set_fat_entry(cluster, next);
+            cluster = next;
+        } else {
+            cluster = fat_entry(cluster);
+        }
+    }
     if (done >= size) {
         entry->size = size;
         write_sector(sector_number, directory_sector);
@@ -248,4 +260,28 @@ uint32_t fs_get_current_dir(void) {
 void fs_set_current_dir(uint32_t dir) {
     current_dir = dir;
     directory_depth = 0;
+}
+
+uint32_t fs_fat_next(uint32_t cluster) {
+    return fat_entry(cluster);
+}
+
+void fs_read_sector(uint32_t sector, char *buffer) {
+    read_sector(sector, buffer);
+}
+
+void fs_write_sector(uint32_t sector, const char *buffer) {
+    write_sector(sector, buffer);
+}
+
+uint32_t fs_alloc_cluster(void) {
+    return alloc_cluster();
+}
+
+uint32_t fs_cluster_sector(uint32_t cluster) {
+    return cluster_sector(cluster);
+}
+
+struct fat32_entry *fs_find_entry(const char *name, char *sector, uint32_t *sector_number) {
+    return find_entry(name, current_dir, sector, sector_number);
 }

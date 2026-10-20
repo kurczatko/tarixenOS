@@ -20,6 +20,8 @@
 #include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
+#include "paging.h"
+#include "loader.h"
 #include "kalkulator.h"
 #include "gdt.h"
 #include "idt.h"
@@ -52,6 +54,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     tapeta_app();
     __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     menu_start();
+
     __asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     mouse_init();
     __asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");

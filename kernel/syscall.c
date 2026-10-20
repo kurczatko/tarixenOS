@@ -1,10 +1,31 @@
 #include "syscall.h"
+#include "paging.h"
 #include "../graficzny/rysowanie.h"
 #include "../graficzny/okno.h"
 #include "../graficzny/czcionka.h"
 #include "../include/printf/printf.h"
+#include "../system_plikow/system_plikow.h"
 
 struct rejestry biezace_rejestry;
+
+static struct open_file_desc {
+    uint8_t used;
+    uint32_t cluster;
+    uint32_t position;
+    uint32_t size;
+    char name[13];
+} open_files[16];
+
+uint32_t userspace_break = 0x00100000;
+
+static int alloc_fd(void) {
+    for (int i = 0; i < 16; i++) if (!open_files[i].used) return i;
+    return -1;
+}
+
+static uint32_t heap_end(void) {
+    return userspace_break;
+}
 
 static struct okno okno_tapeta_user;
 #define KOLO_SRODEK_X 250
@@ -171,6 +192,95 @@ uint32_t syscall_handler(void)
                 return 0xFFFFFFFF;
             printf((const char *)ebx);
             return 0;
+        case SYSCALL_WRITE_CONSOLE:
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
+                return 0xFFFFFFFF;
+            for (uint32_t i = 0; i < ecx; i++) {
+                char c = ((const char *)ebx)[i];
+                if (c == '\n') printf("\n"); else { char tmp[2] = {c, 0}; printf(tmp); }
+            }
+            return (uint32_t)ecx;
+        case SYSCALL_EXIT:
+            return 0xFFFFFFFF;
+        case SYSCALL_BRK:
+            if (ebx == 0) return userspace_break;
+            if (ebx < USER_MEM_START || ebx > USER_MEM_END) return 0xFFFFFFFF;
+            userspace_break = ebx;
+            return userspace_break;
+        case SYSCALL_OPEN: {
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx)) return 0xFFFFFFFF;
+            char sector[512]; uint32_t sector_number = 0;
+            struct fat32_entry *entry = fs_find_entry((const char *)ebx, sector, &sector_number);
+            if (!entry || (entry->attributes & 0x10)) return -1;
+            int fd = alloc_fd();
+            if (fd < 0) return -1;
+            open_files[fd].used = 1;
+            open_files[fd].cluster = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low;
+            open_files[fd].position = 0;
+            open_files[fd].size = entry->size;
+            char name_buf[13]; uint32_t n = 0; const char *s = (const char *)ebx; while (*s && n < 12) { name_buf[n++] = *s++; } name_buf[n] = 0; for (uint32_t i = 0; i < 12; i++) open_files[fd].name[i] = name_buf[i];
+            return fd;
+        }
+        case SYSCALL_READ: {
+            if (ebx >= 16 || !open_files[ebx].used) return -1;
+            if (!wskaznik_uzytkownika_prawidlowy((void *)ecx)) return 0xFFFFFFFF;
+            uint32_t cluster = open_files[ebx].cluster;
+            uint32_t pos = open_files[ebx].position;
+            uint32_t left = open_files[ebx].size - pos;
+            if (left > edx) left = edx;
+            uint32_t copied = 0;
+            uint32_t skip = pos;
+            char sector[512];
+            while (cluster >= 2 && cluster < FAT32_EOC && copied < left) {
+                uint32_t csec = fs_cluster_sector(cluster);
+                fs_read_sector(csec, sector);
+                for (uint32_t i = 0; i < 512 && copied < left; i++) {
+                    if (skip > 0) { skip--; continue; }
+                    ((char *)ecx)[copied++] = sector[i];
+                    open_files[ebx].position++;
+                }
+                cluster = fs_fat_next(cluster);
+            }
+            return copied;
+        }
+        case SYSCALL_CLOSE: {
+            if (ebx >= 16 || !open_files[ebx].used) return -1;
+            open_files[ebx].used = 0;
+            return 0;
+        }
+        case SYSCALL_WRITE_FILE: {
+            if (ebx >= 16 || !open_files[ebx].used) return -1;
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ecx)) return 0xFFFFFFFF;
+            uint32_t cluster = open_files[ebx].cluster;
+            uint32_t pos = open_files[ebx].position;
+            uint32_t to_write = edx;
+            uint32_t written = 0;
+            char sector[512];
+            uint32_t cur_cluster = cluster;
+            uint32_t skip = pos;
+            while (cur_cluster >= 2 && cur_cluster < FAT32_EOC && skip >= 512) {
+                skip -= 512;
+                cur_cluster = fs_fat_next(cur_cluster);
+            }
+            while (written < to_write) {
+                if (cur_cluster < 2 || cur_cluster >= FAT32_EOC) {
+                    cur_cluster = fs_alloc_cluster();
+                    if (!cur_cluster) break;
+                }
+                uint32_t csec = fs_cluster_sector(cur_cluster);
+                fs_read_sector(csec, sector);
+                uint32_t space = 512 - skip;
+                if (space > to_write - written) space = to_write - written;
+                for (uint32_t i = 0; i < space; i++) sector[skip + i] = ((const char *)ecx)[written + i];
+                fs_write_sector(csec, sector);
+                written += space;
+                open_files[ebx].position += space;
+                skip = 0;
+                cur_cluster = fs_fat_next(cur_cluster);
+            }
+            if (open_files[ebx].position > open_files[ebx].size) open_files[ebx].size = open_files[ebx].position;
+            return written;
+        }
         default:
             return 0xFFFFFFFF;
     }

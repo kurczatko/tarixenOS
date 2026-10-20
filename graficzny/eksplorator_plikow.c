@@ -6,6 +6,7 @@
 #include "../kernel/apps/installer.h"
 #include "../kernel/notatnik.h"
 #include "../drivers/keyboard.h"
+#include "../kompilator/cc_os.h"
 
 struct okno pliki;
 static int wybrany_element = -1;
@@ -43,8 +44,10 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
     rysuj_tekst_chicago(x + 8, y + 20, "FOLDER+", 0x00FFFFFF);
     rysuj_prostokat(x + 84, y + 14, 78, 20, 0x00334155);
     rysuj_tekst_chicago(x + 100, y + 20, "TXT+", 0x00FFFFFF);
-    rysuj_prostokat(x + 168, y + 14, 62, 20, 0x00334155);
+    rysuj_prostokat(x + 168, y + 14, 56, 20, 0x00334155);
     rysuj_tekst_chicago(x + 184, y + 20, "WROC", 0x00FFFFFF);
+    rysuj_prostokat(x + 232, y + 14, 62, 20, 0x00334155);
+    rysuj_tekst_chicago(x + 248, y + 20, "C+", 0x00FFFFFF);
 
     if (tryb_tworz) {
         rysuj_tekst_chicago(x, y + 40, "NAZWA:", 0x00000000);
@@ -72,7 +75,8 @@ static void obsluz_klik_plikow(int x, int y)
     if (y >= 52 && y < 72) {
         if (x >= 16 && x < 94) tryb_tworz = 1;
         else if (x >= 100 && x < 178) tryb_tworz = 2;
-        else if (x >= 184 && x < 246) fs_parent_directory();
+        else if (x >= 238 && x < 300) tryb_tworz = 3;
+        else if (x >= 184 && x < 224) fs_parent_directory();
         nazwa_nowego[0] = 0;
         dlugosc_nazwy = 0;
         wybrany_element = -1;
@@ -82,7 +86,14 @@ static void obsluz_klik_plikow(int x, int y)
 
     int klikniety_index = (y - 96) / 16;
     if (klikniety_index >= 0 && klikniety_index < liczba_plikow) {
-        if (wybrany_element == klikniety_index) {
+        if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".C")) {
+            if (wybrany_element == klikniety_index) {
+                kompiluj_i_uruchom(lista_plikow[klikniety_index].name);
+            } else {
+                notatnik_otworz_plik(lista_plikow[klikniety_index].name);
+                wybrany_element = klikniety_index;
+            }
+        } else if (wybrany_element == klikniety_index) {
             if (lista_plikow[klikniety_index].is_directory) {
                 if (cd(lista_plikow[klikniety_index].name) == 0) wybrany_element = -1;
             } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".TXT")) {
@@ -122,7 +133,7 @@ void eksplorator_plikow_obsluz_klawiature(void)
                 int j = 0;
                 while (status[j]) { status_plikow[j] = status[j]; j++; }
                 status_plikow[j] = 0;
-            } else {
+            } else if (tryb_tworz == 2) {
                 char nazwa_pliku[13];
                 int i;
                 for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
@@ -130,6 +141,17 @@ void eksplorator_plikow_obsluz_klawiature(void)
                 nazwa_pliku[i++] = 'T';
                 nazwa_pliku[i++] = 'X';
                 nazwa_pliku[i++] = 'T';
+                nazwa_pliku[i] = 0;
+                const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
+                int j = 0;
+                while (status[j]) { status_plikow[j] = status[j]; j++; }
+                status_plikow[j] = 0;
+            } else if (tryb_tworz == 3) {
+                char nazwa_pliku[13];
+                int i;
+                for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
+                nazwa_pliku[i++] = '.';
+                nazwa_pliku[i++] = 'C';
                 nazwa_pliku[i] = 0;
                 const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
                 int j = 0;
