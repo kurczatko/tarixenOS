@@ -1,5 +1,6 @@
 #include "net.h"
 #include "e1000.h"
+#include "rtl8139.h"
 
 #define FRAME_MAX 1518
 #define IP_OFFSET 14
@@ -21,6 +22,9 @@ static uint32_t next_ip_id = 1;
 static uint32_t tcp_sequence;
 static uint16_t ephemeral_port = LOCAL_PORT;
 static uint8_t frame[FRAME_MAX];
+
+static int (*net_send_fn)(const void *, uint16_t) = e1000_send;
+static int (*net_receive_fn)(void *, uint16_t) = e1000_receive;
 
 static uint16_t read16(const uint8_t *p) { return ((uint16_t)p[0] << 8) | p[1]; }
 static uint32_t read32(const uint8_t *p) { return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | p[3]; }
@@ -72,14 +76,14 @@ static void send_arp_request(const uint8_t target[4])
     write16(packet + 14, 1); write16(packet + 16, ETH_IPV4); packet[18] = 6; packet[19] = 4;
     write16(packet + 20, 1); copy_bytes(packet + 22, mac_address, 6); copy_bytes(packet + 28, local_ip, 4);
     zero_bytes(packet + 32, 6); copy_bytes(packet + 38, target, 4);
-    e1000_send(packet, sizeof(packet));
+    net_send_fn(packet, sizeof(packet));
 }
 
 static int resolve_arp(const uint8_t target[4], uint8_t result[6])
 {
     send_arp_request(target);
     for (uint32_t tries = 0; tries < NET_WAIT_POLLS; tries++) {
-        int length = e1000_receive(frame, sizeof(frame));
+        int length = net_receive_fn(frame, sizeof(frame));
         if (length < 42 || read16(frame + 12) != ETH_ARP) continue;
         if (read16(frame + 20) == 2 && equal_bytes(frame + 38, local_ip, 4) && equal_bytes(frame + 28, target, 4)) {
             copy_bytes(result, frame + 22, 6); return 1;
@@ -115,7 +119,7 @@ static void make_udp_packet(uint8_t *packet, const uint8_t *destination_mac,
     copy_bytes(udp + 8, payload, payload_length);
     uint16_t sum = transport_checksum(packet + 14, udp, udp_length, IP_UDP);
     write16(udp + 6, sum ? sum : 0xFFFF);
-    e1000_send(packet, 14 + 20 + udp_length);
+    net_send_fn(packet, 14 + 20 + udp_length);
 }
 
 static int parse_dhcp_options(const uint8_t *options, uint32_t length, uint8_t wanted,
@@ -159,7 +163,7 @@ static int dhcp_configure(void)
     uint8_t server[4] = {0,0,0,0};
     int got_offer = 0;
     for (uint32_t tries = 0; tries < NET_WAIT_POLLS && !got_offer; tries++) {
-        int length = e1000_receive(frame, sizeof(frame));
+        int length = net_receive_fn(frame, sizeof(frame));
         if (length < 14 + 20 + 8 + 240 || read16(frame + 12) != ETH_IPV4 || frame[23] != IP_UDP) continue;
         uint8_t *udp = frame + 34;
         if (read16(udp) != 67 || read16(udp + 2) != 68) continue;
@@ -183,7 +187,7 @@ static int dhcp_configure(void)
     make_udp_packet(frame, broadcast_mac, zero_ip, broadcast_ip, 68, 67, dhcp, (uint16_t)p);
 
     for (uint32_t tries = 0; tries < NET_WAIT_POLLS; tries++) {
-        int length = e1000_receive(frame, sizeof(frame));
+        int length = net_receive_fn(frame, sizeof(frame));
         if (length < 14 + 20 + 8 + 240 || read16(frame + 12) != ETH_IPV4 || frame[23] != IP_UDP) continue;
         uint8_t *udp = frame + 34;
         if (read16(udp) != 67 || read16(udp + 2) != 68) continue;
@@ -204,9 +208,21 @@ static int dhcp_configure(void)
 
 int net_init(void)
 {
-    if (!e1000_init() || !e1000_get_mac(mac_address)) return 0;
-    configured = (uint8_t)dhcp_configure();
-    if (configured) configured = (uint8_t)resolve_arp(gateway_ip, gateway_mac);
+    if (e1000_init() && e1000_get_mac(mac_address)) {
+        net_send_fn = e1000_send;
+        net_receive_fn = e1000_receive;
+    } else if (rtl8139_init() && rtl8139_get_mac(mac_address)) {
+        net_send_fn = rtl8139_send;
+        net_receive_fn = rtl8139_receive;
+    } else {
+        return 0;
+    }
+
+    local_ip[0] = 10; local_ip[1] = 0; local_ip[2] = 2; local_ip[3] = 15;
+    gateway_ip[0] = 10; gateway_ip[1] = 0; gateway_ip[2] = 2; gateway_ip[3] = 2;
+    subnet_mask[0] = 255; subnet_mask[1] = 255; subnet_mask[2] = 255; subnet_mask[3] = 0;
+    dns_ip[0] = 10; dns_ip[1] = 0; dns_ip[2] = 2; dns_ip[3] = 3;
+    configured = 1;
     return configured;
 }
 
@@ -243,7 +259,7 @@ static int dns_resolve(const char *host, uint8_t address[4])
     if (!resolve_next_hop(dns_ip, dns_mac)) return 0;
     make_udp_packet(frame, dns_mac, local_ip, dns_ip, 53000, 53, query, query_length);
     for (uint32_t tries = 0; tries < NET_WAIT_POLLS; tries++) {
-        int length = e1000_receive(frame, sizeof(frame));
+        int length = net_receive_fn(frame, sizeof(frame));
         if (length < 14 + 20 + 8 + 12 || read16(frame + 12) != ETH_IPV4 || frame[23] != IP_UDP) continue;
         uint8_t *udp = frame + 34;
         if (read16(udp) != 53 || read16(udp + 2) != 53000) continue;
@@ -285,7 +301,7 @@ static void make_tcp_packet(uint8_t *packet, const uint8_t destination_mac[6], c
     write32(tcp + 4, sequence); write32(tcp + 8, acknowledgement); tcp[12] = 0x50; tcp[13] = flags;
     write16(tcp + 14, 4096); if (payload_length) copy_bytes(tcp + 20, payload, payload_length);
     write16(tcp + 16, transport_checksum(packet + 14, tcp, tcp_length, IP_TCP));
-    e1000_send(packet, 14 + 20 + tcp_length);
+    net_send_fn(packet, 14 + 20 + tcp_length);
 }
 
 static int tcp_wait(uint8_t *packet, uint8_t **tcp_out, uint16_t *payload_length,
@@ -293,7 +309,7 @@ static int tcp_wait(uint8_t *packet, uint8_t **tcp_out, uint16_t *payload_length
                     uint32_t attempts)
 {
     for (uint32_t tries = 0; tries < attempts; tries++) {
-        int length = e1000_receive(packet, FRAME_MAX);
+        int length = net_receive_fn(packet, FRAME_MAX);
         if (length < 54 || read16(packet + 12) != ETH_IPV4 || packet[23] != IP_TCP || !equal_bytes(packet + 26, remote_ip, 4)) continue;
         uint8_t *tcp = packet + 34;
         if (read16(tcp) != remote_port || read16(tcp + 2) != local_port) continue;
@@ -329,7 +345,7 @@ int net_tcp_connect(struct net_tcp_connection *connection, const char *host, uin
                     connection->sequence, connection->acknowledgement, 0x10, 0, 0);
     for (uint32_t tries = 0; tries < 1000000000; tries++) {
         if ((tries & 0x3FF) == 0) { __asm__ volatile("pause" ::: "memory"); }
-        if (e1000_send(frame, 54)) break;
+        if (net_send_fn(frame, 54)) break;
     }
     connection->connected = 1;
     return 1;
@@ -344,7 +360,7 @@ int net_tcp_send(struct net_tcp_connection *connection, const uint8_t *data, uin
     packet_length = (uint16_t)(14 + 20 + 20 + length);
     for (uint32_t tries = 0; tries < 1000000000; tries++) {
         if ((tries & 0x3FF) == 0) { __asm__ volatile("pause" ::: "memory"); }
-        if (e1000_send(frame, packet_length)) break;
+        if (net_send_fn(frame, packet_length)) break;
     }
     connection->sequence += length;
     return 1;

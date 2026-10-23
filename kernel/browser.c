@@ -686,7 +686,7 @@ static void browser_fetch(void)
     int length;
     if (parsed == -3) { set_status("Adres z portem nieobslugiwany"); page[0] = 0; okno_narysuj(&browser_window); return; }
     if (parsed == 0) { set_status("Nieprawidlowy adres"); okno_narysuj(&browser_window); return; }
-    if (!net_ready()) { set_status("Brak sieci: E1000/DHCP niedostepne"); okno_narysuj(&browser_window); return; }
+    if (!net_ready()) { set_status("Brak sieci: sterownik/DHCP niedostepne"); okno_narysuj(&browser_window); return; }
 
     set_status("Laczenie... czekaj");
     okno_narysuj(&browser_window);
@@ -973,7 +973,7 @@ void browser_open(void)
     address_focused = 1;
     focused_field = -1;
     for (uint32_t fi = 0; fi < field_count; fi++) fields[fi].focused = 0;
-    if (!net_ready()) set_status("Brak sieci: E1000/DHCP niedostepne");
+    if (!net_ready()) set_status("Brak sieci: sterownik/DHCP niedostepne");
     else set_status("Wpisz adres i nacisnij IDZ");
     okno_stworz(&browser_window, 120, 80, BROWSER_WIDTH, BROWSER_HEIGHT,
                 "PRZEGLADARKA HTTP/HTTPS", browser_draw);
