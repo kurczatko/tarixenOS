@@ -54,6 +54,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     gdt_install();
     idt_install();
     syscall_install();
+    net_init();
     pulp_init();
     tapeta_app();
     __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
