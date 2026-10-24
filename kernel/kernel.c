@@ -73,6 +73,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
     __asm__ volatile ("movb $'M', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    konta_start();
+
     while(1) {
         char tekst_czasu[9];
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
@@ -80,6 +82,11 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         usb_poll();
         hid_poll();
         kursor_tekstowy_tick();
+        if (!konta_czy_zalogowano()) {
+            konta_obsluz();
+            keyboard_discard_pending();
+            continue;
+        }
         if (aktywne_okno && aktywne_okno->otwarte && aktywne_okno->w_polu_tekstowym) {
             char znak;
             while (keyboard_try_getchar(&znak)) {
