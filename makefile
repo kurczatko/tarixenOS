@@ -14,6 +14,7 @@ ISO_IMAGE := $(BUILD_DIR)/tarixenOS.iso
 
 CC32 := cc
 CC64 := cc
+CXX := g++
 LD32 := ld
 LD64 := ld
 OBJCOPY := objcopy
@@ -21,12 +22,13 @@ NASM := nasm
 
 CFLAGS32 := -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector -Wno-incompatible-pointer-types
 CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector -mcmodel=kernel -mno-red-zone
+CXXFLAGS := -m32 -Os -ffreestanding -fno-exceptions -fno-rtti -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(filter-out kernel/shell.c,$(wildcard kernel/*.c)) kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c
-KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES)))
-KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
+KERNEL_SOURCES := $(filter-out kernel/shell.c,$(wildcard kernel/*.c)) kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp
+KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES)))
+KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%64.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
 
 .PHONY: all image iso clean
 
@@ -51,6 +53,10 @@ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC32) $(CFLAGS32) -c $< -o $@
 
+$(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
 $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC32) $(CFLAGS32) -c $< -o $@
@@ -65,6 +71,14 @@ $(BUILD_DIR)/%64.o: %.c | $(BUILD_DIR)
 		x86_64-elf-gcc $(CFLAGS64) -c $< -o $@; \
 	else \
 		echo "Pomijam x86_64 (brak toolchain, użyj make image)"; \
+		touch $@; \
+	fi
+
+$(BUILD_DIR)/%64.o: %.cpp | $(BUILD_DIR)
+	@if command -v x86_64-elf-g++ >/dev/null 2>&1; then \
+		mkdir -p $(dir $@); \
+		x86_64-elf-g++ $(CFLAGS64) -fno-exceptions -fno-rtti -c $< -o $@ || touch $@; \
+	else \
 		touch $@; \
 	fi
 

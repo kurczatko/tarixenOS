@@ -21,6 +21,7 @@
 #include "notatnik.h"
 #include "../drivers/sound/intel_hd.h"
 #include "../drivers/net.h"
+#include "../drivers/floppy.h"
 #include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
@@ -49,6 +50,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     }
     __asm__ volatile ("movb $'D', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     init_fs();
+    floppy_init();
     __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     tapeta_wczytaj();
     gdt_install();

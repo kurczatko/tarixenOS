@@ -9,7 +9,7 @@
 #define NOTATNIK_MAKS 512
 #define NOTATNIK_SZEROKOSC 640
 #define NOTATNIK_WYSOKOSC 440
-#define NOTATNIK_PRZYCISK_Y 400
+#define NOTATNIK_PRZYCISK_Y 370
 #define NOTATNIK_PRZYCISK_OKNA_Y 430
 #define CONTENT_X 8
 #define CONTENT_Y 30
@@ -28,6 +28,29 @@ static uint8_t notatnik_biezacy_styl = 0;
 static char notatnik_plik[16] = NOTATNIK_PLIK;
 static int notatka_dlugosc;
 static char notatnik_status[32];
+static uint8_t notatnik_tryb_tekstowy;
+
+static int notatnik_ma_rozszerzenie(const char *nazwa, const char *rozszerzenie)
+{
+    int dlugosc = 0;
+    int rozszerzenie_dlugosc = 0;
+    while (nazwa[dlugosc]) dlugosc++;
+    while (rozszerzenie[rozszerzenie_dlugosc]) rozszerzenie_dlugosc++;
+    if (dlugosc < rozszerzenie_dlugosc) return 0;
+    for (int i = 0; i < rozszerzenie_dlugosc; i++) {
+        char znak = nazwa[dlugosc - rozszerzenie_dlugosc + i];
+        char oczekiwany = rozszerzenie[i];
+        if (znak >= 'a' && znak <= 'z') znak -= 'a' - 'A';
+        if (oczekiwany >= 'a' && oczekiwany <= 'z') oczekiwany -= 'a' - 'A';
+        if (znak != oczekiwany) return 0;
+    }
+    return 1;
+}
+
+static void notatnik_ustaw_tryb_tekstowy(void)
+{
+    notatnik_tryb_tekstowy = notatnik_ma_rozszerzenie(notatnik_plik, ".TXT") ? 1 : 0;
+}
 
 static void notatnik_ustaw_plik(const char *nazwa_pliku)
 {
@@ -72,23 +95,27 @@ static void notatnik_narysuj(int x, int y, int szerokosc, int wysokosc)
                         notatka_rozmiar[indeks], notatka_styl[indeks]);
         line_x += cena;
     }
-    rysuj_prostokat(x + 8, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 12, y + NOTATNIK_PRZYCISK_Y + 4, "KURSA", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 60, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 64, y + NOTATNIK_PRZYCISK_Y + 4, "POGR", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 112, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 116, y + NOTATNIK_PRZYCISK_Y + 4, "CIEN", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 164, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 168, y + NOTATNIK_PRZYCISK_Y + 4, "MALY", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 216, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 220, y + NOTATNIK_PRZYCISK_Y + 4, "NOR", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 268, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 272, y + NOTATNIK_PRZYCISK_Y + 4, "DUZY", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 320, y + NOTATNIK_PRZYCISK_Y, 80, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 324, y + NOTATNIK_PRZYCISK_Y + 4, "ODCZYTAJ", KOLOR_TEKST_PRZYCISKU);
-    rysuj_prostokat(x + 410, y + NOTATNIK_PRZYCISK_Y, 70, 20, KOLOR_PRZYCISKU);
-    rysuj_tekst_chicago(x + 414, y + NOTATNIK_PRZYCISK_Y + 4, "ZAPISZ", KOLOR_TEKST_PRZYCISKU);
-    rysuj_tekst_chicago(x + 490, y + NOTATNIK_PRZYCISK_Y + 4, notatnik_status, KOLOR_TEKST_PRZYCISKU);
+    if (notatnik_tryb_tekstowy) {
+        rysuj_tekst_chicago(x + 490, y + NOTATNIK_PRZYCISK_Y + 4, notatnik_status, KOLOR_TEKST_PRZYCISKU);
+    } else {
+        rysuj_prostokat(x + 8, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 12, y + NOTATNIK_PRZYCISK_Y + 4, "KURSA", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 60, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 64, y + NOTATNIK_PRZYCISK_Y + 4, "POGR", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 112, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 116, y + NOTATNIK_PRZYCISK_Y + 4, "CIEN", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 164, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 168, y + NOTATNIK_PRZYCISK_Y + 4, "MALY", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 216, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 220, y + NOTATNIK_PRZYCISK_Y + 4, "NOR", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 268, y + NOTATNIK_PRZYCISK_Y, 44, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 272, y + NOTATNIK_PRZYCISK_Y + 4, "DUZY", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 320, y + NOTATNIK_PRZYCISK_Y, 80, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 324, y + NOTATNIK_PRZYCISK_Y + 4, "ODCZYTAJ", KOLOR_TEKST_PRZYCISKU);
+        rysuj_prostokat(x + 410, y + NOTATNIK_PRZYCISK_Y, 70, 20, KOLOR_PRZYCISKU);
+        rysuj_tekst_chicago(x + 414, y + NOTATNIK_PRZYCISK_Y + 4, "ZAPISZ", KOLOR_TEKST_PRZYCISKU);
+        rysuj_tekst_chicago(x + 490, y + NOTATNIK_PRZYCISK_Y + 4, notatnik_status, KOLOR_TEKST_PRZYCISKU);
+    }
     if (okno_notatnik.w_polu_tekstowym && kursor_tekstowy_widoczny()) {
         int cx = x;
         int cy = y;
@@ -106,8 +133,7 @@ static void notatnik_odczytaj(void)
 {
     int i;
     int odczyt;
-    int count;
-    char buf[NOTATNIK_MAKS * 3 + 8];
+    char buf[NOTATNIK_MAKS + 8];
     for (i = 0; i <= NOTATNIK_MAKS; i++) {
         notatka[i] = 0;
         notatka_rozmiar[i] = 1;
@@ -121,11 +147,24 @@ static void notatnik_odczytaj(void)
         notatnik_ustaw_status("brak pliku");
         return;
     }
+    if (notatnik_tryb_tekstowy) {
+        int count = odczyt;
+        if (count > NOTATNIK_MAKS) count = NOTATNIK_MAKS;
+        for (i = 0; i < count; i++) {
+            notatka[i] = buf[i];
+            notatka_rozmiar[i] = 1;
+            notatka_styl[i] = 0;
+        }
+        notatka_dlugosc = count;
+        notatka[notatka_dlugosc] = 0;
+        notatnik_ustaw_status("odczytano txt");
+        return;
+    }
     if (odczyt < 6 || buf[0] != 'N' || buf[1] != 'T' || buf[2] != 'F') {
         notatnik_ustaw_status("zly format");
         return;
     }
-    count = (unsigned char)buf[4] | ((unsigned char)buf[5] << 8);
+    int count = (unsigned char)buf[4] | ((unsigned char)buf[5] << 8);
     if (count > NOTATNIK_MAKS) count = NOTATNIK_MAKS;
     if (6 + count * 3 > odczyt) count = (odczyt - 6) / 3;
     for (i = 0; i < count; i++) {
@@ -140,6 +179,15 @@ static void notatnik_odczytaj(void)
 
 static void notatnik_zapisz(void)
 {
+    if (notatnik_tryb_tekstowy) {
+        create_file(notatnik_plik, (uint32_t)notatka_dlugosc);
+        if (write_file(notatnik_plik, notatka, (uint32_t)notatka_dlugosc) != 0) {
+            notatnik_ustaw_status("blad zapisu");
+            return;
+        }
+        notatnik_ustaw_status("zapisano txt");
+        return;
+    }
     char buf[NOTATNIK_MAKS * 3 + 8];
     int i;
     int pos = 0;
@@ -170,7 +218,7 @@ static void notatnik_klik(int x, int y)
     int linia;
     int indeks;
     int cena;
-    if (cy >= NOTATNIK_PRZYCISK_Y && cy < NOTATNIK_PRZYCISK_Y + 20) {
+    if (!notatnik_tryb_tekstowy && cy >= NOTATNIK_PRZYCISK_Y && cy < NOTATNIK_PRZYCISK_Y + 20) {
         if (cx >= 8 && cx < 52) notatnik_biezacy_styl ^= 2;
         if (cx >= 60 && cx < 104) notatnik_biezacy_styl ^= 1;
         if (cx >= 112 && cx < 156) notatnik_biezacy_styl ^= 4;
@@ -216,6 +264,7 @@ static void notatnik_otworz_biezacy_plik(void)
     notatka[0] = 0;
     notatka_rozmiar[0] = 1;
     notatka_styl[0] = 0;
+    notatnik_ustaw_tryb_tekstowy();
     notatnik_ustaw_status("gotowy");
     notatnik_odczytaj();
     okno_stworz(&okno_notatnik, 56, 50, NOTATNIK_SZEROKOSC,

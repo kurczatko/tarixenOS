@@ -5,6 +5,8 @@
 #include "../graficzny/okno.h"
 #include "../graficzny/rysowanie.h"
 #include "../graficzny/czcionka.h"
+#include "browser_css.h"
+#include "browser_js.h"
 
 #define BROWSER_WIDTH 760
 #define BROWSER_HEIGHT 570
@@ -16,19 +18,12 @@
 #define BROWSER_FIELDS_MAX 16
 
 #define FIELD_MARKER '\x02'
+#define BULLET_MARKER '\x03'
 
 struct browser_link {
     uint16_t start;
     uint16_t end;
     char url[256];
-};
-
-struct browser_style {
-    uint32_t color;
-    uint32_t background;
-    uint8_t has_background;
-    uint8_t bold;
-    uint8_t rozmiar;
 };
 
 struct browser_css_rule {
@@ -54,7 +49,7 @@ struct browser_field {
 };
 
 static struct okno browser_window;
-static char address[128] = "https://google.com/";
+static char address[128] = "http://motherfuckingwebsite.com/";
 static char response[BROWSER_RESPONSE_MAX];
 static char page[BROWSER_PAGE_MAX];
 static uint32_t page_colors[BROWSER_PAGE_MAX];
@@ -77,6 +72,33 @@ static uint8_t browser_use_https;
 static char current_form_action[256];
 static uint8_t current_form_method_get;
 
+static char js_elem_id[32][64];
+static int js_elem_page[32];
+static int js_elem_count;
+
+static void js_note_element(const char *tag, const char *id, int page_index)
+{
+    if (!id || !id[0]) return;
+    for (int i = 0; i < js_elem_count; i++) {
+        if (js_elem_page[i] == page_index) return;
+    }
+    if (js_elem_count >= 32) return;
+    int n = 0;
+    while (id[n] && n < 63) { js_elem_id[js_elem_count][n] = id[n]; n++; }
+    js_elem_id[js_elem_count][n] = 0;
+    js_elem_page[js_elem_count] = page_index;
+    js_elem_count++;
+    js_register_element(tag, id, page_index);
+}
+
+static const char *js_find_id_by_page(int page_index)
+{
+    for (int i = 0; i < js_elem_count; i++) {
+        if (js_elem_page[i] == page_index) return js_elem_id[i];
+    }
+    return 0;
+}
+
 static void copy_text(char *destination, uint32_t capacity, const char *source)
 {
     uint32_t i = 0;
@@ -94,6 +116,17 @@ static int starts_with(const char *text, const char *prefix)
 static void set_status(const char *text)
 {
     copy_text(status, sizeof(status), text);
+}
+
+void js_host_alert(const char *msg)
+{
+    copy_text(status, sizeof(status), msg);
+    if (browser_opened && browser_window.otwarte) okno_narysuj(&browser_window);
+}
+
+void js_host_log(const char *msg)
+{
+    (void)msg;
 }
 
 static int lower_char(char c)
@@ -388,13 +421,31 @@ static void page_from_response(int response_length)
                            !(response[close_tag] == '<' && response[close_tag + 1] == '/' &&
                              slice_equal_nocase(response, close_tag + 2, 5, "style"))) close_tag++;
                     parse_css_stylesheet(response, tag_end + 1, close_tag);
+                    css_parse_stylesheet(response + tag_end + 1, close_tag - (tag_end + 1));
                     in_style = 1;
                 }
                 i = tag_end;
                 continue;
             }
             if (in_style) { i = tag_end; continue; }
-            if (text_equal_nocase(tag, "script")) in_script = !closing;
+            if (text_equal_nocase(tag, "script")) {
+                if (closing) { in_script = 0; i = tag_end; continue; }
+                int s_start = tag_end + 1;
+                int s_end = s_start;
+                while (s_end + 7 < response_length &&
+                       !(response[s_end] == '<' && response[s_end + 1] == '/' &&
+                         slice_equal_nocase(response, s_end + 2, 6, "script"))) s_end++;
+                if (s_end > s_start && s_end - s_start < 2048) {
+                    static char js_buf[2048];
+                    int jn = 0;
+                    while (s_start < s_end && jn < 2047) { js_buf[jn++] = response[s_start++]; }
+                    js_buf[jn] = 0;
+                    js_run(js_buf, jn);
+                }
+                in_script = 1;
+                i = s_end < response_length ? s_end : tag_end;
+                continue;
+            }
 
             if (closing) {
                 if (text_equal_nocase(tag, "a") && anchor_active) {
@@ -427,6 +478,8 @@ static void page_from_response(int response_length)
                                 text_equal_nocase(tag, "pre") || text_equal_nocase(tag, "center");
                 if (block_tag && output > 0 && page[output - 1] != '\n')
                     append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+                if (text_equal_nocase(tag, "li"))
+                    append_page_character(BULLET_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
                 if (text_equal_nocase(tag, "hr")) {
                     append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
                     append_page_character('\x01', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
@@ -538,6 +591,12 @@ static void page_from_response(int response_length)
                         }
                     }
                 }
+                if (id_start >= 0 && id_length > 0 && id_length < 64) {
+                    char id_buf[64];
+                    for (int k = 0; k < id_length; k++) id_buf[k] = response[id_start + k];
+                    id_buf[id_length] = 0;
+                    js_note_element(tag, id_buf, output);
+                }
                 if (text_equal_nocase(tag, "form") && !closing) {
                     if (action_length > 0) copy_text(current_form_action, sizeof(current_form_action), action_value);
                     else current_form_action[0] = 0;
@@ -575,6 +634,28 @@ static void page_from_response(int response_length)
                         current_style.background = rule->style.background;
                         current_style.has_background = 1;
                     }
+                }
+                {
+                    char class_buf[32] = {0};
+                    char id_buf[64] = {0};
+                    if (class_start >= 0 && class_length > 0 && class_length < 32) {
+                        for (int k = 0; k < class_length; k++) class_buf[k] = response[class_start + k];
+                        class_buf[class_length] = 0;
+                    }
+                    if (id_start >= 0 && id_length > 0 && id_length < 64) {
+                        for (int k = 0; k < id_length; k++) id_buf[k] = response[id_start + k];
+                        id_buf[id_length] = 0;
+                    }
+                    struct browser_style cs;
+                    css_compute(tag, class_start >= 0 ? class_buf : 0, id_start >= 0 ? id_buf : 0, "", &cs);
+                    if (cs.has_border_color) { current_style.border_color = cs.border_color; current_style.has_border_color = 1; }
+                    if (cs.has_border_width) { current_style.border_width = cs.border_width; current_style.has_border_width = 1; }
+                    if (cs.has_padding) { current_style.padding = cs.padding; current_style.has_padding = 1; }
+                    if (cs.has_margin) { current_style.margin = cs.margin; current_style.has_margin = 1; }
+                    if (cs.has_width) { current_style.width = cs.width; current_style.has_width = 1; }
+                    if (cs.has_cursor) { copy_text(current_style.cursor, sizeof(current_style.cursor), cs.cursor); current_style.has_cursor = 1; }
+                    current_style.text_align = cs.text_align;
+                    current_style.display = cs.display;
                 }
                 if (text_equal_nocase(tag, "body") && current_style.has_background)
                     page_background = current_style.background;
@@ -810,6 +891,7 @@ static void browser_draw(int x, int y, int width, int height)
         }
         if (line < page_scroll_line) {
             if (c == FIELD_MARKER) char_x += 160;
+            else if (c == BULLET_MARKER) char_x += 8;
             else char_x += znak_szerokosc(page_rozmiar[i]);
             continue;
         }
@@ -841,6 +923,11 @@ static void browser_draw(int x, int y, int width, int height)
                 char_x += fw * 8;
                 continue;
             }
+            char_x += 8;
+            continue;
+        }
+        if (c == BULLET_MARKER) {
+            rysuj_prostokat(character_x, character_y + 3, 2, 2, page_colors[i]);
             char_x += 8;
             continue;
         }
@@ -889,6 +976,7 @@ static int browser_link_at(int x, int y)
         }
         if (page[i] == '\x01') { char_x = 84 * 8; continue; }
         if (page[i] == FIELD_MARKER) char_x += 160;
+        else if (page[i] == BULLET_MARKER) char_x += 8;
         else char_x += znak_szerokosc(page_rozmiar[i]);
     }
     if (page_index < 0) return -1;
@@ -911,6 +999,7 @@ void browser_scroll_wheel(int delta)
         }
         if (page[i] == '\x01') { char_x = 84 * 8; continue; }
         if (page[i] == FIELD_MARKER) char_x += 160;
+        else if (page[i] == BULLET_MARKER) char_x += 8;
         else char_x += znak_szerokosc(page_rozmiar[i]);
     }
     if (char_x) total_lines++;
@@ -945,11 +1034,17 @@ static void browser_click(int x, int y)
         focused_field = field;
         fields[field].focused = 1;
         okno_narysuj(&browser_window);
+        {
+            const char *jid = js_find_id_by_page(fields[field].page_start);
+            if (jid) js_dispatch_click(jid);
+        }
         return;
     }
 
     int link = browser_link_at(x, y);
     if (link >= 0) {
+        const char *jid = js_find_id_by_page(links[link].start);
+        if (jid) js_dispatch_click(jid);
         if (!copy_resolved_link(links[link].url)) {
             set_status("Nieprawidlowy adres linku");
             okno_narysuj(&browser_window);
@@ -969,6 +1064,8 @@ void browser_open(void)
         okno_narysuj(&browser_window);
         return;
     }
+    css_init();
+    js_init();
     browser_opened = 1;
     address_focused = 1;
     focused_field = -1;

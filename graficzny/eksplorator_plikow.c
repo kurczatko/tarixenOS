@@ -7,6 +7,7 @@
 #include "../kernel/notatnik.h"
 #include "../drivers/keyboard.h"
 #include "../kompilator/cc_os.h"
+#include "../drivers/floppy.h"
 
 struct okno pliki;
 static int wybrany_element = -1;
@@ -16,6 +17,7 @@ static uint8_t tryb_tworz;
 static char nazwa_nowego[9];
 static int dlugosc_nazwy;
 static char status_plikow[24];
+static int view_floppy = 0;
 
 static int ma_rozszerzenie(const char *nazwa, const char *rozszerzenie)
 {
@@ -56,8 +58,28 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
         rysuj_tekst_chicago(x, y + 40, status_plikow, 0x00000000);
     }
 
+    int row_start = y + 58;
+    if (!view_floppy && floppy_present()) {
+        if (wybrany_element == -2) {
+            rysuj_prostokat(x, row_start, 250, 14, 0x003B82F6);
+            rysuj_tekst_chicago(x, row_start, "DYSKIETKA", 0x00FFFFFF);
+        } else {
+            rysuj_tekst_chicago(x, row_start, "DYSKIETKA", 0x00000000);
+        }
+        row_start += 16;
+    }
+    if (view_floppy) {
+        if (wybrany_element == -2) {
+            rysuj_prostokat(x, row_start, 250, 14, 0x003B82F6);
+            rysuj_tekst_chicago(x, row_start, "DYSK TWARDY", 0x00FFFFFF);
+        } else {
+            rysuj_tekst_chicago(x, row_start, "DYSK TWARDY", 0x00000000);
+        }
+        row_start += 16;
+    }
+
     for (int i = 0; i < liczba_plikow; i++) {
-        int row_y = y + 58 + i * 16;
+        int row_y = row_start + i * 16;
         if (row_y + 8 > y + wysokosc) break;
         if (i == wybrany_element) {
             rysuj_prostokat(x, row_y, 250, 14, 0x003B82F6);
@@ -84,7 +106,28 @@ static void obsluz_klik_plikow(int x, int y)
         return;
     }
 
-    int klikniety_index = (y - 96) / 16;
+    int has_toggle = (!view_floppy && floppy_present()) || view_floppy;
+    int toggle_row = 88;
+
+    if (has_toggle && y >= toggle_row && y < toggle_row + 14) {
+        if (!view_floppy && floppy_present()) {
+            view_floppy = 1;
+            fs_set_device_floppy(1);
+            fs_reset_directory();
+        } else if (view_floppy) {
+            view_floppy = 0;
+            fs_set_device_floppy(0);
+            fs_reset_directory();
+        }
+        wybrany_element = -2;
+        okno_narysuj(&pliki);
+        return;
+    }
+
+    int file_base = has_toggle ? 104 : 88;
+    int klikniety_index = (y - file_base) / 16;
+    if (klikniety_index < 0) klikniety_index = -1;
+
     if (klikniety_index >= 0 && klikniety_index < liczba_plikow) {
         if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".C")) {
             if (wybrany_element == klikniety_index) {
@@ -113,6 +156,8 @@ static void obsluz_klik_plikow(int x, int y)
 void eksplorator_plikow(void)
 {
     fs_reset_directory();
+    fs_set_device_floppy(0);
+    view_floppy = 0;
     wybrany_element = -1;
     tryb_tworz = 0;
     status_plikow[0] = 0;

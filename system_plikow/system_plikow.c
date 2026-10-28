@@ -1,5 +1,6 @@
 #include "system_plikow.h"
 #include "../include/printf/printf.h"
+#include "../drivers/floppy.h"
 
 #define FAT32_EOC 0x0FFFFFF8
 #define FAT32_FREE 0
@@ -24,6 +25,7 @@ static uint32_t directory_stack[16];
 static uint8_t directory_depth;
 static uint32_t first_data_sector;
 static uint32_t fat_start;
+static uint8_t fs_use_floppy = 0;
 
 static int memory_compare(const void *left, const void *right, uint32_t count) {
     const uint8_t *a = left;
@@ -41,6 +43,10 @@ static uint8_t inb(uint16_t port) { uint8_t value; __asm__ volatile ("inb %1, %0
 static void ata_wait(void) { while (inb(ATA_STATUS) & 0x80) { } }
 
 void read_sector(uint32_t sector, char *buffer) {
+    if (fs_use_floppy) {
+        floppy_read_sector(sector, buffer);
+        return;
+    }
     uint32_t i; uint16_t word;
     ata_wait(); outb(0x1F2, 1); outb(0x1F3, sector); outb(0x1F4, sector >> 8);
     outb(0x1F5, sector >> 16); outb(0x1F6, 0xE0 | ((sector >> 24) & 0x0F)); outb(0x1F7, 0x20);
@@ -49,6 +55,10 @@ void read_sector(uint32_t sector, char *buffer) {
 }
 
 void write_sector(uint32_t sector, const char *buffer) {
+    if (fs_use_floppy) {
+        floppy_write_sector(sector, buffer);
+        return;
+    }
     uint32_t i; uint16_t word;
     ata_wait(); outb(0x1F2, 1); outb(0x1F3, sector); outb(0x1F4, sector >> 8);
     outb(0x1F5, sector >> 16); outb(0x1F6, 0xE0 | ((sector >> 24) & 0x0F)); outb(0x1F7, 0x30);
@@ -112,6 +122,21 @@ void init_fs(void) {
     read_sector(0, (char *)&bpb);
     if (bpb.bytes_per_sector != 512 || bpb.root_cluster < 2) { printf("Blad: brak systemu FAT32\n"); return; }
     fat_start = bpb.reserved_sectors; first_data_sector = fat_start + bpb.fat_count * bpb.fat_size; current_dir = bpb.root_cluster; directory_depth = 0;
+}
+
+void fs_set_device_floppy(int use_floppy) {
+    fs_use_floppy = (uint8_t)(use_floppy ? 1 : 0);
+    if (use_floppy) {
+        floppy_read_sector(0, (char *)&bpb);
+    } else {
+        read_sector(0, (char *)&bpb);
+    }
+    if (bpb.bytes_per_sector != 512 || bpb.root_cluster < 2) return;
+    fat_start = bpb.reserved_sectors; first_data_sector = fat_start + bpb.fat_count * bpb.fat_size; current_dir = bpb.root_cluster; directory_depth = 0;
+}
+
+int fs_is_floppy(void) {
+    return fs_use_floppy;
 }
 
 static struct fat32_entry *new_entry(const char *name, uint8_t attributes, char *sector) {
