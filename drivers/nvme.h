@@ -3,9 +3,6 @@
 
 #include "../include/printf/types.h"
 
-#ifdef __cplusplus
-extern "C" {
-
 struct nvme_id_controller {
     uint16_t vid;
     uint16_t vid2;
@@ -1108,6 +1105,10 @@ struct nvme_command {
     uint32_t rsvd63;
 };
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int nvme_init(void);
 int nvme_read(uint32_t nsid, uint64_t lba, uint32_t sector_count, void *buffer);
 int nvme_write(uint32_t nsid, uint64_t lba, uint32_t sector_count, const void *buffer);
@@ -1117,6 +1118,7 @@ uint32_t nvme_get_sector_size(uint32_t nsid);
 int nvme_identify_controller(void *buffer, uint32_t buffer_size);
 int nvme_identify_namespace(uint32_t nsid, void *buffer, uint32_t buffer_size);
 
+#ifdef __cplusplus
 }
 #endif
 
