@@ -20,6 +20,7 @@
 #include "../system_plikow/system_plikow.h"
 #include "notatnik.h"
 #include "../drivers/sound/intel_hd.h"
+#include "../drivers/alc650.h"
 #include "../drivers/net.h"
 #include "../drivers/floppy.h"
 #include "../drivers/nvme.h"
@@ -76,6 +77,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     __asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     __asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     init_intel_hda();
+    alc650_init();
     __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
     __asm__ volatile ("movb $'M', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
