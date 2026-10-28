@@ -159,6 +159,10 @@ static int tls_build_client_hello(struct tls13_connection *connection, const cha
     write16(handshake + p, 43); p += 2;
     write16(handshake + p, 2); p += 2;
     write16(handshake + p, 0x0304); p += 2;
+    write16(handshake + p, 0x002b); p += 2;
+    write16(handshake + p, 3); p += 2;
+    handshake[p++] = 2;
+    write16(handshake + p, 0x0304); p += 2;
     write16(handshake + p, 49); p += 2;
     write16(handshake + p, 1); p += 2;
     handshake[p++] = 1;
@@ -292,6 +296,7 @@ static int tls_read_handshake_message(struct tls13_connection *connection, int e
         uint16_t record_length;
         if (!tls_read_record(connection, &record_type, hs_message_buffer + hs_message_end,
                              (uint16_t)(TLS_BUFFER_SIZE - hs_message_end), &record_length)) return 0;
+        if (record_type == 20) continue;
         if (record_type != TLS_RECORD_HANDSHAKE) return 0;
         if (encrypted) {
             uint8_t inner_type;
@@ -400,10 +405,10 @@ int tls13_https_get(const char *host, const char *path, char *response, uint32_t
 
     if (!host || !path || !response || capacity < 2) return -1;
     for (uint32_t i = 0; i < sizeof(connection); i++) ((uint8_t *)&connection)[i] = 0;
-
-    if (net_tcp_connect(&connection.tcp, host, 443) < 0) return -1;
     hs_message_start = 0;
     hs_message_end = 0;
+
+    if (net_tcp_connect(&connection.tcp, host, 443) < 0) return -1;
     if (!tls_build_client_hello(&connection, host, record, &record_length) || !tls_send(&connection, record, record_length)) { net_tcp_close(&connection.tcp); return -2; }
     {
         uint8_t *server_hello_message;
