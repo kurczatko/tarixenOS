@@ -206,6 +206,10 @@ void okno_zamknij(struct okno *okno)
     if (zmienianie_rozmiaru && aktywne_okno == okno) {
         zmienianie_rozmiaru = 0;
     }
+    int zamkniety_x = okno->x;
+    int zamkniety_y = okno->y;
+    int zamkniety_szerokosc = okno->szerokosc;
+    int zamkniety_wysokosc = okno->wysokosc;
     okno->otwarte = 0;
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         if (okna[indeks] == okno) {
@@ -215,6 +219,7 @@ void okno_zamknij(struct okno *okno)
             break;
         }
     }
+    odtworz_fragment_tla_bufor(zamkniety_x, zamkniety_y, zamkniety_szerokosc, zamkniety_wysokosc);
     if (aktywne_okno == okno)
         aktywne_okno = liczba_okien ? okna[liczba_okien - 1] : 0;
     okno_odrysuj_wszystkie();
@@ -390,6 +395,10 @@ void okno_zakoncz_przeciaganie(void)
 void okno_zminimalizuj(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
+    int zamkniety_x = okno->x;
+    int zamkniety_y = okno->y;
+    int zamkniety_szerokosc = okno->szerokosc;
+    int zamkniety_wysokosc = okno->wysokosc;
     okno->zminimalizowane = 1;
     if (aktywne_okno == okno) {
         aktywne_okno = 0;
@@ -400,6 +409,7 @@ void okno_zminimalizuj(struct okno *okno)
             }
         }
     }
+    odtworz_fragment_tla_bufor(zamkniety_x, zamkniety_y, zamkniety_szerokosc, zamkniety_wysokosc);
     okno_odrysuj_wszystkie();
 }
 
