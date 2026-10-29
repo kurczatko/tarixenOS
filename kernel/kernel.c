@@ -39,6 +39,7 @@
 
 extern struct okno *aktywne_okno;
 
+
 void __attribute__((section(".text.entry"))) kernel_main(void)
 {
     __asm__ volatile ("movb $'A', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
