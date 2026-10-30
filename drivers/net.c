@@ -371,8 +371,8 @@ int net_tcp_receive(struct net_tcp_connection *connection, uint8_t *data, uint16
     uint8_t *tcp;
     uint16_t payload_length;
     if (!connection || !connection->connected || !data || !capacity) return -1;
-    (void)attempts;
-    for (uint32_t tries = 0; tries < 1000000000; tries++) {
+    if (attempts == 0) attempts = 1000000000;
+    for (uint32_t tries = 0; tries < attempts; tries++) {
         if ((tries & 0x3FF) == 0) { __asm__ volatile("pause" ::: "memory"); }
         int length = tcp_wait(frame, &tcp, &payload_length, connection->remote_ip, connection->remote_port,
                               connection->local_port, 1);
@@ -443,9 +443,14 @@ int net_http_get(const char *host, const char *path, char *response, uint32_t ca
     tcp_sequence += request_length;
     uint32_t used = 0;
     uint8_t finished = 0;
+    uint32_t idle_tries = 0;
     for (uint32_t tries = 0; tries < NET_WAIT_POLLS && !finished && used + 1 < capacity; tries++) {
         int length = tcp_wait(frame, &tcp, &payload_length, remote_ip, 80, local_port, 1);
-        if (!length) continue;
+        if (!length) {
+            if (++idle_tries > 5000000) break;
+            continue;
+        }
+        idle_tries = 0;
         uint8_t flags = tcp[13];
         uint32_t sequence = read32(tcp + 4);
         uint32_t acknowledgement = read32(tcp + 8);

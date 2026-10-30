@@ -467,7 +467,12 @@ int tls13_https_get(const char *host, const char *path, char *response, uint32_t
 
     while (used + 1 < capacity) {
         uint16_t app_length = 0;
-        if (!tls_read_app_record(&connection, app_data, sizeof(app_data), &app_length)) break;
+        uint32_t tls_idle = 0;
+        if (!tls_read_app_record(&connection, app_data, sizeof(app_data), &app_length)) {
+            if (++tls_idle > 100000) break;
+            continue;
+        }
+        tls_idle = 0;
         if (app_length == 0) break;
         uint32_t copy_length = app_length;
         if (copy_length > capacity - used - 1) copy_length = capacity - used - 1;
