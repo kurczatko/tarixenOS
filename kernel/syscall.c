@@ -23,7 +23,7 @@ static int alloc_fd(void) {
     return -1;
 }
 
-static uint32_t heap_end(void) {
+static uint32_t __attribute__((unused)) heap_end(void) {
     return userspace_break;
 }
 

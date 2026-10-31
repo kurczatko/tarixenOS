@@ -44,7 +44,7 @@ void lex_next(lex_t *lx) {
     }
     if (c=='\"') {
         char *b=lx->strbuf; while(lx->p<lx->end && *lx->p!='\"') { char d=*lx->p++; if (d=='\\' && lx->p<lx->end && *lx->p=='n') { *b++='\n'; lx->p++; } else *b++=d; }
-        if (lx->p<lx->end) lx->p++; *b=0;
+        if (lx->p<lx->end) { lx->p++; } *b=0;
         lx->cur.kind=TOK_STRING; lx->cur.str=lx->strbuf; return;
     }
     switch(c) {

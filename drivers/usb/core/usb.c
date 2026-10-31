@@ -76,7 +76,7 @@ typedef struct {
     uint16_t element_link;
     uint16_t max_len;
     uint16_t pad;
-    uhci_td_t td_overlay;
+    uhci_td_t td_overlay __attribute__((aligned(16)));
 } __attribute__((packed, aligned(32))) uhci_qh_t;
 
 static uhci_td_t td_pool[MAX_TDS] __attribute__((aligned(16)));
@@ -243,6 +243,7 @@ static int usb_ctrl_transfer(usb_device_t *dev, uint8_t bmRequestType, uint8_t b
     int qh_idx;
     uint8_t setup_buf[8];
     uint16_t toggle = 0;
+    (void)toggle;
     int direction = (bmRequestType & USB_DIR_IN) ? USB_DIR_IN : USB_DIR_OUT;
     uint16_t datalen = wLength;
     uint8_t pid_data = (direction == USB_DIR_IN) ? TD_PID_IN : TD_PID_OUT;
@@ -383,6 +384,7 @@ static usb_device_t *usb_enumerate_port(uint8_t port) {
     uint8_t *ptr = config_buf;
     uint8_t *end = config_buf + total;
     uint8_t iface_num = 0;
+    (void)iface_num;
     uint8_t ep_idx = 0;
 
     while (ptr < end) {

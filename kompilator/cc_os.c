@@ -34,7 +34,7 @@ static void *cc_os_malloc(int rozmiar) {
     return p;
 }
 
-static void cc_os_free(void *p) {
+static void __attribute__((unused)) cc_os_free(void *p) {
     (void)p;
 }
 
@@ -321,9 +321,9 @@ static int zapisz_elf_do_bufora(cg_t *cg, uint8_t *bufor, int max_rozmiar) {
     p[24]=7;
     p[28]=0x00; p[29]=0x10; p[30]=0x00; p[31]=0x00;
     p += 32;
-    for (uint32_t i = 0; i < cg->code_size; i++) p[i] = cg->code[i];
+    for (int i = 0; i < cg->code_size; i++) p[i] = cg->code[i];
     p += cg->code_size;
-    for (uint32_t i = 0; i < cg->rodata_size; i++) p[i] = cg->rodata[i];
+    for (int i = 0; i < cg->rodata_size; i++) p[i] = cg->rodata[i];
     return 52 + 32 + (int)total;
 }
 

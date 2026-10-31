@@ -5,6 +5,7 @@
 
 typedef void (*okno_rysuj_zawartosc)(int x, int y, int szerokosc, int wysokosc);
 typedef void (*okno_obsluz_klik)(int x, int y);
+struct okno;
 typedef void (*okno_pole_tekstowe)(struct okno *okno);
 typedef int (*okno_pole_tekstowe_znak)(struct okno *okno, char znak, uint8_t ctrl);
 

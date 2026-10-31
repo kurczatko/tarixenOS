@@ -16,7 +16,7 @@ static uint8_t local_ip[4];
 static uint8_t subnet_mask[4] = {255, 255, 255, 0};
 static uint8_t gateway_ip[4];
 static uint8_t dns_ip[4];
-static uint8_t gateway_mac[6];
+static uint8_t __attribute__((unused)) gateway_mac[6];
 static uint8_t configured;
 static uint32_t next_ip_id = 1;
 static uint32_t tcp_sequence;
@@ -143,7 +143,7 @@ static int parse_dhcp_options(const uint8_t *options, uint32_t length, uint8_t w
     return 0;
 }
 
-static int dhcp_configure(void)
+static int __attribute__((unused)) dhcp_configure(void)
 {
     static const uint8_t broadcast_mac[6] = {255,255,255,255,255,255};
     uint8_t dhcp[300];

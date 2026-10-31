@@ -37,7 +37,7 @@ static int hid_find_endpoint(usb_device_t *dev, uint8_t ep_type, uint8_t dir) {
     return -1;
 }
 
-static int hid_get_descriptor(usb_device_t *dev, uint8_t desc_type, uint8_t index, uint16_t length, void *data) {
+static int __attribute__((unused)) hid_get_descriptor(usb_device_t *dev, uint8_t desc_type, uint8_t index, uint16_t length, void *data) {
     uint8_t bmRequestType = USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE;
     uint16_t wValue = ((uint16_t)desc_type << 8) | index;
     return usb_control_transfer(dev, bmRequestType, HID_REQ_GET_REPORT, wValue, 0, length, data);
@@ -230,6 +230,7 @@ void hid_poll(void) {
                     uint8_t mapped = hid_kbd_map[keycode];
                     if (mapped != 0) {
                         uint8_t shift = (modifier & 0x22) != 0;
+                        (void)shift;
                         hdev->kbd_cb(mapped, 1);
                     }
                 }

@@ -88,7 +88,7 @@ static char tok_name[64] = {0};
 
 static int str_len(const char *s) { int n = 0; while (s && s[n]) n++; return n; }
 static int str_eq(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; } return *a == *b; }
-static int str_ncase(const char *a, const char *b) {
+static int __attribute__((unused)) str_ncase(const char *a, const char *b) {
     while (*a && *b) { char x = *a >= 'A' && *a <= 'Z' ? *a + 32 : *a; char y = *b >= 'A' && *b <= 'Z' ? *b + 32 : *b; if (x != y) return 0; a++; b++; }
     return *a == *b;
 }
@@ -676,7 +676,7 @@ static Value eval_call_node(int node_idx, Value this_val) {
     return make_undefined();
 }
 
-static int js_native_id_from_name(const char *name) {
+static int __attribute__((unused)) js_native_id_from_name(const char *name) {
     if (str_eq(name, "alert")) return 0;
     if (str_eq(name, "log")) return 1;
     if (str_eq(name, "getElementById")) return 2;

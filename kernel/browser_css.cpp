@@ -156,7 +156,7 @@ static void decls(const char *t, int s, int e, struct browser_style *st, uint8_t
     }
 }
 
-static int selector_kind(const char *sel, char *kind_out) {
+static int __attribute__((unused)) selector_kind(const char *sel, char *kind_out) {
     if (sel[0] == '.') { *kind_out = 1; return 1; }
     if (sel[0] == '#') { *kind_out = 2; return 1; }
     *kind_out = 0;
@@ -204,6 +204,7 @@ void css_parse_stylesheet(const char *text, int length) {
         while (de < length && text[de] != '}') de++;
         char sel[64]; int sn = 0;
         int k = 0;
+        (void)k;
         int si = ss;
         while (si < se && text[si] != ' ' && text[si] != '.' && text[si] != '#' &&
                text[si] != ':' && text[si] != ',' && sn < 63) sel[sn++] = text[si++];

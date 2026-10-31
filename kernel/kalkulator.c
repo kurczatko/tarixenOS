@@ -247,7 +247,7 @@ static int kalkulator_pole_tekstowe_znak(struct okno *okno, char znak, uint8_t c
         kalkulator_wynik();
     } else if (znak == '+' || znak == '-' || znak == '*' || znak == '/') {
         kalkulator_ustaw_operacja(znak);
-    } else if (znak >= '0' && znak <= '9' || znak == '.') {
+    } else if ((znak >= '0' && znak <= '9') || znak == '.') {
         kalkulator_dodaj_znak(znak);
     } else {
         return 1;

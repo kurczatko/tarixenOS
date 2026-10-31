@@ -186,6 +186,7 @@ void gra(void)
         static int ostatni_y;
         int dx = mx - ostatni_x;
         int dy = my - ostatni_y;
+        (void)dy;
         if (dx != 0) {
             gra_obrot(dx * 0.0015);
         }

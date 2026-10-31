@@ -363,7 +363,9 @@ static void page_from_response(int response_length)
     int anchor_active = 0;
     int anchor_start = 0;
     int style_depth = 0;
-    struct browser_style current_style = {0x001E293B, 0x00FFFFFF, 0, 0, 0};
+    struct browser_style current_style = {0};
+    current_style.color = 0x001E293B;
+    current_style.background = 0x00FFFFFF;
     struct browser_style style_stack[BROWSER_STYLE_DEPTH];
     char tag_stack[BROWSER_STYLE_DEPTH][16];
     char anchor_url[256];

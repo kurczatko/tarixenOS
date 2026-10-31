@@ -11,7 +11,7 @@ static void *cg_os_malloc(int rozmiar) {
     return p;
 }
 
-static void cg_os_free(void *p) {
+static void __attribute__((unused)) cg_os_free(void *p) {
     (void)p;
 }
 
