@@ -63,6 +63,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     idt_install();
     syscall_install();
     net_init();
+    ustaw_status_internetu(net_ready());
     pulp_init();
     tapeta_app();
     __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
