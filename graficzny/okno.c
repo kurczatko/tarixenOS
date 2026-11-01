@@ -169,6 +169,7 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->tytul = tytul;
     okno->rysuj_zawartosc = rysuj_zawartosc;
     okno->obsluz_klik = 0;
+    okno->obsluz_ruch = 0;
     okno->pole_tekstowe_enter = 0;
     okno->pole_tekstowe_wyjdz = 0;
     okno->pole_tekstowe_znak = 0;
@@ -189,6 +190,11 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
 void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_klik)
 {
     if (okno) okno->obsluz_klik = obsluz_klik;
+}
+
+void okno_ustaw_obsluge_ruchu(struct okno *okno, okno_obsluz_ruch_fn obsluz_ruch)
+{
+    if (okno) okno->obsluz_ruch = obsluz_ruch;
 }
 
 void okno_narysuj(struct okno *okno)
@@ -320,7 +326,17 @@ void okno_obsluz_ruch(int x, int y)
 {
     int nx;
     int ny;
-    if (!przeciaganie && !zmienianie_rozmiaru) return;
+    if (!przeciaganie && !zmienianie_rozmiaru) {
+        if (aktywne_okno && aktywne_okno->otwarte && aktywne_okno->obsluz_ruch) {
+            int wx = x - aktywne_okno->x;
+            int wy = y - aktywne_okno->y;
+            if (wx >= 4 && wx < aktywne_okno->szerokosc - 4 &&
+                wy >= 22 && wy < aktywne_okno->wysokosc - 2) {
+                aktywne_okno->obsluz_ruch(aktywne_okno, wx, wy);
+            }
+        }
+        return;
+    }
     if (!aktywne_okno || !aktywne_okno->otwarte) return;
 
     if (przeciaganie) {

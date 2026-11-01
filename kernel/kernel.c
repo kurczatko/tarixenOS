@@ -19,6 +19,7 @@
 #include "../graficzny/pulpit.h"
 #include "../system_plikow/system_plikow.h"
 #include "notatnik.h"
+#include "malowanie.h"
 #include "../drivers/sound/intel_hd.h"
 #include "../drivers/alc650.h"
 #include "../drivers/net.h"
@@ -138,6 +139,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             eksplorator_plikow_obsluz_klawiature();
             notatnik_obsluz_klawiature();
             kalkulator_obsluz_klawiature();
+            malowanie_obsluz_klawiature();
         }
         if (keyboard_windows_pressed()) {
             menu_start_przełącz();

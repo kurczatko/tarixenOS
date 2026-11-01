@@ -108,3 +108,5 @@ void qemu_vga_3d_depth_test_enable(uint8_t enable);
 }
 #endif
 
+#endif
+

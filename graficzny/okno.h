@@ -5,6 +5,7 @@
 
 typedef void (*okno_rysuj_zawartosc)(int x, int y, int szerokosc, int wysokosc);
 typedef void (*okno_obsluz_klik)(int x, int y);
+typedef void (*okno_obsluz_ruch_fn)(struct okno *okno, int x, int y);
 struct okno;
 typedef void (*okno_pole_tekstowe)(struct okno *okno);
 typedef int (*okno_pole_tekstowe_znak)(struct okno *okno, char znak, uint8_t ctrl);
@@ -31,6 +32,7 @@ struct okno {
     const char *tytul;
     okno_rysuj_zawartosc rysuj_zawartosc;
     okno_obsluz_klik obsluz_klik;
+    okno_obsluz_ruch_fn obsluz_ruch;
     okno_pole_tekstowe pole_tekstowe_enter;
     okno_pole_tekstowe pole_tekstowe_wyjdz;
     okno_pole_tekstowe_znak pole_tekstowe_znak;
@@ -44,6 +46,7 @@ int okno_obsluz_klikniecie(int x, int y);
 void okno_obsluz_ruch(int x, int y);
 void okno_zakoncz_przeciaganie(void);
 void okno_ustaw_obsluge_klikniecia(struct okno *okno, okno_obsluz_klik obsluz_klik);
+void okno_ustaw_obsluge_ruchu(struct okno *okno, okno_obsluz_ruch_fn obsluz_ruch);
 void okno_ustaw_pole_tekstowe_enter(struct okno *okno, okno_pole_tekstowe fn);
 void okno_ustaw_pole_tekstowe_wyjdz(struct okno *okno, okno_pole_tekstowe fn);
 void okno_ustaw_pole_tekstowe_znak(struct okno *okno, okno_pole_tekstowe_znak fn);
