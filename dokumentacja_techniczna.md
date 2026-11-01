@@ -1160,6 +1160,93 @@ inicjalizuje dzwiek Intel HD Audio.
 
 inicjalizuje kodek ALC650.
 
+## sterownik dzwieku - drivers/sound/audigy2.cpp
+
+sterownik Creative Sound Blaster Audigy 2 (EMU10K2) napisany w C++. obsluguje pelny dzwiek przestrzenny 3D oraz standard EAX.
+
+### klasa Audigy2
+
+glowna klasa sterownika. singleton dostepny przez `Audigy2::instance()`.
+
+```
+static Audigy2* instance();
+```
+
+### probe
+
+sprawdza czy urzadzenie to Audigy 2 (vendor 0x1102, device 0x0004).
+
+```
+uint8_t probe(uint16_t vendor, uint16_t device);
+```
+
+### init / deinit
+
+inicjalizuje mikser, SPDIF, EAX i bufora DMA. `deinit` zatrzymuje odtwarzanie i zwalnia DMA.
+
+```
+void init(void);
+void deinit(void);
+```
+
+### irq_handler
+
+obsluguje przerwanie sprzegtu z karty dzwiekowej.
+
+```
+void irq_handler(void);
+```
+
+### PCM
+
+```
+int pcm_open(uint16_t channels, uint32_t rate, uint16_t format);
+int pcm_write(const void* data, uint32_t bytes);
+int pcm_read(void* data, uint32_t bytes);
+void pcm_close(void);
+```
+
+otwiera strumien PCM, zapisuje/odczytuje dane przez bufor DMA i zamyka strumien.
+
+### dzwiek przestrzenny 3D (64 glosy)
+
+```
+int voice3d_alloc(Voice3D* voice);
+void voice3d_free(Voice3D* voice);
+void voice3d_set_position(Voice3D* voice, float x, float y, float z);
+void voice3d_set_velocity(Voice3D* voice, float x, float y, float z);
+void voice3d_set_gain(Voice3D* voice, float gain);
+void voice3d_play(Voice3D* voice, const void* buffer, uint32_t size);
+void voice3d_stop(Voice3D* voice);
+```
+
+alokuje jeden z 64 glosow 3D, ustawia jego polozenie, predkosc, wzmocnienie, odtwarza bufor dzwiekowy i zatrzymuje glos. polozenie wplywa na glosnosc przez tlumienie odleglosciowe (min_distance / max_distance).
+
+struktura `Voice3D` zawiera: voice_id, active, pos_x/y/z, velocity_x/y/z, orientation_x/y/z, gain, min_distance, max_distance, buffer_addr, buffer_size.
+
+### EAX (Environmental Audio Extensions)
+
+```
+int eax_enable(uint8_t enable);
+int eax_set_environment(const EaxEnvironment* env);
+int eax_set_listener(float x, float y, float z,
+                     float fx, float fy, float fz,
+                     float ux, float uy, float uz);
+```
+
+wlacz/wylacz EAX, ustaw srodowisko dzwiekowe (pokoj, room_hf, odbicia, poglos, czas rozpadu, dyfuzyjnosc, gestosc, flagi) oraz polozenie i orientacje słuchacza.
+
+struktura `EaxEnvironment` zawiera: room, room_hf, reflections, reflections_delay, reverb, reverb_delay, decay_time, decay_hf_ratio, reflections_hf, reverb_hf, diffusion, density, flags.
+
+### glosnosc glowna
+
+```
+void set_master_volume(uint8_t percent);
+uint8_t get_master_volume(void);
+```
+
+ustawia i zwraca glosnosc glowna w procentach (0-100).
+
 ## struktura plikow
 
 ```
@@ -1197,6 +1284,12 @@ tarixenOS/
 │   ├── delay.c           # opoznienie
 │   ├── usb/              # USB
 │   └── sound/            # dzwiek
+│       ├── intel_hd.c    # Intel HD Audio
+│       ├── intel_hd.h    # naglowek Intel HD Audio
+│       ├── alc650.c      # kodek ALC650
+│       ├── alc650.h      # naglowek ALC650
+│       ├── audigy2.cpp   # Creative Sound Blaster Audigy 2 (EMU10K2)
+│       └── audigy2.h     # naglowek Audigy 2
 ├── system_plikow/        # system plikow FAT32
 ├── user_land/            # aplikacje uzytkownika
 │   ├── konta.c           # konta uzytkownikow
