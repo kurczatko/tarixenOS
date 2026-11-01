@@ -97,18 +97,21 @@ static int czy_wolne_miejsce(double x, double y)
 
 static void spawn_pilki(void)
 {
-    for (int i = 0; i < MAX_PILKI; i++) {
+    int spawn_count = 1 + (gra_rand() % 3);
+    int spawned = 0;
+    
+    for (int i = 0; i < MAX_PILKI && spawned < spawn_count; i++) {
         if (!pilki[i].aktywna) {
             int proby = 0;
             do {
                 pilki[i].x = 1.5 + (double)(gra_rand() % (GRA_MAP_W - 3));
                 pilki[i].y = 1.5 + (double)(gra_rand() % (GRA_MAP_H - 3));
                 proby++;
-            } while (!czy_wolne_miejsce(pilki[i].x, pilki[i].y) && proby < 50);
+            } while (!czy_wolne_miejsce(pilki[i].x, pilki[i].y) && proby < 100);
             
             if (czy_wolne_miejsce(pilki[i].x, pilki[i].y)) {
                 pilki[i].aktywna = 1;
-                break;
+                spawned++;
             }
         }
     }
@@ -300,7 +303,7 @@ static void gra_rysuj_zawartosc(int x, int y, int szerokosc, int wysokosc)
     rysuj_pilke_3d(x, y, szerokosc, wysokosc);
 
     if (gra_koniec) {
-        const char *msg = "zdechles!";
+        const char *msg = "przegrales";
         int msg_len = 9;
         int char_w = 8;
         int char_h = 8;

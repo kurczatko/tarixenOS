@@ -39,6 +39,7 @@
 #include "proces.h"
 #include "timer.h"
 #include "pik.h"
+#include "../drivers/qemu_vga.h"
 
 extern struct okno *aktywne_okno;
 extern uint32_t __bss_start;
@@ -77,6 +78,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     floppy_init();
     nvme_init();
     intel_uhd_init();
+    qemu_vga_init();
     __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     tapeta_wczytaj();
     gdt_install();
