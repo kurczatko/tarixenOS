@@ -27,7 +27,7 @@ void gdt_install(void)
     gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);                    /* ring0 dane */
     gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);                    /* ring3 kod */
     gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);                    /* ring3 dane */
-    gdt_set_gate(5, (uint32_t)&tss, sizeof(struct tss) - 1, 0xE9, 0x00); /* TSS (dostepny) */
+    gdt_set_gate(5, (uint32_t)&tss, sizeof(struct tss) - 1, 0x89, 0x00); /* TSS (dostepny) */
     gdt_set_gate(6, 0, 0, 0, 0);                                   /* TSS high (unused) */
 
     asm volatile ("lgdt %0" : : "m"(gp));

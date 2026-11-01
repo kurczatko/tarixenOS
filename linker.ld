@@ -31,9 +31,12 @@ SECTIONS
 
     .bss ALIGN(4) :
     {
+        . = MAX(., 0x100000);
+        __bss_start = .;
         *(COMMON)
         *(.bss)
         *(.bss.*)
+        __bss_end = .;
     } :data
 
     /DISCARD/ :

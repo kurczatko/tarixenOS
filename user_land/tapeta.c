@@ -1,6 +1,19 @@
-#include <../user_land/syscall.h>
+#include "../graficzny/okno.h"
+#include "../graficzny/rysowanie.h"
+#include "tapeta.h"
+
+static void tapeta_app_rysuj(int x, int y, int szerokosc, int wysokosc) {
+    tapeta_picker_rysuj(x, y, szerokosc, wysokosc);
+}
+
+static void tapeta_app_klik(int x, int y)
+{
+    tapeta_picker_klik(x, y);
+}
 
 void tapeta_app(void)
 {
-    okno_stworz(248, 80, 360, 170, "TAPETA");
+    static struct okno okno;
+    okno_stworz(&okno, 248, 80, 360, 170, "TAPETA", tapeta_app_rysuj);
+    okno_ustaw_obsluge_klikniecia(&okno, tapeta_app_klik);
 }

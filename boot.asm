@@ -85,7 +85,27 @@ video_mode_depth_ok:
     jne video_mode_next
     cmp dword [VBE_INFO_BUFFER + 0x28], 0
     je video_mode_next
+    mov cx, [si]
+    mov [selected_vbe_mode], cx
+    mov ax, 0x4F02
+    mov bx, [selected_vbe_mode]
+    or bx, 0x4000
     push si
+    int 0x10
+    pop si
+    cmp ax, 0x004F
+    jne video_mode_next
+    ; Re-query mode info AFTER setting the mode to get actual parameters
+    mov ax, 0x4F01
+    mov cx, [selected_vbe_mode]
+    mov di, VBE_INFO_BUFFER
+    push ds
+    pop es
+    push si
+    int 0x10
+    pop si
+    cmp ax, 0x004F
+    jne video_mode_next
     mov si, VBE_INFO_BUFFER
     mov ax, 0x5000
     mov es, ax
@@ -95,14 +115,6 @@ video_mode_depth_ok:
     rep movsd
     mov al, [VBE_CONTROLLER_BUFFER + 5]
     mov [es:0x00FF], al
-    pop si
-    mov ax, 0x4F02
-    mov bx, [si]
-    or bx, 0x4000
-    push si
-    int 0x10
-    pop si
-    cmp ax, 0x004F
     je video_mode_ready
 video_mode_next:
     add si, 2
@@ -111,23 +123,14 @@ video_mode_next:
 video_mode_error:
     mov ax, 0x0003
     int 0x10
-    mov si, video_error_message
-video_error_print:
-    lodsb
-    test al, al
-    jz video_error_halt
-    mov ah, 0x0E
-    int 0x10
-    jmp video_error_print
-video_error_halt:
     cli
     hlt
-    jmp video_error_halt
+    jmp video_mode_error
 
 video_modes:
-    dw 0x0144, 0x0118, 0xFFFF
-video_error_message:
-    db 'No supported 1024x768 VBE mode', 0
+    dw 0x011B, 0x0144, 0x0118, 0xFFFF
+selected_vbe_mode:
+    dw 0
 video_mode_ready:
 
     mov cx, KERNEL_SECTORS / 32
@@ -191,7 +194,7 @@ protected_mode:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x8F000
+    mov esp, 0x280000
 
     mov esi, reloc_code
     mov edi, 0x90000

@@ -5,7 +5,7 @@ __attribute__((aligned(4096))) static uint32_t page_table_low[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_low2[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_fb[1024];
 
-static void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags)
+void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags)
 {
     table[(vaddr / PAGE_SIZE) & 0x3FF] = (paddr & ~(PAGE_SIZE - 1)) | flags;
 }
@@ -35,7 +35,7 @@ void paging_init(void)
     page_directory[1] = ((uint32_t)page_table_low2 | PAGE_PRESENT | PAGE_READWRITE);
 
     page_directory[0xFD000000 >> 22] = ((uint32_t)page_table_fb | PAGE_PRESENT | PAGE_READWRITE);
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 1024; i++) {
         map_page(page_table_fb, 0xFD000000 + i * PAGE_SIZE, 0xFD000000 + i * PAGE_SIZE, PAGE_PRESENT | PAGE_READWRITE);
     }
 

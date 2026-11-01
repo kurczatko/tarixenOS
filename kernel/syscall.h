@@ -22,6 +22,30 @@
 #define SYSCALL_CLOSE 25
 #define SYSCALL_WRITE_FILE 26
 
+#define SYSCALL_PROCES_STWORZ 27
+#define SYSCALL_PROCES_ZAKONCZ 28
+#define SYSCALL_PROCES_YIELD 29
+#define SYSCALL_PROCES_POBIERZ_PID 30
+
+#define SYSCALL_FS_LIST 31
+#define SYSCALL_FS_CD 32
+#define SYSCALL_FS_PWD 33
+#define SYSCALL_FS_RESET_DIR 34
+
+// New window syscalls
+#define SYSCALL_OKNO_ZAMKNIJ 35
+#define SYSCALL_OKNO_PIKSEL 36
+#define SYSCALL_OKNO_PROSTOKAT 37
+#define SYSCALL_OKNO_TEKST 38
+#define SYSCALL_OKNO_KLIK 39
+#define SYSCALL_OKNO_RUCH 40
+
+// Keyboard syscall
+#define SYSCALL_KLAWIATURA_GETCHAR 41
+
+// Load and run ELF from filesystem
+#define SYSCALL_PROCES_URUCHOM_ELF 42
+
 void syscall_install(void);
 struct rejestry {
     uint32_t eax, ebx, ecx, edx, esi, edi;
@@ -30,7 +54,6 @@ extern struct rejestry biezace_rejestry;
 extern uint32_t userspace_break;
 uint32_t syscall_handler(void);
 
-/* Sprawdza, czy wskaznik lezy w przestrzeni uzytkownika (ponizej granicy jadra). */
 static inline int wskaznik_uzytkownika_prawidlowy(const void *ptr)
 {
     return (uint32_t)ptr < GRANICA_PAMIEC_UZYTKOWNIKA;

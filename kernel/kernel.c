@@ -36,12 +36,32 @@
 #include "syscall.h"
 #include "../user_land/tapeta.h"
 #include "paging.h"
+#include "proces.h"
+#include "timer.h"
+#include "pik.h"
 
 extern struct okno *aktywne_okno;
+extern uint32_t __bss_start;
+extern uint32_t __bss_end;
 
+void proces_uruchom_pierwszy(struct proces *p) {
+    struct tss *tss = gdt_tss();
+    tss->esp0 = p->kernel_stack;
+    tss->cr3 = (uint32_t)p->page_directory;
+
+    asm volatile("mov %0, %%cr3" :: "r"(p->page_directory));
+
+    uint32_t eip = p->regs.eip;
+    uint32_t esp = p->regs.esp;
+    userspace_uruchom(eip, esp);
+}
 
 void __attribute__((section(".text.entry"))) kernel_main(void)
 {
+    for (uint32_t *bss = &__bss_start; bss < &__bss_end; bss++) {
+        *bss = 0;
+    }
+
     __asm__ volatile ("movb $'A', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     rysowanie_init();
     __asm__ volatile ("movb $'B', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
@@ -84,6 +104,12 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     pulp_init();
     __asm__ volatile ("movb $'M', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     konta_start();
+
+    pik_init();
+    timer_init(100);
+    pik_enable_irq(0);
+
+    proces_init();
 
     while(1) {
         char tekst_czasu[9];

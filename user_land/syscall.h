@@ -1,62 +1,84 @@
-#ifndef SYSCALL_USER_H
-#define SYSCALL_USER_H
+#ifndef USERLAND_SYSCALL_H
+#define USERLAND_SYSCALL_H
 
 #include "../include/printf/types.h"
 
-#define SYSCALL_TAPETA_ZMIEŃ 0
+#define SYSCALL_TAPETA_ZMIEN 0
 #define SYSCALL_TAPETA_POBIERZ 1
-#define SYSCALL_EKRAN_CZYŚĆ 2
+#define SYSCALL_EKRAN_CZYSC 2
 #define SYSCALL_EKRAN_PIKSEL 3
-#define SYSCALL_EKRAN_PROSTOKĄT 4
+#define SYSCALL_EKRAN_PROSTOKAT 4
 #define SYSCALL_TEKST_RYSUJ 5
-#define SYSCALL_OKNO_STWÓRZ 6
+#define SYSCALL_OKNO_STWORZ 6
 #define SYSCALL_OKNO_RYSUJ 7
 #define SYSCALL_MYSZ_POZYCJA 8
 #define SYSCALL_DRUKUJ 9
+#define SYSCALL_WRITE_CONSOLE 20
+#define SYSCALL_EXIT 21
+#define SYSCALL_BRK 22
+#define SYSCALL_OPEN 23
+#define SYSCALL_READ 24
+#define SYSCALL_CLOSE 25
+#define SYSCALL_WRITE_FILE 26
 
-static inline uint32_t syscall_wywolaj(uint32_t numer, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
+#define SYSCALL_PROCES_STWORZ 27
+#define SYSCALL_PROCES_ZAKONCZ 28
+#define SYSCALL_PROCES_YIELD 29
+#define SYSCALL_PROCES_POBIERZ_PID 30
+
+#define SYSCALL_FS_LIST 31
+#define SYSCALL_FS_CD 32
+#define SYSCALL_FS_PWD 33
+#define SYSCALL_FS_RESET_DIR 34
+#define SYSCALL_OKNO_ZAMKNIJ 35
+#define SYSCALL_OKNO_PIKSEL 36
+#define SYSCALL_OKNO_PROSTOKAT 37
+#define SYSCALL_OKNO_TEKST 38
+#define SYSCALL_OKNO_KLIK 39
+#define SYSCALL_OKNO_RUCH 40
+#define SYSCALL_KLAWIATURA_GETCHAR 41
+#define SYSCALL_PROCES_URUCHOM_ELF 42
+
+static inline uint32_t syscall0(uint32_t num)
 {
-    uint32_t wynik;
-    asm volatile ("int $0x80"
-        : "=a"(wynik)
-        : "a"(numer), "b"(a1), "c"(a2), "d"(a3), "S"(a4), "D"(a5)
-        : "memory");
-    return wynik;
+    uint32_t ret;
+    __asm__ volatile ("int $0x80" : "=a"(ret) : "a"(num) : "memory");
+    return ret;
 }
 
-static inline void tapeta_zmien(uint32_t kolor)
+static inline uint32_t syscall1(uint32_t num, uint32_t arg1)
 {
-    syscall_wywolaj(SYSCALL_TAPETA_ZMIEŃ, kolor, 0, 0, 0, 0);
+    uint32_t ret;
+    __asm__ volatile ("int $0x80" : "=a"(ret) : "a"(num), "b"(arg1) : "memory");
+    return ret;
 }
 
-static inline void ekran_czysc(uint32_t kolor)
+static inline uint32_t syscall2(uint32_t num, uint32_t arg1, uint32_t arg2)
 {
-    syscall_wywolaj(SYSCALL_EKRAN_CZYŚĆ, kolor, 0, 0, 0, 0);
+    uint32_t ret;
+    __asm__ volatile ("int $0x80" : "=a"(ret) : "a"(num), "b"(arg1), "c"(arg2) : "memory");
+    return ret;
 }
 
-static inline void ekran_piksel(int x, int y, uint32_t kolor)
+static inline uint32_t syscall3(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3)
 {
-    syscall_wywolaj(SYSCALL_EKRAN_PIKSEL, (uint32_t)x, (uint32_t)y, kolor, 0, 0);
+    uint32_t ret;
+    __asm__ volatile ("int $0x80" : "=a"(ret) : "a"(num), "b"(arg1), "c"(arg2), "d"(arg3) : "memory");
+    return ret;
 }
 
-static inline void ekran_prostokat(int x, int y, int sx, int sy, uint32_t kolor)
+static inline uint32_t syscall4(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4)
 {
-    syscall_wywolaj(SYSCALL_EKRAN_PROSTOKĄT, (uint32_t)x, (uint32_t)y, (uint32_t)sx, (uint32_t)sy, kolor);
+    uint32_t ret;
+    __asm__ volatile ("int $0x80" : "=a"(ret) : "a"(num), "b"(arg1), "c"(arg2), "d"(arg3), "S"(arg4) : "memory");
+    return ret;
 }
 
-static inline void tekst_rysuj(int x, int y, const char *tekst, uint32_t kolor)
+static inline uint32_t syscall5(uint32_t num, uint32_t arg1, uint32_t arg2, uint32_t arg3, uint32_t arg4, uint32_t arg5)
 {
-    syscall_wywolaj(SYSCALL_TEKST_RYSUJ, (uint32_t)x, (uint32_t)y, (uint32_t)tekst, kolor, 0);
-}
-
-static inline void okno_stworz(int x, int y, int sx, int sy, const char *tytul)
-{
-    syscall_wywolaj(SYSCALL_OKNO_STWÓRZ, (uint32_t)x, (uint32_t)y, (uint32_t)sx, (uint32_t)sy, (uint32_t)tytul);
-}
-
-static inline void druk(const char *tekst)
-{
-    syscall_wywolaj(SYSCALL_DRUKUJ, (uint32_t)tekst, 0, 0, 0, 0);
+    uint32_t ret;
+    __asm__ volatile ("int $0x80" : "=a"(ret) : "a"(num), "b"(arg1), "c"(arg2), "d"(arg3), "S"(arg4), "D"(arg5) : "memory");
+    return ret;
 }
 
 #endif

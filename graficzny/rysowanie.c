@@ -233,13 +233,12 @@ struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
     return 0;
 }
 
-static void kopiuj_pamiec(void *dst, const void *src, uint32_t bajty)
+static void kopiuj_pamiec(volatile uint8_t *dst, const uint32_t *src, uint32_t bajty)
 {
-    uint32_t *d = (uint32_t *)dst;
-    const uint32_t *s = (const uint32_t *)src;
+    volatile uint32_t *d = (volatile uint32_t *)dst;
     uint32_t dwords = bajty / 4;
     for (uint32_t i = 0; i < dwords; i++) {
-        d[i] = s[i];
+        d[i] = src[i];
     }
 }
 
@@ -285,7 +284,7 @@ void odswiez_fragment_widoku(int x, int y, int szerokosc, int wysokosc)
     for (int wiersz = 0; wiersz < wysokosc; wiersz++) {
         uint32_t offset = (uint32_t)(y + wiersz) * EKRAN_SZEROKOSC + (uint32_t)x;
         if (framebuffer_ma_szybki_format()) {
-            kopiuj_pamiec((void *)&pamiec_graficzna[offset * 4], &obraz[offset], szerokosc * 4);
+            kopiuj_pamiec(&pamiec_graficzna[offset * 4], &obraz[offset], szerokosc * 4);
         } else {
             for (int kolumna = 0; kolumna < szerokosc; kolumna++)
                 zapisz_piksel_framebuffera(x + kolumna, y + wiersz, obraz[offset + kolumna]);
@@ -305,7 +304,7 @@ static void narysuj_napis_systemowy(void)
 void odswiez_widok(void)
 {
     if (framebuffer_ma_szybki_format()) {
-        kopiuj_pamiec((void *)pamiec_graficzna, obraz, EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4);
+        kopiuj_pamiec(pamiec_graficzna, obraz, EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4);
     } else {
         for (int y = 0; y < EKRAN_WYSOKOSC; y++) {
             uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
@@ -430,6 +429,11 @@ void ustaw_kolor_tapety(uint32_t kolor)
     }
     narysuj_napis_systemowy();
     odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+}
+
+uint32_t pobierz_kolor_tapety(void)
+{
+    return kolor_tapety;
 }
 
 #define PLIK_TAPETA "TAPETA.CFG"

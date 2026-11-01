@@ -22,7 +22,7 @@ void shell() {
     vga_init();
     keyboard_init();
 
-    konta();
+    konta_start();
     menu_start();
 
     printf(" &#| ");
@@ -66,7 +66,6 @@ void shell() {
             }
 
 
-
             if (buf[0] == '^') {
                 printf(" czy chcesz:\n");
                 printf(" a. stworzyc folder\n b. wyswietlic zawartosc tego gdzie jestes\n c. stworzyc plik\n UWAGA! jak wpisujesz nazwe to tylko jedna litera.");
@@ -106,7 +105,7 @@ void shell() {
             }
 
             if (buf[0] == 'u') {
-                panika();
+                panika("user request");
             }
 
             if (buf[0] == 'g'){
@@ -215,4 +214,3 @@ void shell() {
         }
     }
 }
-

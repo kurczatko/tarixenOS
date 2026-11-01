@@ -20,23 +20,82 @@ LD64 := ld
 OBJCOPY := objcopy
 NASM := nasm
 
-CFLAGS32 := -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector -Wno-incompatible-pointer-types
+CFLAGS32 := -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ilibc -Ikernel -Igraficzny_tryb -fno-stack-protector -Wno-incompatible-pointer-types
 CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector -mcmodel=kernel -mno-red-zone
 CXXFLAGS := -m32 -Os -ffreestanding -fno-exceptions -fno-rtti -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(filter-out kernel/shell.c,$(wildcard kernel/*.c)) kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) $(wildcard user_land/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp
+KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user_land/konta.c user_land/tapeta.c
 KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES)))
 KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%64.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
 
-.PHONY: all image iso clean
+USER_APPS := NOTATNIK.ELF EKSPLORATOR.ELF BROWSER.ELF KALKULATOR.ELF GRA.ELF KURSOR.ELF
+USER_APPS_LOWER := notatnik eksploartor browser kalkulator gra kursor
+
+.PHONY: all image iso clean user_apps
 
 all: image
 
 image: $(OS_IMAGE)
 
 iso: $(ISO_IMAGE)
+
+user_apps: $(addprefix $(BUILD_DIR)/,$(USER_APPS))
+
+$(BUILD_DIR)/NOTATNIK.ELF: user_land/apps/notatnik_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/notatnik_user.o
+	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/notatnik_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
+
+$(BUILD_DIR)/EKSPLORATOR.ELF: user_land/apps/eksplorator_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/eksplorator_user.o
+	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/eksplorator_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
+
+$(BUILD_DIR)/BROWSER.ELF: user_land/apps/browser_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/browser_user.o
+	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/browser_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
+
+$(BUILD_DIR)/KALKULATOR.ELF: user_land/apps/kalkulator_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/kalkulator_user.o
+	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/kalkulator_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
+
+$(BUILD_DIR)/GRA.ELF: user_land/apps/gra_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/gra_user.o
+	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/gra_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
+
+$(BUILD_DIR)/KURSOR.ELF: user_land/apps/kursor_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+	@mkdir -p $(dir $@)
+	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/kursor_user.o
+	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/kursor_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -110,6 +169,11 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
 		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
 	fi
 	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=192 conv=notrunc status=none
+	@for app in $(USER_APPS); do \
+		if [ -f $(BUILD_DIR)/$$app ]; then \
+			mcopy -i $@ $(BUILD_DIR)/$$app ::/$$app; \
+		fi; \
+	done
 	@if [ -f $(UEFI_BIN) ]; then \
 		echo "UEFI stub gotowy (img BIOS32)"; \
 	fi

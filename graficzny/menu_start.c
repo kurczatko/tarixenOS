@@ -243,8 +243,35 @@ void menu_start_mouse_click(void)
     int y;
 
     mouse_pozycja(&x, &y);
+    __asm__ volatile ("movw $0x3F8, %%dx; movb $'S', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    for (int shift = 12; shift >= 0; shift -= 4) {
+        uint8_t digit = (uint8_t)(((uint32_t)x >> shift) & 0xF);
+        uint8_t character = (uint8_t)(digit < 10 ? '0' + digit : 'A' + digit - 10);
+        __asm__ volatile ("movw $0x3F8, %%dx; outb %0, %%dx" :: "a"(character) : "edx");
+    }
+    __asm__ volatile ("movw $0x3F8, %%dx; movb $',', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    for (int shift = 12; shift >= 0; shift -= 4) {
+        uint8_t digit = (uint8_t)(((uint32_t)y >> shift) & 0xF);
+        uint8_t character = (uint8_t)(digit < 10 ? '0' + digit : 'A' + digit - 10);
+        __asm__ volatile ("movw $0x3F8, %%dx; outb %0, %%dx" :: "a"(character) : "edx");
+    }
+    if (x < 0)
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'-', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    else if (x == 0)
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'0', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    else if (x < START_SZEROKOSC)
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'x', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    else if (x < EKRAN_SZEROKOSC)
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'+', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    else
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'!', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    if (y >= START_Y && y < START_Y + START_WYSOKOSC)
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'y', %%al; outb %%al, %%dx" ::: "eax", "edx");
+    else
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'Y', %%al; outb %%al, %%dx" ::: "eax", "edx");
     if (!menu_otwarte && x >= START_X && x < START_X + START_SZEROKOSC &&
         y >= START_Y && y < START_Y + START_WYSOKOSC) { /*BARDZO NUDNE. w skrocie jesli klikniesz na przycisk menu start to sie ono otworzy*/
+        __asm__ volatile ("movw $0x3F8, %%dx; movb $'O', %%al; outb %%al, %%dx" ::: "eax", "edx");
         menu_otwarte = 1;
         menu_start_narysuj();
         return;
@@ -263,7 +290,10 @@ void menu_start_mouse_click(void)
     }
     if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
         y >= MENU_Y + 84 && y < MENU_Y + 112) {
-            eksplorator_plikow();
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+        eksplorator_plikow();
+        return;
     }
     if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
         y >= MENU_Y + 120 && y < MENU_Y + 148) {

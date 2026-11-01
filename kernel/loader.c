@@ -4,6 +4,7 @@
 #include "syscall.h"
 #include "userspace.h"
 #include "../include/printf/vga.h"
+#include "proces.h"
 
 #define ELF_MAGIC 0x464C457F
 #define PT_LOAD 1
@@ -38,7 +39,7 @@ struct elf32_phdr {
 
 static uint8_t elf_buf[65536];
 
-int userspace_load_and_run(const char *path) {
+int userspace_load_elf(const char *path, uint32_t *entry_out) {
     int size = read_file(path, (char *)elf_buf, sizeof(elf_buf));
     if (size <= 0) return -1;
     struct elf32_ehdr *eh = (struct elf32_ehdr *)elf_buf;
@@ -58,7 +59,24 @@ int userspace_load_and_run(const char *path) {
     max_addr = (max_addr + 4095) & ~4095;
     if (max_addr > 0x003F0000) max_addr = 0x003F0000;
     userspace_break = max_addr;
-    uint32_t stack = 0x003FF000;
-    userspace_uruchom(eh->e_entry, stack);
+    *entry_out = eh->e_entry;
     return 0;
+}
+
+int userspace_load_and_run(const char *path) {
+    uint32_t entry;
+    int ret = userspace_load_elf(path, &entry);
+    if (ret != 0) return ret;
+    uint32_t stack = 0x003FF000;
+    userspace_uruchom(entry, stack);
+    return 0;
+}
+
+int proces_zaladuj_elf(const char *path) {
+    uint32_t entry;
+    int ret = userspace_load_elf(path, &entry);
+    if (ret != 0) return ret;
+    struct proces *p = proces_stworz(entry, path, 0);
+    if (!p) return 0;
+    return p->pid;
 }

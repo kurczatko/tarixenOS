@@ -5,6 +5,10 @@
 #include "../graficzny/czcionka.h"
 #include "../include/printf/printf.h"
 #include "../system_plikow/system_plikow.h"
+#include "proces.h"
+#include "../drivers/keyboard.h"
+#include "loader.h"
+#include "../user_land/tapeta.h"
 
 struct rejestry biezace_rejestry;
 
@@ -27,7 +31,6 @@ static uint32_t __attribute__((unused)) heap_end(void) {
     return userspace_break;
 }
 
-static struct okno okno_tapeta_user;
 #define KOLO_SRODEK_X 250
 #define KOLO_SRODEK_Y 80
 #define KOLO_PROMIEN 40
@@ -88,7 +91,7 @@ static uint32_t hsv_na_xrgb(int h, uint32_t s, uint32_t v)
     return (r << 16) | (g << 8) | b;
 }
 
-static void rysuj_wybor_tapety_user(int x, int y, int szerokosc, int wysokosc)
+void tapeta_picker_rysuj(int x, int y, int szerokosc, int wysokosc)
 {
     static const uint32_t kolory[] = {
         0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
@@ -118,7 +121,7 @@ static void rysuj_wybor_tapety_user(int x, int y, int szerokosc, int wysokosc)
     }
 }
 
-static void obsluz_wybor_tapety_user(int x, int y)
+void tapeta_picker_klik(int x, int y)
 {
     static const uint32_t kolory[] = {
         0x001E293B, 0x00334155, 0x00E74C3C, 0x0027AE60,
@@ -146,6 +149,25 @@ static void obsluz_wybor_tapety_user(int x, int y)
     tapeta_zapisz();
 }
 
+static struct okno *pobierz_okno_procesu(int handle)
+{
+    struct proces *p = proces_aktualny();
+    if (!p) return 0;
+    if (handle < 0 || handle >= MAX_OKNA_PROCESU) return 0;
+    if (!p->okna_uzyte[handle]) return 0;
+    return &p->okna[handle];
+}
+
+static int znajdz_wolny_slot_okna(void)
+{
+    struct proces *p = proces_aktualny();
+    if (!p) return -1;
+    for (int i = 0; i < MAX_OKNA_PROCESU; i++) {
+        if (!p->okna_uzyte[i]) return i;
+    }
+    return -1;
+}
+
 uint32_t syscall_handler(void)
 {
     uint32_t eax = biezace_rejestry.eax;
@@ -161,7 +183,7 @@ uint32_t syscall_handler(void)
             tapeta_zapisz();
             return 0;
         case SYSCALL_TAPETA_POBIERZ:
-            return 0;
+            return pobierz_kolor_tapety();
         case SYSCALL_EKRAN_CZYŚĆ:
             wypelnij_ekran((uint32_t)ebx);
             return 0;
@@ -176,17 +198,95 @@ uint32_t syscall_handler(void)
                 return 0xFFFFFFFF;
             rysuj_tekst_chicago((int)ebx, (int)ecx, (const char *)edx, (uint32_t)esi);
             return 0;
-        case SYSCALL_OKNO_STWÓRZ:
+        case SYSCALL_OKNO_STWÓRZ: {
             if (!wskaznik_uzytkownika_prawidlowy((const void *)edi))
                 return 0xFFFFFFFF;
-            okno_stworz(&okno_tapeta_user, (int)ebx, (int)ecx, (int)edx, (int)esi, (const char *)edi, rysuj_wybor_tapety_user);
-            okno_ustaw_obsluge_klikniecia(&okno_tapeta_user, obsluz_wybor_tapety_user);
+            int slot = znajdz_wolny_slot_okna();
+            if (slot < 0) return 0xFFFFFFFF;
+            struct proces *proc = proces_aktualny();
+            if (!proc) return 0xFFFFFFFF;
+            struct okno *okno = &proc->okna[slot];
+            okno_stworz(okno, (int)ebx, (int)ecx, (int)edx, (int)esi, (const char *)edi, 0);
+            proc->okna_uzyte[slot] = 1;
+            return slot;
+        }
+        case SYSCALL_OKNO_RYSUJ: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            okno_narysuj(okno);
             return 0;
-        case SYSCALL_OKNO_RYSUJ:
-            odswiez_widok();
+        }
+        case SYSCALL_OKNO_ZAMKNIJ: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            okno_zamknij(okno);
+            struct proces *proc = proces_aktualny();
+            if (proc) proc->okna_uzyte[ebx] = 0;
             return 0;
-        case SYSCALL_MYSZ_POZYCJA:
+        }
+        case SYSCALL_OKNO_PIKSEL: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            int x = (int)ecx;
+            int y = (int)edx;
+            uint32_t color = (uint32_t)esi;
+            if (x < 0 || x >= okno->szerokosc - 16 || y < 22 || y >= okno->wysokosc - 2)
+                return 0xFFFFFFFF;
+            rysuj_piksel(okno->x + 8 + x, okno->y + 30 + y, color);
             return 0;
+        }
+        case SYSCALL_OKNO_PROSTOKAT: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            int x = (int)ecx;
+            int y = (int)edx;
+            int w = (int)esi;
+            int h = (int)edi;
+            if (x < 0 || y < 22 || x + w > okno->szerokosc - 16 || y + h > okno->wysokosc - 2)
+                return 0xFFFFFFFF;
+            rysuj_prostokat(okno->x + 8 + x, okno->y + 30 + y, w, h, 0);
+            return 0;
+        }
+        case SYSCALL_OKNO_TEKST: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)edx))
+                return 0xFFFFFFFF;
+            int x = (int)ecx;
+            int y = (int)edx;
+            const char *text = (const char *)esi;
+            uint32_t color = (uint32_t)edi;
+            if (x < 0 || y < 22 || x >= okno->szerokosc - 16 || y >= okno->wysokosc - 2)
+                return 0xFFFFFFFF;
+            rysuj_tekst_chicago(okno->x + 8 + x, okno->y + 30 + y, text, color);
+            return 0;
+        }
+        case SYSCALL_OKNO_KLIK: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            int x = (int)ecx;
+            int y = (int)edx;
+            if (x < 0 || x >= okno->szerokosc || y < 0 || y >= okno->wysokosc)
+                return 0xFFFFFFFF;
+            okno_obsluz_klikniecie(okno->x + x, okno->y + y);
+            return 0;
+        }
+        case SYSCALL_OKNO_RUCH: {
+            struct okno *okno = pobierz_okno_procesu((int)ebx);
+            if (!okno) return 0xFFFFFFFF;
+            int x = (int)ecx;
+            int y = (int)edx;
+            if (x < 0 || x >= okno->szerokosc || y < 0 || y >= okno->wysokosc)
+                return 0xFFFFFFFF;
+            okno_obsluz_ruch(okno->x + x, okno->y + y);
+            return 0;
+        }
+        case SYSCALL_MYSZ_POZYCJA: {
+            int mx, my;
+            mx = 512;
+            my = 384;
+            return (mx & 0xFFFF) | ((my & 0xFFFF) << 16);
+        }
         case SYSCALL_DRUKUJ:
             if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
                 return 0xFFFFFFFF;
@@ -280,6 +380,53 @@ uint32_t syscall_handler(void)
             }
             if (open_files[ebx].position > open_files[ebx].size) open_files[ebx].size = open_files[ebx].position;
             return written;
+        }
+        case SYSCALL_PROCES_STWORZ: {
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ecx))
+                return 0xFFFFFFFF;
+            struct proces *p = proces_stworz(ebx, (const char *)ecx, edx);
+            if (!p) return 0xFFFFFFFF;
+            return p->pid;
+        }
+        case SYSCALL_PROCES_ZAKONCZ:
+            proces_zakoncz(ebx);
+            return 0;
+        case SYSCALL_PROCES_YIELD:
+            proces_yield();
+            return 0;
+        case SYSCALL_PROCES_POBIERZ_PID:
+            return proces_pobierz_pid();
+        case SYSCALL_FS_LIST:
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
+                return 0xFFFFFFFF;
+            return fs_list_current((struct fs_entry_info *)ebx, ecx);
+        case SYSCALL_FS_CD:
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
+                return 0xFFFFFFFF;
+            return cd((const char *)ebx);
+        case SYSCALL_FS_PWD:
+            if (!wskaznik_uzytkownika_prawidlowy((void *)ebx))
+                return 0xFFFFFFFF;
+            fs_get_current_dir_name((char *)ebx);
+            return 0;
+        case SYSCALL_FS_RESET_DIR:
+            fs_reset_directory();
+            return 0;
+        case SYSCALL_KLAWIATURA_GETCHAR: {
+            char znak = 0;
+            uint8_t ctrl = 0;
+            if (keyboard_try_getchar(&znak)) {
+                ctrl = keyboard_ctrl_pressed();
+                return (uint32_t)(unsigned char)znak | ((uint32_t)ctrl << 8);
+            }
+            return 0xFFFFFFFF;
+        }
+        case SYSCALL_PROCES_URUCHOM_ELF: {
+            if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
+                return 0xFFFFFFFF;
+            int pid = proces_zaladuj_elf((const char *)ebx);
+            if (pid <= 0) return 0xFFFFFFFF;
+            return pid;
         }
         default:
             return 0xFFFFFFFF;

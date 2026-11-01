@@ -119,18 +119,22 @@ static struct fat32_entry *find_entry(const char *name, uint32_t directory, char
 }
 
 void init_fs(void) {
-    read_sector(0, (char *)&bpb);
+    char boot_sector[512];
+    read_sector(0, boot_sector);
+    for (uint32_t i = 0; i < sizeof(bpb); i++) ((char *)&bpb)[i] = boot_sector[i];
     if (bpb.bytes_per_sector != 512 || bpb.root_cluster < 2) { printf("Blad: brak systemu FAT32\n"); return; }
     fat_start = bpb.reserved_sectors; first_data_sector = fat_start + bpb.fat_count * bpb.fat_size; current_dir = bpb.root_cluster; directory_depth = 0;
 }
 
 void fs_set_device_floppy(int use_floppy) {
+    char boot_sector[512];
     fs_use_floppy = (uint8_t)(use_floppy ? 1 : 0);
     if (use_floppy) {
-        floppy_read_sector(0, (char *)&bpb);
+        floppy_read_sector(0, boot_sector);
     } else {
-        read_sector(0, (char *)&bpb);
+        read_sector(0, boot_sector);
     }
+    for (uint32_t i = 0; i < sizeof(bpb); i++) ((char *)&bpb)[i] = boot_sector[i];
     if (bpb.bytes_per_sector != 512 || bpb.root_cluster < 2) return;
     fat_start = bpb.reserved_sectors; first_data_sector = fat_start + bpb.fat_count * bpb.fat_size; current_dir = bpb.root_cluster; directory_depth = 0;
 }
@@ -309,4 +313,39 @@ uint32_t fs_cluster_sector(uint32_t cluster) {
 
 struct fat32_entry *fs_find_entry(const char *name, char *sector, uint32_t *sector_number) {
     return find_entry(name, current_dir, sector, sector_number);
+}
+
+void fs_get_current_dir_name(char *buf) {
+    if (current_dir == bpb.root_cluster) {
+        buf[0] = '/';
+        buf[1] = 0;
+        return;
+    }
+    buf[0] = '/';
+    int pos = 1;
+    uint32_t dir = current_dir;
+    uint32_t stack[16];
+    int depth = directory_depth;
+    for (int i = 0; i < depth; i++) {
+        stack[i] = directory_stack[i];
+    }
+    char name[13];
+    while (dir != bpb.root_cluster && depth > 0) {
+        depth--;
+        dir = stack[depth];
+        fs_set_current_dir(dir);
+        int count = fs_list_current((struct fs_entry_info *)name, 1);
+        if (count > 0) {
+            int len = 0;
+            while (name[len]) len++;
+            int name_pos = pos;
+            for (int i = len - 1; i >= 0; i--) {
+                if (pos < 127) buf[pos++] = name[i];
+            }
+            if (pos < 127) buf[pos++] = '/';
+        }
+    }
+    fs_set_current_dir(current_dir);
+    if (pos > 1) pos--;
+    buf[pos] = 0;
 }

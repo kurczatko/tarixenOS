@@ -12,5 +12,6 @@
 #define USER_MEM_END    0x00400000
 
 void paging_init(void);
+void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags);
 
 #endif

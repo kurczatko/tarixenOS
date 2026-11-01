@@ -32,6 +32,7 @@ int fs_list_current(struct fs_entry_info *entries, int capacity);
 void fs_reset_directory(void);
 int fs_parent_directory(void);
 uint32_t fs_get_current_dir(void);
+void fs_get_current_dir_name(char *buf);
 void fs_set_current_dir(uint32_t dir);
 uint32_t fs_fat_next(uint32_t cluster);
 void fs_read_sector(uint32_t sector, char *buffer);

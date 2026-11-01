@@ -3,11 +3,31 @@
 
 #include "../include/printf/types.h"
 
-/* Przejdz do userspace (ring 3) i wykonaj kod pod `wejscie` na stosie `stos`.
- * Nie wraca do wywolujacego. */
 void userspace_uruchom(uint32_t wejscie, uint32_t stos);
 
-/* Gora dostepnego adresowego prostoru uzytkownika (ponizej ladowania jadra). */
 #define GRANICA_PAMIEC_UZYTKOWNIKA 0x00100000
+
+#define SYSCALL_TAPETA_ZMIEŃ 0
+#define SYSCALL_TAPETA_POBIERZ 1
+#define SYSCALL_EKRAN_CZYŚĆ 2
+#define SYSCALL_EKRAN_PIKSEL 3
+#define SYSCALL_EKRAN_PROSTOKĄT 4
+#define SYSCALL_TEKST_RYSUJ 5
+#define SYSCALL_OKNO_STWÓRZ 6
+#define SYSCALL_OKNO_RYSUJ 7
+#define SYSCALL_MYSZ_POZYCJA 8
+#define SYSCALL_DRUKUJ 9
+#define SYSCALL_WRITE_CONSOLE 20
+#define SYSCALL_EXIT 21
+#define SYSCALL_BRK 22
+#define SYSCALL_OPEN 23
+#define SYSCALL_READ 24
+#define SYSCALL_CLOSE 25
+#define SYSCALL_WRITE_FILE 26
+
+#define SYSCALL_PROCES_STWORZ 27
+#define SYSCALL_PROCES_ZAKONCZ 28
+#define SYSCALL_PROCES_YIELD 29
+#define SYSCALL_PROCES_POBIERZ_PID 30
 
 #endif
