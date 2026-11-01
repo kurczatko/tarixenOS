@@ -5,6 +5,9 @@
 #include "../system_plikow/system_plikow.h"
 #include "../drivers/keyboard.h"
 #include "../kernel/notatnik.h"
+#include "../kernel/loader.h"
+
+extern void zainstaluj_pakiet_tsi(const char *nazwa_pliku);
 
 #define PULPIT_ICON_W 64
 #define PULPIT_ICON_H 80
@@ -15,6 +18,9 @@
 struct pulp_ikona {
     char nazwa[13];
     uint8_t jest_folder;
+    uint8_t jest_program;
+    uint8_t ikona_ma_dane;
+    uint32_t ikona_dane[32][32];
     int x;
     int y;
 };
@@ -44,6 +50,23 @@ static int nazwy_rowne(const char *a, const char *b)
         i++;
     }
     return a[i] == b[i];
+}
+
+static int nazwa_konczy_sie_na(const char *nazwa, const char *suffix)
+{
+    int n = 0;
+    while (nazwa[n]) n++;
+    int s = 0;
+    while (suffix[s]) s++;
+    if (n < s) return 0;
+    for (int i = 0; i < s; i++) {
+        char a = nazwa[n - s + i];
+        char b = suffix[i];
+        if (a >= 'a' && a <= 'z') a -= 'a' - 'A';
+        if (b >= 'a' && b <= 'z') b -= 'a' - 'A';
+        if (a != b) return 0;
+    }
+    return 1;
 }
 
 static int parsuj_uint(char **p)
@@ -90,6 +113,49 @@ static void pulp_laduj_ikony(void)
         for (int j = 0; j < 13; j++) ikony[i].nazwa[j] = lista[i].name[j];
         ikony[i].nazwa[12] = 0;
         ikony[i].jest_folder = lista[i].is_directory;
+        ikony[i].jest_program = 0;
+        ikony[i].ikona_ma_dane = 0;
+        for (int j = 0; j < 32; j++) {
+            for (int k = 0; k < 32; k++) {
+                ikony[i].ikona_dane[j][k] = 0;
+            }
+        }
+        if (!ikony[i].jest_folder) {
+            int len = 0;
+            while (ikony[i].nazwa[len]) len++;
+            if (len > 4 &&
+                ikony[i].nazwa[len - 4] == '.' &&
+                ikony[i].nazwa[len - 3] == 'E' &&
+                ikony[i].nazwa[len - 2] == 'L' &&
+                ikony[i].nazwa[len - 1] == 'F') {
+                ikony[i].jest_program = 1;
+            }
+        }
+        char ikona_plik[64];
+        int n = 0;
+        while (ikony[i].nazwa[n] && n < 60) {
+            ikona_plik[n] = ikony[i].nazwa[n];
+            n++;
+        }
+        ikona_plik[n++] = '.';
+        ikona_plik[n++] = 'I';
+        ikona_plik[n++] = 'C';
+        ikona_plik[n] = 0;
+        char ikona_buf[4096];
+        int ikona_rozmiar = read_file(ikona_plik, ikona_buf, sizeof(ikona_buf));
+        if (ikona_rozmiar > 0 && ikona_rozmiar <= (int)sizeof(ikona_buf)) {
+            int px = 0, py = 0;
+            for (int b = 0; b + 3 < ikona_rozmiar && py < 32; b += 4) {
+                uint32_t kolor = *(uint32_t *)(ikona_buf + b);
+                ikony[i].ikona_dane[py][px] = kolor;
+                px++;
+                if (px >= 32) {
+                    px = 0;
+                    py++;
+                }
+            }
+            ikony[i].ikona_ma_dane = 1;
+        }
         ikony[i].x = 20 + kolumna * PULPIT_ICON_W;
         ikony[i].y = 20 + wiersz * PULPIT_ICON_H;
         kolumna++;
@@ -165,16 +231,28 @@ void ikony_zapisz_uklad(void)
     }
 }
 
-static void pulp_rysuj_ikone(int x, int y, const char *nazwa, uint8_t jest_folder)
+static void pulp_rysuj_ikone(int x, int y, const char *nazwa, uint8_t jest_folder, uint8_t jest_program, uint8_t ikona_ma_dane, uint32_t ikona_dane[32][32])
 {
-    uint32_t kolor = jest_folder ? 0x004A5D6E : 0x00334155;
-    rysuj_prostokat(x, y, 48, 48, kolor);
-    rysuj_prostokat(x + 4, y + 4, 40, 40, 0x00FFFFFF);
-    if (jest_folder) {
-        rysuj_prostokat(x + 12, y + 12, 24, 12, 0x00FBBF24);
+    if (ikona_ma_dane) {
+        for (int py = 0; py < 32; py++) {
+            for (int px = 0; px < 32; px++) {
+                rysuj_piksel(x + 8 + px, y + 8 + py, ikona_dane[py][px]);
+            }
+        }
     } else {
-        rysuj_prostokat(x + 12, y + 16, 24, 8, 0x00FBBF24);
-        rysuj_prostokat(x + 12, y + 28, 24, 8, 0x00FBBF24);
+        uint32_t kolor = jest_folder ? 0x004A5D6E : (jest_program ? 0x003B82F6 : 0x00334155);
+        rysuj_prostokat(x, y, 48, 48, kolor);
+        rysuj_prostokat(x + 4, y + 4, 40, 40, 0x00FFFFFF);
+        if (jest_folder) {
+            rysuj_prostokat(x + 12, y + 12, 24, 12, 0x00FBBF24);
+        } else if (jest_program) {
+            rysuj_prostokat(x + 12, y + 16, 24, 8, 0x00FBBF24);
+            rysuj_prostokat(x + 12, y + 28, 24, 8, 0x00FBBF24);
+            rysuj_prostokat(x + 16, y + 20, 16, 4, 0x00FBBF24);
+        } else {
+            rysuj_prostokat(x + 12, y + 16, 24, 8, 0x00FBBF24);
+            rysuj_prostokat(x + 12, y + 28, 24, 8, 0x00FBBF24);
+        }
     }
     rysuj_tekst_chicago(x, y + 52, nazwa, 0x00000000);
 }
@@ -182,7 +260,7 @@ static void pulp_rysuj_ikone(int x, int y, const char *nazwa, uint8_t jest_folde
 static void pulp_rysuj_wszystkie_ikony(void)
 {
     for (int i = 0; i < liczba_ikon; i++) {
-        pulp_rysuj_ikone(ikony[i].x, ikony[i].y, ikony[i].nazwa, ikony[i].jest_folder);
+        pulp_rysuj_ikone(ikony[i].x, ikony[i].y, ikony[i].nazwa, ikony[i].jest_folder, ikony[i].jest_program, ikony[i].ikona_ma_dane, ikony[i].ikona_dane);
     }
     odswiez_widok();
 }
@@ -243,7 +321,7 @@ void pulp_mouse_ruch(int x, int y)
     ikony[i].x = nx;
     ikony[i].y = ny;
     przeciąganie_ruch = 1;
-    pulp_rysuj_ikone(nx, ny, ikony[i].nazwa, ikony[i].jest_folder);
+    pulp_rysuj_ikone(nx, ny, ikony[i].nazwa, ikony[i].jest_folder, ikony[i].jest_program, ikony[i].ikona_ma_dane, ikony[i].ikona_dane);
     odswiez_fragment_widoku(nx, ny, PULPIT_ICON_W, PULPIT_ICON_H);
 }
 
@@ -262,6 +340,18 @@ void pulp_mouse_release(int x, int y)
             cd("pulpit");
             if (ikony[i].jest_folder) {
                 cd(ikony[i].nazwa);
+            } else if (ikony[i].jest_program) {
+                cd("..");
+                fs_set_current_dir(stary_dir);
+                proces_zaladuj_elf(ikony[i].nazwa);
+                return;
+            } else if (nazwa_konczy_sie_na(ikony[i].nazwa, ".tsi")) {
+                zainstaluj_pakiet_tsi(ikony[i].nazwa);
+                cd("..");
+                fs_set_current_dir(stary_dir);
+                pulp_laduj_ikony();
+                pulp_rysuj_wszystkie_ikony();
+                return;
             } else {
                 notatnik_otworz_plik(ikony[i].nazwa);
             }
