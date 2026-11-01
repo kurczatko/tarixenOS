@@ -83,9 +83,21 @@ static uint32_t g_ring[QEMU_VGA_RING_SIZE];
 static uint32_t g_ring_head = 0;
 static uint32_t g_ring_tail = 0;
 
-static float g_zbuffer[QEMU_VGA_FB_WIDTH * QEMU_VGA_FB_HEIGHT];
+typedef struct {
+    uint32_t opcode;
+    uint32_t arg0;
+    uint32_t arg1;
+    uint32_t arg2;
+    uint32_t arg3;
+} qv3_cmd_t;
+
+static qv3_cmd_t g_cmd_buffer[QEMU_VGA_3D_MAX_CMDS];
+static uint32_t g_cmd_count = 0;
+static qv3_vtx_attr_t g_vtx_buffer[QEMU_VGA_3D_MAX_VTX];
+static uint32_t g_vtx_count = 0;
+static uint16_t g_idx_buffer[QEMU_VGA_3D_MAX_IDX];
+static uint32_t g_idx_count = 0;
 static qv3_matrix_t g_matrix;
-static int g_scene_begun = 0;
 
 static int qemu_vga_find_device(void)
 {
@@ -169,144 +181,114 @@ static void blt_copy(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t sr
     ring_flush();
 }
 
-static float qv3_sin(float x)
+static uint32_t float_to_uint(float f)
 {
-    while (x > 3.14159265358979323846f * 2.0f) x -= 3.14159265358979323846f * 2.0f;
-    while (x < -3.14159265358979323846f * 2.0f) x += 3.14159265358979323846f * 2.0f;
-    float x2 = x * x;
-    return x * (1.0f - x2 / 6.0f + x2 * x2 / 120.0f - x2 * x2 * x2 / 5040.0f);
+    union {
+        float f;
+        uint32_t u;
+    } u;
+    u.f = f;
+    return u.u;
 }
 
-static float qv3_cos(float x)
+static void write_matrix_block(uint32_t base, const qv3_matrix_t *m)
 {
-    while (x > 3.14159265358979323846f * 2.0f) x -= 3.14159265358979323846f * 2.0f;
-    while (x < -3.14159265358979323846f * 2.0f) x += 3.14159265358979323846f * 2.0f;
-    float x2 = x * x;
-    return 1.0f - x2 / 2.0f + x2 * x2 / 24.0f - x2 * x2 * x2 / 720.0f;
-}
-
-static float qv3_tan(float x)
-{
-    float c = qv3_cos(x);
-    if (c == 0.0f) c = 0.0001f;
-    return qv3_sin(x) / c;
-}
-
-static qv3_matrix_t matrix_identity(void)
-{
-    qv3_matrix_t m;
-    int i, j;
-    for (i = 0; i < 4; i++) {
-        for (j = 0; j < 4; j++) {
-            m.m[i][j] = (i == j) ? 1.0f : 0.0f;
+    int r;
+    int c;
+    for (r = 0; r < 4; r++) {
+        for (c = 0; c < 4; c++) {
+            mmio_write(base + (uint32_t)((r * 4 + c) * 4), float_to_uint(m->m[r][c]));
         }
     }
-    return m;
 }
 
-static qv3_matrix_t matrix_mul(const qv3_matrix_t *a, const qv3_matrix_t *b)
+static void cmd_emit(uint32_t opcode, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3)
 {
-    qv3_matrix_t r = matrix_identity();
-    int i, j, k;
-    for (i = 0; i < 4; i++) {
-        for (j = 0; j < 4; j++) {
-            float sum = 0.0f;
-            for (k = 0; k < 4; k++) {
-                sum += a->m[i][k] * b->m[k][j];
+    if (g_cmd_count >= QEMU_VGA_3D_MAX_CMDS) {
+        return;
+    }
+    g_cmd_buffer[g_cmd_count].opcode = opcode;
+    g_cmd_buffer[g_cmd_count].arg0 = a0;
+    g_cmd_buffer[g_cmd_count].arg1 = a1;
+    g_cmd_buffer[g_cmd_count].arg2 = a2;
+    g_cmd_buffer[g_cmd_count].arg3 = a3;
+    g_cmd_count++;
+}
+
+static void cmd_flush(void)
+{
+    uint32_t i = 0;
+    while (i < g_cmd_count) {
+        qv3_cmd_t *cmd = &g_cmd_buffer[i];
+        volatile int wait;
+        for (wait = 0; wait < 1000000; wait++) {
+            if (mmio_read(QEMU_VGA_REG_3D_STATUS) == QEMU_VGA_3D_STATUS_IDLE) {
+                break;
             }
-            r.m[i][j] = sum;
         }
-    }
-    return r;
-}
-
-static qv3_matrix_t matrix_perspective(float fov, float aspect, float znear, float zfar)
-{
-    qv3_matrix_t m = matrix_identity();
-    float f = 1.0f / qv3_tan(fov * 0.5f);
-    float nf = 1.0f / (znear - zfar);
-    m.m[0][0] = f / aspect;
-    m.m[1][1] = f;
-    m.m[2][2] = (zfar + znear) * nf;
-    m.m[2][3] = (2.0f * zfar * znear) * nf;
-    m.m[3][2] = -1.0f;
-    m.m[3][3] = 0.0f;
-    return m;
-}
-
-static float vec_dot(float ax, float ay, float az, float bx, float by, float bz)
-{
-    return ax * bx + ay * by + az * bz;
-}
-
-static void vec_cross(float ax, float ay, float az, float bx, float by, float bz,
-                      float *ox, float *oy, float *oz)
-{
-    *ox = ay * bz - az * by;
-    *oy = az * bx - ax * bz;
-    *oz = ax * by - ay * bx;
-}
-
-static void vec_norm(float *x, float *y, float *z)
-{
-    float temp = (*x) * (*x) + (*y) * (*y) + (*z) * (*z);
-    float inv = 1.0f;
-    if (temp > 0.0f) {
-        float guess = 1.0f;
-        int i;
-        for (i = 0; i < 6; i++) {
-            guess = 0.5f * (guess + temp / guess);
+        mmio_write(QEMU_VGA_REG_3D_CMD, cmd->opcode);
+        switch (cmd->opcode) {
+        case QEMU_VGA_3D_CMD_CLEAR:
+            mmio_write(QEMU_VGA_REG_3D_CLEAR_COLOR, cmd->arg0);
+            mmio_write(QEMU_VGA_REG_3D_CLEAR_DEPTH, cmd->arg1);
+            break;
+        case QEMU_VGA_3D_CMD_DRAW_TRIANGLES: {
+            volatile uint32_t *vtx_dst = (volatile uint32_t *)QEMU_VGA_3D_VTX_BUFFER_ADDR;
+            volatile uint32_t *idx_dst = (volatile uint32_t *)QEMU_VGA_3D_IDX_BUFFER_ADDR;
+            uint32_t vi = 0;
+            const uint32_t *src = 0;
+            uint32_t k = 0;
+            while (vi < g_vtx_count) {
+                src = (const uint32_t *)&g_vtx_buffer[vi];
+                k = 0;
+                while (k < 7U) {
+                    vtx_dst[vi * 7U + k] = src[k];
+                    k++;
+                }
+                vi++;
+            }
+            vi = 0;
+            while (vi < g_idx_count) {
+                idx_dst[vi] = (uint32_t)g_idx_buffer[vi];
+                vi++;
+            }
+            mmio_write(QEMU_VGA_REG_3D_VTX_BASE, QEMU_VGA_3D_VTX_BUFFER_ADDR);
+            mmio_write(QEMU_VGA_REG_3D_VTX_COUNT, g_vtx_count);
+            mmio_write(QEMU_VGA_REG_3D_IDX_BASE, QEMU_VGA_3D_IDX_BUFFER_ADDR);
+            mmio_write(QEMU_VGA_REG_3D_IDX_COUNT, g_idx_count);
+            mmio_write(QEMU_VGA_REG_3D_DRAW_PRIMITIVES, cmd->arg0);
+            break;
         }
-        inv = guess;
+        case QEMU_VGA_3D_CMD_SET_MATRIX: {
+            uint32_t base = QEMU_VGA_REG_3D_PROJ_MTX;
+            if (cmd->arg0 == 1U) {
+                base = QEMU_VGA_REG_3D_VIEW_MTX;
+            } else if (cmd->arg0 == 2U) {
+                base = QEMU_VGA_REG_3D_MODEL_MTX;
+            }
+            write_matrix_block(base, &g_matrix);
+            break;
+        }
+        case QEMU_VGA_3D_CMD_SET_TEXTURE:
+            mmio_write(QEMU_VGA_REG_3D_TEX_BASE, cmd->arg0);
+            break;
+        case QEMU_VGA_3D_CMD_SET_BLEND:
+            mmio_write(QEMU_VGA_REG_3D_BLEND_ENABLE, cmd->arg0);
+            break;
+        case QEMU_VGA_3D_CMD_SET_DEPTH:
+            mmio_write(QEMU_VGA_REG_3D_DEPTH_TEST, cmd->arg0);
+            break;
+        default:
+            break;
+        }
+        for (wait = 0; wait < 1000000; wait++) {
+            if (mmio_read(QEMU_VGA_REG_3D_STATUS) == QEMU_VGA_3D_STATUS_IDLE) {
+                break;
+            }
+        }
+        i++;
     }
-    *x *= inv;
-    *y *= inv;
-    *z *= inv;
-}
-
-static qv3_matrix_t matrix_lookat(qv3_vertex_t *eye, qv3_vertex_t *center, qv3_vertex_t *up)
-{
-    qv3_matrix_t m = matrix_identity();
-    float fx = center->x - eye->x;
-    float fy = center->y - eye->y;
-    float fz = center->z - eye->z;
-    vec_norm(&fx, &fy, &fz);
-    float sx, sy, sz;
-    vec_cross(fx, fy, fz, up->x, up->y, up->z, &sx, &sy, &sz);
-    vec_norm(&sx, &sy, &sz);
-    float ux, uy, uz;
-    vec_cross(sx, sy, sz, fx, fy, fz, &ux, &uy, &uz);
-    m.m[0][0] = sx; m.m[0][1] = ux; m.m[0][2] = -fx; m.m[0][3] = 0.0f;
-    m.m[1][0] = sy; m.m[1][1] = uy; m.m[1][2] = -fy; m.m[1][3] = 0.0f;
-    m.m[2][0] = sz; m.m[2][1] = uz; m.m[2][2] = -fz; m.m[2][3] = 0.0f;
-    m.m[3][0] = -vec_dot(sx, sy, sz, eye->x, eye->y, eye->z);
-    m.m[3][1] = -vec_dot(ux, uy, uz, eye->x, eye->y, eye->z);
-    m.m[3][2] = vec_dot(fx, fy, fz, eye->x, eye->y, eye->z);
-    m.m[3][3] = 1.0f;
-    return m;
-}
-
-static qv3_matrix_t matrix_model(float tx, float ty, float tz,
-                                 float rx, float ry, float rz,
-                                 float sx, float sy, float sz)
-{
-    qv3_matrix_t m = matrix_identity();
-    float cr = qv3_cos(rx), sr = qv3_sin(rx);
-    float cp = qv3_cos(ry), sp = qv3_sin(ry);
-    float cz = qv3_cos(rz), szr = qv3_sin(rz);
-    m.m[0][0] = cp * cz * sx;
-    m.m[0][1] = (sr * sp * cz - cr * szr) * sy;
-    m.m[0][2] = (cr * sp * cz + sr * szr) * sz;
-    m.m[0][3] = tx;
-    m.m[1][0] = cp * szr * sx;
-    m.m[1][1] = (sr * sp * szr + cr * cz) * sy;
-    m.m[1][2] = (cr * sp * szr - sr * cz) * sz;
-    m.m[1][3] = ty;
-    m.m[2][0] = -sp * sx;
-    m.m[2][1] = sr * cp * szr;
-    m.m[2][2] = cr * cp * sz;
-    m.m[2][3] = tz;
-    return m;
+    g_cmd_count = 0;
 }
 
 extern "C" {
@@ -327,6 +309,38 @@ int qemu_vga_init(void)
     mmio_write(QEMU_VGA_REG_2D_FILL, 0U);
     mmio_write(QEMU_VGA_REG_2D_COPY, 0U);
 
+    uint32_t i = 0;
+    while (i < QEMU_VGA_3D_MAX_CMDS) {
+        g_cmd_buffer[i].opcode = 0U;
+        g_cmd_buffer[i].arg0 = 0U;
+        g_cmd_buffer[i].arg1 = 0U;
+        g_cmd_buffer[i].arg2 = 0U;
+        g_cmd_buffer[i].arg3 = 0U;
+        i++;
+    }
+    i = 0;
+    while (i < QEMU_VGA_3D_MAX_VTX) {
+        g_vtx_buffer[i].position[0] = 0.0f;
+        g_vtx_buffer[i].position[1] = 0.0f;
+        g_vtx_buffer[i].position[2] = 0.0f;
+        g_vtx_buffer[i].position[3] = 0.0f;
+        g_vtx_buffer[i].color[0] = 0;
+        g_vtx_buffer[i].color[1] = 0;
+        g_vtx_buffer[i].color[2] = 0;
+        g_vtx_buffer[i].color[3] = 0;
+        g_vtx_buffer[i].texcoord[0] = 0.0f;
+        g_vtx_buffer[i].texcoord[1] = 0.0f;
+        i++;
+    }
+    i = 0;
+    while (i < QEMU_VGA_3D_MAX_IDX) {
+        g_idx_buffer[i] = 0;
+        i++;
+    }
+
+    g_cmd_count = 0;
+    g_vtx_count = 0;
+    g_idx_count = 0;
     g_ring_head = 0;
     g_ring_tail = 0;
     g_initialized = 1;
@@ -341,7 +355,8 @@ void qemu_vga_putpixel(uint32_t x, uint32_t y, uint32_t color)
 
 void qemu_vga_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)
 {
-    uint32_t xx, yy;
+    uint32_t xx;
+    uint32_t yy;
     if (g_initialized) {
         blt_fill(x, y, w, h, color);
         return;
@@ -356,7 +371,8 @@ void qemu_vga_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t 
 
 void qemu_vga_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
 {
-    uint32_t xx, yy;
+    uint32_t xx;
+    uint32_t yy;
     if (g_initialized) {
         blt_copy(dst_x, dst_y, src_x, src_y, w, h);
         return;
@@ -411,116 +427,134 @@ uint32_t qemu_vga_get_height(void)
     return QEMU_VGA_FB_HEIGHT;
 }
 
-void qemu_vga_3d_begin_scene(void)
-{
-    g_scene_begun = 1;
-}
-
-void qemu_vga_3d_end_scene(void)
-{
-    g_scene_begun = 0;
-}
-
 void qemu_vga_3d_set_matrix(qv3_matrix_t *matrix)
 {
-    if (matrix) {
-        g_matrix = *matrix;
-    }
+    if (!matrix) return;
+    g_matrix = *matrix;
+    write_matrix_block(QEMU_VGA_REG_3D_PROJ_MTX, &g_matrix);
+    write_matrix_block(QEMU_VGA_REG_3D_VIEW_MTX, &g_matrix);
+    write_matrix_block(QEMU_VGA_REG_3D_MODEL_MTX, &g_matrix);
+    cmd_emit(QEMU_VGA_3D_CMD_SET_MATRIX, 0U, 0U, 0U, 0U);
 }
 
 void qemu_vga_3d_clear(uint32_t color, float depth)
 {
-    uint32_t count = QEMU_VGA_FB_WIDTH * QEMU_VGA_FB_HEIGHT;
-    uint32_t i;
-    for (i = 0; i < count; i++) {
-        g_fb[i] = color;
-        g_zbuffer[i] = depth;
-    }
-}
-
-static float edge_func(float x, float y, float x0, float y0, float x1, float y1)
-{
-    return (x - x0) * (y1 - y0) - (y - y0) * (x1 - x0);
-}
-
-static void transform_vertex(const qv3_matrix_t *m, const qv3_vertex_t *v,
-                             float *sx, float *sy, float *sz)
-{
-    float x = m->m[0][0] * v->x + m->m[0][1] * v->y + m->m[0][2] * v->z + m->m[0][3] * v->w;
-    float y = m->m[1][0] * v->x + m->m[1][1] * v->y + m->m[1][2] * v->z + m->m[1][3] * v->w;
-    float z = m->m[2][0] * v->x + m->m[2][1] * v->y + m->m[2][2] * v->z + m->m[2][3] * v->w;
-    float w = m->m[3][0] * v->x + m->m[3][1] * v->y + m->m[3][2] * v->z + m->m[3][3] * v->w;
-    if (w == 0.0f) w = 0.0001f;
-    float invw = 1.0f / w;
-    float ndc_x = x * invw;
-    float ndc_y = y * invw;
-    float ndc_z = z * invw;
-    *sx = (ndc_x + 1.0f) * 0.5f * (float)QEMU_VGA_FB_WIDTH;
-    *sy = (1.0f - ndc_y) * 0.5f * (float)QEMU_VGA_FB_HEIGHT;
-    *sz = ndc_z;
-}
-
-static uint32_t color_pack(const qv3_color_t *c)
-{
-    return ((uint32_t)c->a << 24) | ((uint32_t)c->r << 16) |
-           ((uint32_t)c->g << 8) | (uint32_t)c->b;
+    cmd_emit(QEMU_VGA_3D_CMD_CLEAR, color, float_to_uint(depth), 0U, 0U);
 }
 
 void qemu_vga_3d_draw_triangle(qv3_vertex_t *v1, qv3_vertex_t *v2, qv3_vertex_t *v3,
                                qv3_color_t *c1, qv3_color_t *c2, qv3_color_t *c3)
 {
-    if (!g_scene_begun) return;
     if (!v1 || !v2 || !v3 || !c1 || !c2 || !c3) return;
+    if (g_vtx_count + 3U > QEMU_VGA_3D_MAX_VTX) return;
+    if (g_idx_count + 3U > QEMU_VGA_3D_MAX_IDX) return;
 
-    float x0, y0, z0;
-    float x1, y1, z1;
-    float x2, y2, z2;
-    transform_vertex(&g_matrix, v1, &x0, &y0, &z0);
-    transform_vertex(&g_matrix, v2, &x1, &y1, &z1);
-    transform_vertex(&g_matrix, v3, &x2, &y2, &z2);
+    uint32_t i0 = g_vtx_count;
+    uint32_t i1 = g_vtx_count + 1U;
+    uint32_t i2 = g_vtx_count + 2U;
 
-    float area = edge_func(x0, y0, x1, y1, x2, y2);
-    if (area == 0.0f) return;
+    qv3_vtx_attr_t a;
+    a.position[0] = v1->x;
+    a.position[1] = v1->y;
+    a.position[2] = v1->z;
+    a.position[3] = v1->w;
+    a.color[0] = c1->r;
+    a.color[1] = c1->g;
+    a.color[2] = c1->b;
+    a.color[3] = c1->a;
+    a.texcoord[0] = 0.0f;
+    a.texcoord[1] = 0.0f;
+    g_vtx_buffer[i0] = a;
 
-    int min_x = (int)x0; if ((int)x1 < min_x) min_x = (int)x1; if ((int)x2 < min_x) min_x = (int)x2;
-    int min_y = (int)y0; if ((int)y1 < min_y) min_y = (int)y1; if ((int)y2 < min_y) min_y = (int)y2;
-    int max_x = (int)x0; if ((int)x1 > max_x) max_x = (int)x1; if ((int)x2 > max_x) max_x = (int)x2;
-    int max_y = (int)y0; if ((int)y1 > max_y) max_y = (int)y1; if ((int)y2 > max_y) max_y = (int)y2;
+    a.position[0] = v2->x;
+    a.position[1] = v2->y;
+    a.position[2] = v2->z;
+    a.position[3] = v2->w;
+    a.color[0] = c2->r;
+    a.color[1] = c2->g;
+    a.color[2] = c2->b;
+    a.color[3] = c2->a;
+    a.texcoord[0] = 0.0f;
+    a.texcoord[1] = 0.0f;
+    g_vtx_buffer[i1] = a;
 
-    if (min_x < 0) min_x = 0;
-    if (min_y < 0) min_y = 0;
-    if (max_x > (int)QEMU_VGA_FB_WIDTH - 1) max_x = (int)QEMU_VGA_FB_WIDTH - 1;
-    if (max_y > (int)QEMU_VGA_FB_HEIGHT - 1) max_y = (int)QEMU_VGA_FB_HEIGHT - 1;
+    a.position[0] = v3->x;
+    a.position[1] = v3->y;
+    a.position[2] = v3->z;
+    a.position[3] = v3->w;
+    a.color[0] = c3->r;
+    a.color[1] = c3->g;
+    a.color[2] = c3->b;
+    a.color[3] = c3->a;
+    a.texcoord[0] = 0.0f;
+    a.texcoord[1] = 0.0f;
+    g_vtx_buffer[i2] = a;
 
-    uint32_t col0 = color_pack(c1);
-    uint32_t col1 = color_pack(c2);
-    uint32_t col2 = color_pack(c3);
-    (void)col0; (void)col1; (void)col2;
+    g_vtx_count += 3U;
 
-    int y;
-    for (y = min_y; y <= max_y; y++) {
-        int x;
-        for (x = min_x; x <= max_x; x++) {
-            float e0 = edge_func((float)x + 0.5f, (float)y + 0.5f, x1, y1, x2, y2);
-            float e1 = edge_func((float)x + 0.5f, (float)y + 0.5f, x2, y2, x0, y0);
-            float e2 = edge_func((float)x + 0.5f, (float)y + 0.5f, x0, y0, x1, y1);
-            if (e0 >= 0.0f && e1 >= 0.0f && e2 >= 0.0f) {
-                float w0 = e0 / area;
-                float w1 = e1 / area;
-                float w2 = e2 / area;
-                float depth = w0 * z0 + w1 * z1 + w2 * z2;
-                uint32_t idx = (uint32_t)(y * QEMU_VGA_FB_WIDTH + x);
-                if (depth < g_zbuffer[idx]) {
-                    g_zbuffer[idx] = depth;
-                    uint32_t r = (uint32_t)(w0 * (float)c1->r + w1 * (float)c2->r + w2 * (float)c3->r);
-                    uint32_t g = (uint32_t)(w0 * (float)c1->g + w1 * (float)c2->g + w2 * (float)c3->g);
-                    uint32_t b = (uint32_t)(w0 * (float)c1->b + w1 * (float)c2->b + w2 * (float)c3->b);
-                    uint32_t a = (uint32_t)(w0 * (float)c1->a + w1 * (float)c2->a + w2 * (float)c3->a);
-                    g_fb[idx] = (a << 24) | (r << 16) | (g << 8) | b;
-                }
-            }
-        }
+    g_idx_buffer[g_idx_count] = (uint16_t)i0;
+    g_idx_buffer[g_idx_count + 1U] = (uint16_t)i1;
+    g_idx_buffer[g_idx_count + 2U] = (uint16_t)i2;
+    g_idx_count += 3U;
+
+    cmd_emit(QEMU_VGA_3D_CMD_DRAW_TRIANGLES, 1U, 0U, 0U, 0U);
+}
+
+void qemu_vga_3d_flush(void)
+{
+    cmd_flush();
+}
+
+void qemu_vga_3d_begin_scene(void)
+{
+    cmd_emit(QEMU_VGA_3D_CMD_NOP, 0U, 0U, 0U, 0U);
+}
+
+void qemu_vga_3d_end_scene(void)
+{
+    cmd_emit(QEMU_VGA_3D_CMD_FLUSH, 0U, 0U, 0U, 0U);
+    qemu_vga_3d_flush();
+}
+
+void qemu_vga_3d_vertex_buffer(const qv3_vtx_attr_t *vertices, uint32_t count)
+{
+    uint32_t i = 0;
+    if (count > QEMU_VGA_3D_MAX_VTX) count = QEMU_VGA_3D_MAX_VTX;
+    while (i < count) {
+        g_vtx_buffer[i] = vertices[i];
+        i++;
     }
+    g_vtx_count = count;
+}
+
+void qemu_vga_3d_index_buffer(const uint16_t *indices, uint32_t count)
+{
+    uint32_t i = 0;
+    if (count > QEMU_VGA_3D_MAX_IDX) count = QEMU_VGA_3D_MAX_IDX;
+    while (i < count) {
+        g_idx_buffer[i] = indices[i];
+        i++;
+    }
+    g_idx_count = count;
+}
+
+void qemu_vga_3d_texture_bind(uint32_t slot, uint32_t tex_addr)
+{
+    (void)slot;
+    mmio_write(QEMU_VGA_REG_3D_TEX_BASE, tex_addr);
+    cmd_emit(QEMU_VGA_3D_CMD_SET_TEXTURE, tex_addr, 0U, 0U, 0U);
+}
+
+void qemu_vga_3d_blend_enable(uint8_t enable)
+{
+    mmio_write(QEMU_VGA_REG_3D_BLEND_ENABLE, (uint32_t)enable);
+    cmd_emit(QEMU_VGA_3D_CMD_SET_BLEND, (uint32_t)enable, 0U, 0U, 0U);
+}
+
+void qemu_vga_3d_depth_test_enable(uint8_t enable)
+{
+    mmio_write(QEMU_VGA_REG_3D_DEPTH_TEST, (uint32_t)enable);
+    cmd_emit(QEMU_VGA_3D_CMD_SET_DEPTH, (uint32_t)enable, 0U, 0U, 0U);
 }
 
 }
