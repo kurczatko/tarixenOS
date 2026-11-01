@@ -33,7 +33,7 @@ KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOUR
 USER_APPS := NOTATNIK.ELF EKSPLORATOR.ELF BROWSER.ELF KALKULATOR.ELF GRA.ELF KURSOR.ELF
 USER_APPS_LOWER := notatnik eksploartor browser kalkulator gra kursor
 
-.PHONY: all image iso clean user_apps
+.PHONY: all image iso clean user_apps run
 
 all: image
 
@@ -158,7 +158,7 @@ $(KERNEL_BIN32): $(KERNEL_ELF32)
 $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
 	dd if=/dev/zero of=$@ bs=$(FLOPPY_SIZE) count=1 status=none
 	@if command -v mkfs.fat >/dev/null 2>&1; then \
-		mkfs.fat -F 32 -S 512 -s 1 -R 192 -n TARIXENOS $@ >/dev/null; \
+		mkfs.fat -F 32 -S 512 -s 1 -R 32 -n TARIXENOS $@ >/dev/null; \
 	else \
 		echo "Brak mkfs.fat - obraz nie zostanie sformatowany jako FAT32"; exit 1; \
 	fi
@@ -168,7 +168,7 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
 	if [ $$kernel_size -gt $$((512 * 512)) ]; then \
 		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
 	fi
-	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=192 conv=notrunc status=none
+	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=4096 conv=notrunc status=none
 	@for app in $(USER_APPS); do \
 		if [ -f $(BUILD_DIR)/$$app ]; then \
 			mcopy -i $@ $(BUILD_DIR)/$$app ::/$$app; \
@@ -193,4 +193,6 @@ $(ISO_IMAGE): $(UEFI_BIN) $(KERNEL_ELF64) | $(ISO_DIR)
 	fi
 
 clean:
-	rm -rf $(BUILD_DIR)
+
+run: image
+	qemu-system-x86_64 -m 2G -boot c -drive file=$(OS_IMAGE),format=raw -machine pc 

@@ -135,7 +135,7 @@ video_mode_ready:
 
     mov cx, KERNEL_SECTORS / 32
     mov word [dap_segment], 0x1000
-    mov dword [dap_lba_low], 192
+    mov dword [dap_lba_low], 4096
 
 read_kernel_loop:
     push cx
@@ -171,7 +171,7 @@ disk_address_packet:
 dap_segment:
     dw 0x1000
 dap_lba_low:
-    dd 192
+    dd 4096
 dap_lba_high:
     dd 0
 
