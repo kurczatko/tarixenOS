@@ -21,7 +21,7 @@ void usb_mouse_init(void) {
     for (i = 0; i < usb_device_count(); i++) {
         usb_device_t *dev = usb_device_get(i);
         if (!dev || !dev->configured) continue;
-        if (dev->class == USB_CLASS_HID) {
+        if (dev->dev_class == USB_CLASS_HID) {
             if (hid_register_mouse(dev, mouse_callback) == 0) {
                 return;
             }

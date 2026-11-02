@@ -95,7 +95,7 @@ void usb_storage_init(void) {
     for (i = 0; i < usb_device_count(); i++) {
         usb_device_t *dev = usb_device_get(i);
         if (!dev || !dev->configured) continue;
-        if (dev->class == USB_MSC_CLASS && dev->subclass == USB_MSC_SUBCLASS && dev->protocol == USB_MSC_PROTOCOL) {
+        if (dev->dev_class == USB_MSC_CLASS && dev->subclass == USB_MSC_SUBCLASS && dev->protocol == USB_MSC_PROTOCOL) {
             if (usb_msc_find_endpoints(dev) == 0) {
                 usb_msc_dev = dev;
                 uint8_t cmd_inquiry[6] = { SCSI_INQUIRY, 0, 0, 0, 36, 0 };

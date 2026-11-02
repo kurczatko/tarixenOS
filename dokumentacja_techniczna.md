@@ -1104,6 +1104,182 @@ struktura `rtl8188ce_stats` zawiera:
 | rx_errors | bledy odbioru |
 | resets | liczba resetow chipa |
 
+## sterownik bluetooth - drivers/bluetooth/bluetooth.h
+
+sterownik bluetooth dla placas glownej MSI MPG Z890 CARBON WIFI napisany w C++. implementuje pelny stos bluetooth zgodny ze specyfikacja bluetooth core: hci (host controller interface) po usb (transport hci:usb), l2cap (logical link control and adaptation protocol), a2dp (advanced audio distribution profile) dla sluchawek bluetooth, avctp (audio video control transport protocol) oraz sdp (service discovery protocol). obsluguje parowanie i bonding urzadzen oraz wyswietlanie ikony na pasku zadan z oknem wyboru urzadzenia do polaczenia.
+
+### bluetooth_init
+
+inicjalizuje stos bluetooth: wykrywa kontroler na usb (intel lub realtek), inicjalizuje hci, l2cap oraz a2dp, wlacza kontroler i przygotowuje do pracy.
+
+```
+int bluetooth_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy kontroler nie zostanie wykryty lub inicjalizacja nie powiedzie sie.
+
+### bluetooth_is_ready
+
+zwraca 1 gdy sterownik bluetooth jest zainicjowany i gotowy do pracy.
+
+```
+int bluetooth_is_ready(void)
+```
+
+### bluetooth_power_set / bluetooth_power_get
+
+wlacza lub wylacza kontroler bluetooth oraz zwraca aktualny stan zasilania.
+
+```
+int bluetooth_power_set(uint8_t enable);
+int bluetooth_power_get(void);
+```
+
+### bluetooth_inquiry_start / bluetooth_inquiry_stop / bluetooth_is_discovering
+
+rozpoczyna skanowanie urzadzen bluetooth (inquiry), zatrzymuje skanowanie lub zwraca informacje czy skanowanie trwa.
+
+```
+int bluetooth_inquiry_start(void);
+int bluetooth_inquiry_stop(void);
+int bluetooth_is_discovering(void);
+```
+
+### bluetooth_device_count / bluetooth_device_get / bluetooth_device_find
+
+pobiera liczbe wykrytych urzadzen, informacje o urzadzeniu po indeksie lub znajduje urzadzenie po adresie.
+
+```
+uint8_t bluetooth_device_count(void);
+const struct bt_device *bluetooth_device_get(uint8_t index);
+struct bt_device *bluetooth_device_find(const struct bt_addr *addr);
+```
+
+struktura `bt_device` zawiera:
+
+| pole | opis |
+|------|------|
+| addr | adres bluetooth (bd_addr) |
+| dev_class | klasa urzadzenia (3 bajty) |
+| rssi | moc sygnalu |
+| name | nazwa urzadzenia (64 bajty) |
+| device_type | typ urzadzenia (sluchawki, glosnik, telefon, komputer) |
+| bonded | czy urzadzenie jest zsparowane |
+| connected | czy urzadzenie jest polaczone |
+| handle | uchwyt polaczenia hci |
+| services | lista usług sdp |
+| service_count | liczba usług |
+
+### bluetooth_connect / bluetooth_disconnect / bluetooth_is_connected
+
+nawiazuje polaczenie z urzadzeniem bluetooth, rozlacza sie z urzadzeniem lub zwraca informacje czy urzadzenie jest polaczone.
+
+```
+int bluetooth_connect(struct bt_device *device);
+int bluetooth_disconnect(struct bt_device *device);
+int bluetooth_is_connected(struct bt_device *device);
+```
+
+### bluetooth_pair / bluetooth_unpair / bluetooth_is_bonded
+
+sparowuje sie z urzadzeniem (wymiana kluczy laczenia, kod pin), usuwa parowanie lub zwraca informacje czy urzadzenie jest zsparowane.
+
+```
+int bluetooth_pair(struct bt_device *device);
+int bluetooth_unpair(struct bt_device *device);
+int bluetooth_is_bonded(struct bt_device *device);
+```
+
+### bluetooth_set_local_name / bluetooth_get_local_name / bluetooth_get_local_addr
+
+ustawia nazwe lokalnego urzadzenia bluetooth, zwraca nazwe lokalnego urzadzenia lub adres lokalnego urzadzenia.
+
+```
+int bluetooth_set_local_name(const char *name);
+const char *bluetooth_get_local_name(void);
+const struct bt_addr *bluetooth_get_local_addr(void);
+```
+
+### a2dp - sluchawki bluetooth
+
+#### bluetooth_a2dp_open
+
+otwiera strumien audio a2dp do sluchawek bluetooth.
+
+```
+int bluetooth_a2dp_open(struct bt_device *device)
+```
+
+#### bluetooth_a2dp_close
+
+zamyka strumien audio a2dp.
+
+```
+int bluetooth_a2dp_close(struct bt_device *device)
+```
+
+#### bluetooth_a2dp_send
+
+wysyla ramke dzwiekowa sbc do sluchawek.
+
+```
+int bluetooth_a2dp_send(struct bt_device *device, const uint8_t *data, uint32_t length)
+```
+
+#### bluetooth_a2dp_streaming
+
+zwraca 1 gdy strumien audio jest aktywny.
+
+```
+int bluetooth_a2dp_streaming(struct bt_device *device)
+```
+
+### interfejs uzytkownika (pasek zadan i okno parowania)
+
+#### bluetooth_ui_toggle
+
+otwiera lub zamyka okno parowania bluetooth po kliknieciu ikony na pasku zadan.
+
+```
+void bluetooth_ui_toggle(void)
+```
+
+#### bluetooth_ui_mouse_click
+
+obsluguje klikniecie myszy na ikonie bluetooth na pasku zadan. zwraca 1 gdy klikniecie bylo na ikonie bluetooth.
+
+```
+int bluetooth_ui_mouse_click(int x, int y)
+```
+
+#### bluetooth_ui_draw_icon / bluetooth_ui_icon_at
+
+rysuje ikone bluetooth na pasku zadan lub sprawdza czy pozycja (x, y) jest nad ikona bluetooth.
+
+```
+void bluetooth_ui_draw_icon(int x, int y);
+int bluetooth_ui_icon_at(int x, int y);
+```
+
+#### bluetooth_ui_init / bluetooth_poll / bluetooth_ui_rysuj_pasek / bluetooth_ui_update_state
+
+inicjalizuje interfejs uzytkownika bluetooth, wykonuje polling warstw bluetooth, rysuje ikone na pasku zadan lub aktualizuje stan ikony.
+
+```
+void bluetooth_ui_init(void);
+void bluetooth_poll(void);
+void bluetooth_ui_rysuj_pasek(void);
+void bluetooth_ui_update_state(void);
+```
+
+### bluetooth_context_get
+
+pobiera kontekst bluetooth (do odczytu).
+
+```
+void bluetooth_context_get(struct bt_context *out);
+```
+
 ## system plikow - system_plikow/system_plikow.c
 
 system plikow FAT32.
@@ -2199,6 +2375,12 @@ tarixenOS/
 │   ├── delay.c           # opoznienie
 │   ├── internet/         # sterowniki sieciowe (internet)
 │   │   └── rtl8168b.cpp  # Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet, C++)
+│   ├── bluetooth/        # sterownik bluetooth (MSI MPG Z890 CARBON WIFI)
+│   │   ├── bluetooth.h   # naglowek sterownika bluetooth (C API)
+│   │   ├── hci.cpp       # warstwa hci (host controller interface) po usb
+│   │   ├── l2cap.cpp     # warstwa l2cap (logical link control)
+│   │   ├── a2dp.cpp      # warstwa a2dp (sluchawki bluetooth)
+│   │   └── ui.cpp        # interfejs uzytkownika (pasek zadan, okno parowania)
 │   ├── karty_graficzne/  # karty graficzne
 │   │   ├── gma_x4500.cpp  # Intel GMA X4500HD (PCIe, Gen4 GPU, C++)
 │   │   ├── gma_x4500.h    # naglowek Intel GMA X4500HD

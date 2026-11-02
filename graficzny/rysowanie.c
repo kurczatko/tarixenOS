@@ -2,6 +2,7 @@
 #include "czcionka.h"
 #include "okno.h"
 #include "../system_plikow/system_plikow.h"
+#include "../../drivers/bluetooth/bluetooth.h"
 
 #define CURSOR_W 12
 #define CURSOR_H 18
@@ -409,6 +410,7 @@ void narysuj_pasek_zadan(void)
     pasek_zadan_rysuj_ikony_minimalizowanych();
     narysuj_czas_paska();
     narysuj_ikone_internetu();
+    bluetooth_ui_rysuj_pasek();
     odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
 }
 

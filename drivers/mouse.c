@@ -6,6 +6,7 @@
 #include "../graficzny/menu_start.h"
 #include "../graficzny/pulpit.h"
 #include "../kernel/browser.h"
+#include "bluetooth/bluetooth.h"
 
 #define MOUSE_DATA_PORT 0x60
 #define MOUSE_STATUS_PORT 0x64
@@ -121,11 +122,15 @@ void mouse_poll(void) {
             if (!okno_obsluz_klikniecie(x, y)) {
                 if (!pulp_mouse_press(x, y)) {
                     if (y >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC && x >= PASEK_ICON_START_X) {
-                        struct okno *ikona_okno = pasek_zadan_ikona_na_pozycji(x, y);
-                        if (ikona_okno) {
-                            okno_przywroc(ikona_okno);
+                        if (bluetooth_ui_icon_at(x, y)) {
+                            bluetooth_ui_mouse_click(x, y);
                         } else {
-                            menu_start_mouse_click();
+                            struct okno *ikona_okno = pasek_zadan_ikona_na_pozycji(x, y);
+                            if (ikona_okno) {
+                                okno_przywroc(ikona_okno);
+                            } else {
+                                menu_start_mouse_click();
+                            }
                         }
                     } else {
                         menu_start_mouse_click();

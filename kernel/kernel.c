@@ -20,6 +20,7 @@
 #include "../drivers/intel_uhd.h"
 #include "../drivers/karty_graficzne/gma_x4500.h"
 #include "../drivers/karty_graficzne/radeon_hd_8370d.h"
+#include "../drivers/bluetooth/bluetooth.h"
 #include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
@@ -80,6 +81,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     syscall_install();
     net_init();
     ustaw_status_internetu(net_ready());
+    bluetooth_init();
+    bluetooth_ui_init();
     pulp_init();
     tapeta_app();
     __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
@@ -112,6 +115,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
         mouse_poll();
         usb_poll();
+        bluetooth_poll();
         hid_poll();
         kursor_tekstowy_tick();
         if (!konta_czy_zalogowano()) {

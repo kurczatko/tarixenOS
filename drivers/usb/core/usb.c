@@ -369,7 +369,7 @@ static usb_device_t *usb_enumerate_port(uint8_t port) {
     dd = (usb_device_descriptor_t *)devdesc_buf;
     dev->id_vendor = dd->idVendor;
     dev->id_product = dd->idProduct;
-    dev->class = dd->bDeviceClass;
+    dev->dev_class = dd->bDeviceClass;
     dev->subclass = dd->bDeviceSubClass;
     dev->protocol = dd->bDeviceProtocol;
 
@@ -393,7 +393,7 @@ static usb_device_t *usb_enumerate_port(uint8_t port) {
         if (bLength == 0) break;
         if (bType == USB_DT_INTERFACE) {
             usb_interface_descriptor_t *id = (usb_interface_descriptor_t *)ptr;
-            dev->class = id->bInterfaceClass;
+            dev->dev_class = id->bInterfaceClass;
             dev->subclass = id->bInterfaceSubClass;
             dev->protocol = id->bInterfaceProtocol;
             iface_num = id->bInterfaceNumber;

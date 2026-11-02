@@ -94,7 +94,7 @@ typedef struct {
     uint8_t  max_packet_size0;
     uint16_t id_vendor;
     uint16_t id_product;
-    uint8_t  class;
+    uint8_t  dev_class;
     uint8_t  subclass;
     uint8_t  protocol;
     uint8_t  port;
