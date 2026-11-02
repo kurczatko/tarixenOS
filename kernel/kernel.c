@@ -115,7 +115,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             keyboard_discard_pending();
             continue;
         }
-        if (aktywne_okno && aktywne_okno->otwarte && aktywne_okno->w_polu_tekstowym) {
+        if (aktywne_okno && aktywne_okno->otwarte && !aktywne_okno->zminimalizowane && aktywne_okno->w_polu_tekstowym) {
             char znak;
             while (keyboard_try_getchar(&znak)) {
                 uint8_t ctrl = keyboard_ctrl_pressed();

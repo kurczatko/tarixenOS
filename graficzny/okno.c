@@ -152,7 +152,7 @@ void okno_ustaw_aktywne(struct okno *okno)
 
 int okno_czy_aktywne(const struct okno *okno)
 {
-    return okno && okno == aktywne_okno && okno->otwarte;
+    return okno && okno == aktywne_okno && okno->otwarte && !okno->zminimalizowane;
 }
 
 void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
@@ -226,8 +226,15 @@ void okno_zamknij(struct okno *okno)
         }
     }
     odtworz_fragment_tla_bufor(zamkniety_x, zamkniety_y, zamkniety_szerokosc, zamkniety_wysokosc);
-    if (aktywne_okno == okno)
-        aktywne_okno = liczba_okien ? okna[liczba_okien - 1] : 0;
+    if (aktywne_okno == okno) {
+        aktywne_okno = 0;
+        for (int i = liczba_okien - 1; i >= 0; i--) {
+            if (okna[i] && okna[i]->otwarte && !okna[i]->zminimalizowane && okna[i] != okno) {
+                aktywne_okno = okna[i];
+                break;
+            }
+        }
+    }
     okno_odrysuj_wszystkie();
 }
 
@@ -236,7 +243,7 @@ int okno_obsluz_klikniecie(int x, int y)
     struct okno *trafione = 0;
     for (int indeks = liczba_okien - 1; indeks >= 0; indeks--) {
         struct okno *kandydat = okna[indeks];
-        if (kandydat && kandydat->otwarte && x >= kandydat->x &&
+        if (kandydat && kandydat->otwarte && !kandydat->zminimalizowane && x >= kandydat->x &&
             x < kandydat->x + kandydat->szerokosc && y >= kandydat->y &&
             y < kandydat->y + kandydat->wysokosc) {
             trafione = kandydat;
@@ -337,7 +344,7 @@ void okno_obsluz_ruch(int x, int y)
         }
         return;
     }
-    if (!aktywne_okno || !aktywne_okno->otwarte) return;
+    if (!aktywne_okno || !aktywne_okno->otwarte || aktywne_okno->zminimalizowane) return;
 
     if (przeciaganie) {
         nx = x - przesuniecie_x;
