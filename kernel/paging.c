@@ -3,6 +3,7 @@
 __attribute__((aligned(4096))) static uint32_t page_directory[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_low[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_low2[1024];
+__attribute__((aligned(4096))) static uint32_t page_table_low3[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_fb[1024];
 
 void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags)
@@ -16,6 +17,7 @@ void paging_init(void)
         page_directory[i] = 0;
         page_table_low[i] = 0;
         page_table_low2[i] = 0;
+        page_table_low3[i] = 0;
         page_table_fb[i] = 0;
     }
 
@@ -31,8 +33,13 @@ void paging_init(void)
         map_page(page_table_low2, addr, addr, PAGE_PRESENT | PAGE_READWRITE);
     }
 
+    for (uint32_t addr = 8u * 1024u * 1024u; addr < 12u * 1024u * 1024u; addr += PAGE_SIZE) {
+        map_page(page_table_low3, addr, addr, PAGE_PRESENT | PAGE_READWRITE);
+    }
+
     page_directory[0] = ((uint32_t)page_table_low | PAGE_PRESENT | PAGE_READWRITE);
     page_directory[1] = ((uint32_t)page_table_low2 | PAGE_PRESENT | PAGE_READWRITE);
+    page_directory[2] = ((uint32_t)page_table_low3 | PAGE_PRESENT | PAGE_READWRITE);
 
     page_directory[0xFD000000 >> 22] = ((uint32_t)page_table_fb | PAGE_PRESENT | PAGE_READWRITE);
     for (int i = 0; i < 1024; i++) {

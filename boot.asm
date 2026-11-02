@@ -4,6 +4,7 @@
 KERNEL_LOAD_SEGMENT equ 0x1000
 KERNEL_LOAD_OFFSET  equ 0x1000
 KERNEL_SECTORS      equ 512
+KERNEL_START_LBA    equ 126000
 CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
 VBE_INFO_BUFFER     equ 0x7E00
@@ -95,7 +96,6 @@ video_mode_depth_ok:
     pop si
     cmp ax, 0x004F
     jne video_mode_next
-    ; Re-query mode info AFTER setting the mode to get actual parameters
     mov ax, 0x4F01
     mov cx, [selected_vbe_mode]
     mov di, VBE_INFO_BUFFER
@@ -135,7 +135,7 @@ video_mode_ready:
 
     mov cx, KERNEL_SECTORS / 32
     mov word [dap_segment], 0x1000
-    mov dword [dap_lba_low], 4096
+    mov dword [dap_lba_low], KERNEL_START_LBA
 
 read_kernel_loop:
     push cx
@@ -171,7 +171,7 @@ disk_address_packet:
 dap_segment:
     dw 0x1000
 dap_lba_low:
-    dd 4096
+    dd KERNEL_START_LBA
 dap_lba_high:
     dd 0
 

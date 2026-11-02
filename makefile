@@ -5,8 +5,11 @@ BOOT_BIN32 := $(BUILD_DIR)/boot.bin
 KERNEL_ELF32 := $(BUILD_DIR)/kernel32.elf
 KERNEL_BIN32 := $(BUILD_DIR)/kernel32.bin
 OS_IMAGE := $(BUILD_DIR)/tarixenOS.img
+TAPETA_RAW := $(BUILD_DIR)/tapeta.raw
 KERNEL_MAX_SECTORS := 512
 FLOPPY_SIZE := 67108864
+FAT32_SECTORS := 125952
+KERNEL_START_LBA := 126000
 
 UEFI_BIN := $(BUILD_DIR)/uefi64.bin
 KERNEL_ELF64 := $(BUILD_DIR)/kernel64.elf
@@ -120,6 +123,9 @@ $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC32) $(CFLAGS32) -c $< -o $@
 
+$(TAPETA_RAW): tapety/IMG_0449.JPEG | $(BUILD_DIR)
+	magick $< -auto-orient -resize 1024x768! -depth 8 BGRA:$@
+
 $(BUILD_DIR)/%64.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC64) $(CFLAGS64) -c $< -o $@ || touch $@
@@ -155,25 +161,28 @@ $(KERNEL_ELF64): $(KERNEL_OBJECTS64) linker64.ld | $(BUILD_DIR)
 $(KERNEL_BIN32): $(KERNEL_ELF32)
 	$(OBJCOPY) --change-addresses=-0x1000 -O binary $< $@
 
-$(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) | $(BUILD_DIR)
+$(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) | $(BUILD_DIR)
 	dd if=/dev/zero of=$@ bs=$(FLOPPY_SIZE) count=1 status=none
+	dd if=/dev/zero of=$(BUILD_DIR)/fat32.img bs=512 count=$(FAT32_SECTORS) status=none
 	@if command -v mkfs.fat >/dev/null 2>&1; then \
-		mkfs.fat -F 32 -S 512 -s 1 -R 32 -n TARIXENOS $@ >/dev/null; \
+		mkfs.fat -F 32 -S 512 -s 1 -R 32 -n TARIXENOS $(BUILD_DIR)/fat32.img >/dev/null; \
 	else \
 		echo "Brak mkfs.fat - obraz nie zostanie sformatowany jako FAT32"; exit 1; \
 	fi
+	dd if=$(BUILD_DIR)/fat32.img of=$@ conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 count=3 conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 skip=90 seek=90 count=420 conv=notrunc status=none
 	@kernel_size=$$(stat -c %s $(KERNEL_BIN32)); \
 	if [ $$kernel_size -gt $$((512 * 512)) ]; then \
 		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
 	fi
-	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=4096 conv=notrunc status=none
 	@for app in $(USER_APPS); do \
 		if [ -f $(BUILD_DIR)/$$app ]; then \
 			mcopy -i $@ $(BUILD_DIR)/$$app ::/$$app; \
 		fi; \
 	done
+	mcopy -i $@ $(TAPETA_RAW) ::/TAPETA.RAW
+	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=$(KERNEL_START_LBA) conv=notrunc status=none
 	@if [ -f $(UEFI_BIN) ]; then \
 		echo "UEFI stub gotowy (img BIOS32)"; \
 	fi

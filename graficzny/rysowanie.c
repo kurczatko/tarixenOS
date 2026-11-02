@@ -48,6 +48,11 @@ static int kursor_y;
 static void narysuj_kursor_bitmapa(int x, int y);
 
 uint32_t *obraz = (uint32_t *)0x00400000;
+#define TAPETA_BITMAPA_ADRES 0x00810000
+#define TAPETA_BITMAPA_BAJTY (EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4u)
+#define PLIK_TAPETA_BITMAPA "TAPETA.RAW"
+static uint32_t *tapeta_bitmapa = (uint32_t *)TAPETA_BITMAPA_ADRES;
+static int tapeta_bitmapa_wczytana;
 static uint32_t kolor_tapety = KOLOR_TLA;
 static int tapeta_gradientowa = 1;
 
@@ -334,6 +339,8 @@ void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
         for (int px = 0; px < szerokosc; px++) {
             if (py >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) {
                 obraz[offset + px] = KOLOR_PASKA_ZADAN;
+            } else if (tapeta_bitmapa_wczytana) {
+                obraz[offset + px] = tapeta_bitmapa[offset + px];
             } else {
                 obraz[offset + px] = tapeta_gradientowa ? kolor_tla_dla_x(x + px) : kolor_tapety;
             }
@@ -409,6 +416,7 @@ void wypelnij_ekran(uint32_t kolor)
 {
     kolor_tapety = kolor;
     tapeta_gradientowa = 0;
+    tapeta_bitmapa_wczytana = 0;
     for (uint32_t i = 0; i < EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
         obraz[i] = kolor_tapety;
     }
@@ -421,6 +429,7 @@ void ustaw_kolor_tapety(uint32_t kolor)
 {
     kolor_tapety = kolor;
     tapeta_gradientowa = 0;
+    tapeta_bitmapa_wczytana = 0;
     for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
         uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
         for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
@@ -459,7 +468,14 @@ static uint32_t parsuj_hex(char **p)
 
 static void narysuj_tapete_tlo(void)
 {
-    if (tapeta_gradientowa) {
+    if (tapeta_bitmapa_wczytana) {
+        for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
+            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+            for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+                obraz[offset + x] = tapeta_bitmapa[offset + x];
+            }
+        }
+    } else if (tapeta_gradientowa) {
         for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
             uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
             for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
@@ -481,15 +497,25 @@ static void narysuj_tapete_tlo(void)
 int tapeta_wczytaj(void)
 {
     fs_reset_directory();
+    int bitmapa_bajty = read_file(PLIK_TAPETA_BITMAPA, (char *)tapeta_bitmapa,
+                                  TAPETA_BITMAPA_BAJTY);
+    tapeta_bitmapa_wczytana = bitmapa_bajty == (int)TAPETA_BITMAPA_BAJTY;
+
     char buf[64];
     int n = read_file(PLIK_TAPETA, buf, sizeof(buf) - 1);
-    if (n <= 0) return 0;
-    buf[n] = 0;
-    char *p = buf;
-    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
-    kolor_tapety = parsuj_hex(&p);
-    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
-    tapeta_gradientowa = (*p == '1') ? 1u : 0u;
+    if (n > 0) {
+        buf[n] = 0;
+        char *p = buf;
+        while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
+        kolor_tapety = parsuj_hex(&p);
+        while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
+        tapeta_gradientowa = (*p == '1') ? 1u : 0u;
+        tapeta_bitmapa_wczytana = (*p == '2') && tapeta_bitmapa_wczytana;
+    } else if (tapeta_bitmapa_wczytana) {
+        tapeta_gradientowa = 0;
+    } else {
+        return 0;
+    }
     narysuj_tapete_tlo();
     return 1;
 }
@@ -505,7 +531,7 @@ void tapeta_zapisz(void)
         buf[pos++] = "0123456789ABCDEF"[(v >> (28 - i * 4)) & 0xF];
     }
     buf[pos++] = ' ';
-    buf[pos++] = tapeta_gradientowa ? '1' : '0';
+    buf[pos++] = tapeta_bitmapa_wczytana ? '2' : (tapeta_gradientowa ? '1' : '0');
     buf[pos++] = '\n';
     buf[pos] = 0;
     fs_reset_directory();
