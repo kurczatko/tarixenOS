@@ -19,6 +19,7 @@
 #include "../drivers/nvme.h"
 #include "../drivers/intel_uhd.h"
 #include "../drivers/karty_graficzne/gma_x4500.h"
+#include "../drivers/karty_graficzne/radeon_hd_8370d.h"
 #include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
@@ -70,6 +71,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     nvme_init();
     intel_uhd_init();
     gma_x4500_init();
+    radeon_hd_8370d_init();
     qemu_vga_init();
     __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     tapeta_wczytaj();

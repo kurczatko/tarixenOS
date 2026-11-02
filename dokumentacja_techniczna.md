@@ -1775,6 +1775,393 @@ void gma_x4500_context_get(struct gma_x4500_context *out);
 int gma_x4500_3d_available(void)
 ```
 
+## karta graficzna - drivers/karty_graficzne/radeon_hd_8370d.cpp
+
+sterownik karty graficznej AMD Radeon HD 8370D (GCN, Graphics Core Next, chipset Richland) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami, shadery (vertex/pixel/geometry/compute), render targety, depth-stencil, command buffer oraz presentation. sterownik opiera sie na architekturze GCN 3.0 (Southern Islands).
+
+### radeon_hd_8370d_init
+
+inicjalizuje sterownik Radeon HD 8370D: wyszukuje urzadzenie na PCI (vendor 0x1002, urzadzenia 0x9907/0x9908/0x9909), mapuje adresy MMIO, czysci przerwania, resetuje Command Processor (ME i PFP), inicjalizuje ring buffer CP, konfiguruje silnik wyswietlania (CRTC0, plane, surface), wlacza potok 3D GCN (color buffer, depth buffer, blend, rasterizer, shader SQ, tekstury, sampler) oraz inicjalizuje kursor sprxetowy.
+
+```
+int radeon_hd_8370d_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### radeon_hd_8370d_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int radeon_hd_8370d_is_ready(void)
+```
+
+### radeon_hd_8370d_putpixel
+
+rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem.
+
+```
+void radeon_hd_8370d_putpixel(uint32_t x, uint32_t y, uint32_t color)
+```
+
+### radeon_hd_8370d_fillrect
+
+wypelnia prostokat o podanym rozmiarze i kolorze. uzywa ring buffer CP gdy sterownik jest zainicjowany, w przeciwnym razie petla CPU.
+
+```
+void radeon_hd_8370d_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)
+```
+
+### radeon_hd_8370d_blt
+
+kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) uzywajac ring buffer CP sprzetowego.
+
+```
+void radeon_hd_8370d_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
+```
+
+### radeon_hd_8370d_cursor_set
+
+ustawia kursor sprhetowy na pozycji (x, y) z podanym obrazem 64x64 (obsuguje przezroczystosc). obraz jest kopiowany do pamieci ramki graficznej.
+
+```
+void radeon_hd_8370d_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)
+```
+
+### radeon_hd_8370d_cursor_hide
+
+ukrywa kursor sprhetowy.
+
+```
+void radeon_hd_8370d_cursor_hide(void)
+```
+
+### radeon_hd_8370d_get_fb
+
+zwraca wskaznik na ramke graficzna (framebuffer).
+
+```
+void *radeon_hd_8370d_get_fb(void)
+```
+
+### radeon_hd_8370d_get_width / radeon_hd_8370d_get_height
+
+zwracaja szerokosc i wysokosc ekranu (1024x768).
+
+```
+uint32_t radeon_hd_8370d_get_width(void);
+uint32_t radeon_hd_8370d_get_height(void);
+```
+
+### radeon_hd_8370d_get_device_id / radeon_hd_8370d_get_revision
+
+zwracaja id urzadzenia i revisje karty graficznej.
+
+```
+uint16_t radeon_hd_8370d_get_device_id(void);
+uint8_t radeon_hd_8370d_get_revision(void);
+```
+
+### radeon_hd_8370d_info_get
+
+pobiera pelne informacje o urzadzeniu do struktury radeon_hd_8370d_info (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, gcn_generation).
+
+```
+void radeon_hd_8370d_info_get(struct radeon_hd_8370d_info *out)
+```
+
+## akceleracja 3D GCN - drivers/karty_graficzne/radeon_hd_8370d.cpp
+
+### tworzenie i niszczenie zasobow 3D
+
+#### radeon_hd_8370d_vertex_buffer_create
+
+tworzy vertex buffer (wierzcholki). zwraca handle lub RADEON_HANDLE_NULL przy bledzie.
+
+```
+radeon_handle_t radeon_hd_8370d_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data)
+```
+
+#### radeon_hd_8370d_vertex_buffer_destroy / radeon_hd_8370d_vertex_buffer_update
+
+niszczy vertex buffer lub aktualizuje jego dane od podanego offsetu.
+
+```
+void radeon_hd_8370d_vertex_buffer_destroy(radeon_handle_t handle);
+void radeon_hd_8370d_vertex_buffer_update(radeon_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### radeon_hd_8370d_index_buffer_create
+
+tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe). zwraca handle.
+
+```
+radeon_handle_t radeon_hd_8370d_index_buffer_create(uint32_t index_count, uint32_t format, const void *data)
+```
+
+#### radeon_hd_8370d_index_buffer_destroy / radeon_hd_8370d_index_buffer_update
+
+niszczy index buffer lub aktualizuje jego dane.
+
+```
+void radeon_hd_8370d_index_buffer_destroy(radeon_handle_t handle);
+void radeon_hd_8370d_index_buffer_update(radeon_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### radeon_hd_8370d_texture_create
+
+tworzy teksture 2D o podanym rozmiarze, formacie i liczbie poziom mipmap. zwraca handle.
+
+```
+radeon_handle_t radeon_hd_8370d_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data)
+```
+
+#### radeon_hd_8370d_texture_destroy / radeon_hd_8370d_texture_update / radeon_hd_8370d_texture_generate_mipmaps
+
+niszczy teksture, aktualizuje jej zawartosc (upload z pamieci systemowej do FB) lub generuje mipmapy.
+
+```
+void radeon_hd_8370d_texture_destroy(radeon_handle_t handle);
+void radeon_hd_8370d_texture_update(radeon_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data);
+void radeon_hd_8370d_texture_generate_mipmaps(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_render_target_create / radeon_hd_8370d_render_target_destroy
+
+tworzy lub niszczy render target (bufor koloru do renderowania 3D z obsluga przezroczystosci alpha).
+
+```
+radeon_handle_t radeon_hd_8370d_render_target_create(uint32_t width, uint32_t height, uint32_t format, uint8_t alpha_blend);
+void radeon_hd_8370d_render_target_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_depth_stencil_create / radeon_hd_8370d_depth_stencil_destroy
+
+tworzy lub niszczy depth-stencil buffer (bufor glebi i stencil).
+
+```
+radeon_handle_t radeon_hd_8370d_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format);
+void radeon_hd_8370d_depth_stencil_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_shader_create / radeon_hd_8370d_shader_destroy
+
+tworzy shader (vertex/pixel/geometry/compute) z kodu bajtowego ISA GPU lub niszczy shader.
+
+```
+radeon_handle_t radeon_hd_8370d_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size);
+void radeon_hd_8370d_shader_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_sampler_state_create / radeon_hd_8370d_sampler_state_destroy
+
+tworzy lub niszczy stan probki tekstury (filtrowanie min/mag/mip, adresowanie, anisotropia, porownanie).
+
+```
+radeon_handle_t radeon_hd_8370d_sampler_state_create(uint32_t filter_min, uint32_t filter_mag, uint32_t filter_mip, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint32_t max_anisotropy, uint8_t compare_enable);
+void radeon_hd_8370d_sampler_state_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_blend_state_create / radeon_hd_8370d_blend_state_destroy
+
+tworzy lub niszczy stan blendowania (przezroczystosc alpha, operacje blendowania, staly kolor blendowania).
+
+```
+radeon_handle_t radeon_hd_8370d_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor);
+void radeon_hd_8370d_blend_state_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_rasterizer_state_create / radeon_hd_8370d_rasterizer_state_destroy
+
+tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage dla przezroczystosci).
+
+```
+radeon_handle_t radeon_hd_8370d_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage);
+void radeon_hd_8370d_rasterizer_state_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_depth_stencil_state_create / radeon_hd_8370d_depth_stencil_state_destroy
+
+tworzy lub niszczy stan depth-stencil (testy glebi i stencil z przodem i tylem).
+
+```
+radeon_handle_t radeon_hd_8370d_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func);
+void radeon_hd_8370d_depth_stencil_state_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_input_layout_create / radeon_hd_8370d_input_layout_destroy
+
+tworzy lub niszczy input layout (mapowanie atrybutow vertex do slotow GCN).
+
+```
+radeon_handle_t radeon_hd_8370d_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats);
+void radeon_hd_8370d_input_layout_destroy(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_constant_buffer_create / radeon_hd_8370d_constant_buffer_destroy / radeon_hd_8370d_constant_buffer_update
+
+tworzy, niszczy lub aktualizuje constant buffer (stale shadera / uniforms GCN).
+
+```
+radeon_handle_t radeon_hd_8370d_constant_buffer_create(uint32_t size);
+void radeon_hd_8370d_constant_buffer_destroy(radeon_handle_t handle);
+void radeon_hd_8370d_constant_buffer_update(radeon_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+### bindowanie stanow potoku 3D GCN
+
+#### radeon_hd_8370d_bind_vertex_buffer / radeon_hd_8370d_bind_index_buffer / radeon_hd_8370d_bind_input_layout
+
+binduje vertex buffer, index buffer lub input layout do potoku 3D GCN.
+
+```
+void radeon_hd_8370d_bind_vertex_buffer(radeon_handle_t handle);
+void radeon_hd_8370d_bind_index_buffer(radeon_handle_t handle);
+void radeon_hd_8370d_bind_input_layout(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_bind_vertex_shader / radeon_hd_8370d_bind_pixel_shader / radeon_hd_8370d_bind_geometry_shader / radeon_hd_8370d_bind_compute_shader
+
+binduje shader vertex, pixel, geometry lub compute do potoku 3D GCN.
+
+```
+void radeon_hd_8370d_bind_vertex_shader(radeon_handle_t handle);
+void radeon_hd_8370d_bind_pixel_shader(radeon_handle_t handle);
+void radeon_hd_8370d_bind_geometry_shader(radeon_handle_t handle);
+void radeon_hd_8370d_bind_compute_shader(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_bind_render_target / radeon_hd_8370d_bind_depth_stencil
+
+binduje render target lub depth-stencil do potoku 3D GCN.
+
+```
+void radeon_hd_8370d_bind_render_target(radeon_handle_t handle);
+void radeon_hd_8370d_bind_depth_stencil(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_bind_blend_state / radeon_hd_8370d_bind_rasterizer_state / radeon_hd_8370d_bind_depth_stencil_state
+
+binduje stan blendowania, rasterizera lub depth-stencil do potoku 3D GCN.
+
+```
+void radeon_hd_8370d_bind_blend_state(radeon_handle_t handle);
+void radeon_hd_8370d_bind_rasterizer_state(radeon_handle_t handle);
+void radeon_hd_8370d_bind_depth_stencil_state(radeon_handle_t handle)
+```
+
+#### radeon_hd_8370d_bind_sampler_and_texture / radeon_hd_8370d_bind_constant_buffer
+
+binduje probke tekstury i teksture do slotu lub constant buffer do slotu.
+
+```
+void radeon_hd_8370d_bind_sampler_and_texture(uint32_t slot, radeon_handle_t sampler, radeon_handle_t texture);
+void radeon_hd_8370d_bind_constant_buffer(uint32_t slot, radeon_handle_t handle)
+```
+
+### konfiguracja potoku 3D GCN
+
+#### radeon_hd_8370d_set_viewport
+
+ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi.
+
+```
+void radeon_hd_8370d_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth)
+```
+
+#### radeon_hd_8370d_set_scissor
+
+ustawia prostokat przyciecia renderowania (scissor).
+
+```
+void radeon_hd_8370d_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom)
+```
+
+#### radeon_hd_8370d_set_primitive_topology
+
+ustawia typ primitivu do rysowania (punkt, linia, trojkat, kwadrat itp.).
+
+```
+void radeon_hd_8370d_set_primitive_topology(uint32_t topology)
+```
+
+#### radeon_hd_8370d_set_alpha_blend_global
+
+wlacza lub wylacza globalne blendowanie alfa (przezroczystosc) dla calego potoku 3D.
+
+```
+void radeon_hd_8370d_set_alpha_blend_global(uint8_t enable)
+```
+
+### rysowanie 3D
+
+#### radeon_hd_8370d_clear_render_target
+
+czyści render target podanym kolorem.
+
+```
+void radeon_hd_8370d_clear_render_target(radeon_handle_t rt, uint32_t color)
+```
+
+#### radeon_hd_8370d_clear_depth_stencil
+
+czyści depth-stencil podanymi wartosciami glebi i stencil.
+
+```
+void radeon_hd_8370d_clear_depth_stencil(radeon_handle_t ds, float depth, uint8_t stencil)
+```
+
+#### radeon_hd_8370d_draw
+
+rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex.
+
+```
+void radeon_hd_8370d_draw(uint32_t vertex_count, uint32_t start_vertex)
+```
+
+#### radeon_hd_8370d_draw_indexed
+
+rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex.
+
+```
+void radeon_hd_8370d_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)
+```
+
+### command buffer (akceleracja 3D w strumieniu GCN)
+
+#### radeon_hd_8370d_command_begin / radeon_hd_8370d_command_end
+
+rozpoczyna nagrywanie polecen do command buffer lub zakoncza nagrywanie i wykonuje wszystkie polecenia przez Command Processor.
+
+```
+void radeon_hd_8370d_command_begin(void);
+void radeon_hd_8370d_command_end(void)
+```
+
+### presentation (swap chain)
+
+#### radeon_hd_8370d_swap_chain_create / radeon_hd_8370d_swap_chain_destroy / radeon_hd_8370d_present
+
+tworzy swap chain (podwojne buforowanie z opcja vsync i premultiplied alpha dla przezroczystosci), niszczy swap chain lub przebija tylny bufor na przedni (present).
+
+```
+radeon_handle_t radeon_hd_8370d_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync, uint8_t alpha_premultiplied);
+void radeon_hd_8370d_swap_chain_destroy(radeon_handle_t handle);
+void radeon_hd_8370d_present(radeon_handle_t chain)
+```
+
+### informacje o akceleracji 3D GCN
+
+#### radeon_hd_8370d_context_get / radeon_hd_8370d_3d_available
+
+pobiera biezacy kontekst 3D GCN lub zwraca 1 gdy akceleracja 3D jest dostepna.
+
+```
+void radeon_hd_8370d_context_get(struct radeon_hd_8370d_context *out);
+int radeon_hd_8370d_3d_available(void)
+```
+
 ## struktura plikow
 
 ```
@@ -1812,6 +2199,11 @@ tarixenOS/
 │   ├── delay.c           # opoznienie
 │   ├── internet/         # sterowniki sieciowe (internet)
 │   │   └── rtl8168b.cpp  # Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet, C++)
+│   ├── karty_graficzne/  # karty graficzne
+│   │   ├── gma_x4500.cpp  # Intel GMA X4500HD (PCIe, Gen4 GPU, C++)
+│   │   ├── gma_x4500.h    # naglowek Intel GMA X4500HD
+│   │   ├── radeon_hd_8370d.cpp  # AMD Radeon HD 8370D (PCIe, GCN 3.0, C++)
+│   │   └── radeon_hd_8370d.h  # naglowek AMD Radeon HD 8370D
 │   ├── usb/              # USB
 │   └── sound/            # dzwiek
 │       ├── intel_hd.c    # Intel HD Audio
