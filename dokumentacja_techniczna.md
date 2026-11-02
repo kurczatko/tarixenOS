@@ -960,6 +960,78 @@ zamyka polaczenie TCP.
 void net_tcp_close(struct net_tcp_connection *connection)
 ```
 
+## sterownik RTL8168B - drivers/internet/rtl8168b.cpp
+
+sterownik karty sieciowej Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet) napisany w C++. obsluguje wysylanie i odbieranie ramek ethernet, integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna.
+
+### rtl8168b_init
+
+inicjalizuje sterownik RTL8168B: wyszukuje urzadzenie na magistrali PCI, mapuje adresy MMIO, resetuje chip, czytuje adres MAC, konfiguruje rejestry TCR/RCR, ustawia bufor odbiorczy i deskryptory nadawcze, wlacza TX i RX.
+
+```
+int rtl8168b_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### rtl8168b_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int rtl8168b_is_ready(void)
+```
+
+### rtl8168b_get_mac
+
+pobiera adres MAC karty do tablicy 6 bajtow.
+
+```
+int rtl8168b_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### rtl8168b_send
+
+wysyla ramke ethernet przez kartę. oczekuje az deskryptor nadawczy zostanie zwolniony przez kartę (wlasciciel = sterownik).
+
+```
+int rtl8168b_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie nadawania, -1 przy blednych argumentach.
+
+### rtl8168b_receive
+
+odbiera nastepna dostepna ramke z bufora odbiorczego do podanego bufora. tryb polling (bez przerwan), sprawdza rejestr ISR.
+
+```
+int rtl8168b_receive(void *frame, uint16_t capacity)
+```
+
+zwraca dlugosc odebranej ramki w bajtach, 0 gdy brak danych, -1 przy blednych argumentach.
+
+### rtl8168b_stats_get
+
+pobiera statystyki sterownika (liczniki pakietow i bajtow TX/RX oraz bledy).
+
+```
+void rtl8168b_stats_get(struct rtl8168b_stats *out)
+```
+
+struktura `rtl8168b_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| tx_packets | liczba wyslanych pakietow |
+| tx_bytes | liczba wyslanych bajtow |
+| tx_errors | bledy nadawania |
+| rx_packets | liczba odebranych pakietow |
+| rx_bytes | liczba odebranych bajtow |
+| rx_errors | bledy odbioru |
+| resets | liczba resetow chipa |
+
 ## system plikow - system_plikow/system_plikow.c
 
 system plikow FAT32.
@@ -1282,6 +1354,8 @@ tarixenOS/
 │   ├── floppy.c          # dyskietka
 │   ├── net.c             # siec
 │   ├── delay.c           # opoznienie
+│   ├── internet/         # sterowniki sieciowe (internet)
+│   │   └── rtl8168b.cpp  # Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet, C++)
 │   ├── usb/              # USB
 │   └── sound/            # dzwiek
 │       ├── intel_hd.c    # Intel HD Audio
