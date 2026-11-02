@@ -1319,6 +1319,390 @@ uint8_t get_master_volume(void);
 
 ustawia i zwraca glosnosc glowna w procentach (0-100).
 
+## karta graficzna - drivers/karty_graficzne/gma_x4500.cpp
+
+sterownik karty graficznej Intel GMA X4500HD (Gen4 GPU, chipset G45) napisany w C++. obsluguje potok wyswietlania 2D, blitter, ramke graficzna, kursor sprzetowy oraz pelna akceleracje 3D (Gen4 pipeline: vertex/index buffory, tekstury, shadery, render targety, depth-stencil, command buffer, presentation).
+
+### gma_x4500_init
+
+inicjalizuje sterownik GMA X4500HD: wyszukuje urzadzenie na PCI, mapuje adresy MMIO, czysci przerwania, wylacza wyswietlanie, konfiguruje DPLL, timing potoku, powierzchnie A, wlacza pipe i transcoder, inicjalizuje ring buffer blitera, kursor sprhetowy oraz potok 3D Gen4.
+
+```
+int gma_x4500_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### gma_x4500_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int gma_x4500_is_ready(void)
+```
+
+### gma_x4500_putpixel
+
+rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem.
+
+```
+void gma_x4500_putpixel(uint32_t x, uint32_t y, uint32_t color)
+```
+
+### gma_x4500_fillrect
+
+wypelnia prostokat o podanym rozmiarze i kolorze. uzywa blitera sprzetowego gdy sterownik jest zainicjowany, w przeciwnym razie petla CPU.
+
+```
+void gma_x4500_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)
+```
+
+### gma_x4500_blt
+
+kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) uzywajac blitera sprhetowego XY_SRC_COPY_BLT.
+
+```
+void gma_x4500_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
+```
+
+### gma_x4500_cursor_set
+
+ustawia kursor sprhetowy na pozycji (x, y) z podanym obrazem 64x64 (kopiowany do pamieci ramki graficznej).
+
+```
+void gma_x4500_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)
+```
+
+### gma_x4500_cursor_hide
+
+ukrywa kursor sprhetowy.
+
+```
+void gma_x4500_cursor_hide(void)
+```
+
+### gma_x4500_get_fb
+
+zwraca wskaznik na ramke graficzna (framebuffer).
+
+```
+void *gma_x4500_get_fb(void)
+```
+
+### gma_x4500_get_width / gma_x4500_get_height
+
+zwracaja szerokosc i wysokosc ekranu (1024x768).
+
+```
+uint32_t gma_x4500_get_width(void);
+uint32_t gma_x4500_get_height(void);
+```
+
+### gma_x4500_get_device_id / gma_x4500_get_revision
+
+zwracaja id urzadzenia i revisje karty graficznej.
+
+```
+uint16_t gma_x4500_get_device_id(void);
+uint8_t gma_x4500_get_revision(void);
+```
+
+### gma_x4500_info_get
+
+pobiera pelne informacje o urzadzeniu do struktury gma_x4500_info (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized).
+
+```
+void gma_x4500_info_get(struct gma_x4500_info *out)
+```
+
+## akceleracja 3D - drivers/karty_graficzne/gma_x4500.cpp
+
+### tworzenie i niszczenie zasobow 3D
+
+#### gma_x4500_vertex_buffer_create
+
+tworzy vertex buffer (wierzcholki). zwraca handle lub GMA_HANDLE_NULL przy bledzie.
+
+```
+gma_handle_t gma_x4500_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data)
+```
+
+#### gma_x4500_vertex_buffer_destroy
+
+niszczy vertex buffer o podanym handle.
+
+```
+void gma_x4500_vertex_buffer_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_vertex_buffer_update
+
+aktualizuje dane vertex buffera od podanego offsetu.
+
+```
+void gma_x4500_vertex_buffer_update(gma_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### gma_x4500_index_buffer_create
+
+tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe). zwraca handle.
+
+```
+gma_handle_t gma_x4500_index_buffer_create(uint32_t index_count, uint32_t format, const void *data)
+```
+
+#### gma_x4500_index_buffer_destroy / gma_x4500_index_buffer_update
+
+niszczy index buffer lub aktualizuje jego dane.
+
+```
+void gma_x4500_index_buffer_destroy(gma_handle_t handle);
+void gma_x4500_index_buffer_update(gma_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### gma_x4500_texture_create
+
+tworzy teksture 2D o podanym rozmiarze, formacie i liczbie poziom mipmap. zwraca handle.
+
+```
+gma_handle_t gma_x4500_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data)
+```
+
+#### gma_x4500_texture_destroy / gma_x4500_texture_update
+
+niszczy teksture lub aktualizuje jej zawartosc (upload z pamieci systemowej do FB).
+
+```
+void gma_x4500_texture_destroy(gma_handle_t handle);
+void gma_x4500_texture_update(gma_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data)
+```
+
+#### gma_x4500_render_target_create / gma_x4500_render_target_destroy
+
+tworzy lub niszczy render target (bufor koloru do renderowania 3D).
+
+```
+gma_handle_t gma_x4500_render_target_create(uint32_t width, uint32_t height, uint32_t format);
+void gma_x4500_render_target_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_depth_stencil_create / gma_x4500_depth_stencil_destroy
+
+tworzy lub niszczy depth-stencil buffer (bufor glebi i stencil).
+
+```
+gma_handle_t gma_x4500_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format);
+void gma_x4500_depth_stencil_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_shader_create / gma_x4500_shader_destroy
+
+tworzy shader (vertex/pixel/geometry) z kodu bajtowego GPU lub niszczy shader.
+
+```
+gma_handle_t gma_x4500_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size);
+void gma_x4500_shader_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_sampler_state_create / gma_x4500_sampler_state_destroy
+
+tworzy lub niszczy stan probki tekstury (filtrowanie, adresowanie, anisotropia).
+
+```
+gma_handle_t gma_x4500_sampler_state_create(uint32_t filter, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint32_t max_anisotropy);
+void gma_x4500_sampler_state_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_blend_state_create / gma_x4500_blend_state_destroy
+
+tworzy lub niszczy stan blendowania (kolor wyjsciowy vs render target).
+
+```
+gma_handle_t gma_x4500_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask);
+void gma_x4500_blend_state_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_rasterizer_state_create / gma_x4500_rasterizer_state_destroy
+
+tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample).
+
+```
+gma_handle_t gma_x4500_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line);
+void gma_x4500_rasterizer_state_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_depth_stencil_state_create / gma_x4500_depth_stencil_state_destroy
+
+tworzy lub niszczy stan depth-stencil (testy glebi i stencil).
+
+```
+gma_handle_t gma_x4500_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func);
+void gma_x4500_depth_stencil_state_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_input_layout_create / gma_x4500_input_layout_destroy
+
+tworzy lub niszczy input layout (mapowanie atrybutow vertex do slotow).
+
+```
+gma_handle_t gma_x4500_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats);
+void gma_x4500_input_layout_destroy(gma_handle_t handle)
+```
+
+#### gma_x4500_constant_buffer_create / gma_x4500_constant_buffer_destroy / gma_x4500_constant_buffer_update
+
+tworzy, niszczy lub aktualizuje constant buffer (stale shadera / uniforms).
+
+```
+gma_handle_t gma_x4500_constant_buffer_create(uint32_t size);
+void gma_x4500_constant_buffer_destroy(gma_handle_t handle);
+void gma_x4500_constant_buffer_update(gma_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+### bindowanie stanow potoku 3D
+
+#### gma_x4500_bind_vertex_buffer / gma_x4500_bind_index_buffer / gma_x4500_bind_input_layout
+
+binduje vertex buffer, index buffer lub input layout do potoku 3D.
+
+```
+void gma_x4500_bind_vertex_buffer(gma_handle_t handle);
+void gma_x4500_bind_index_buffer(gma_handle_t handle);
+void gma_x4500_bind_input_layout(gma_handle_t handle)
+```
+
+#### gma_x4500_bind_vertex_shader / gma_x4500_bind_pixel_shader / gma_x4500_bind_geometry_shader
+
+binduje shader vertex, pixel lub geometry do potoku 3D.
+
+```
+void gma_x4500_bind_vertex_shader(gma_handle_t handle);
+void gma_x4500_bind_pixel_shader(gma_handle_t handle);
+void gma_x4500_bind_geometry_shader(gma_handle_t handle)
+```
+
+#### gma_x4500_bind_render_target / gma_x4500_bind_depth_stencil
+
+binduje render target lub depth-stencil do potoku 3D.
+
+```
+void gma_x4500_bind_render_target(gma_handle_t handle);
+void gma_x4500_bind_depth_stencil(gma_handle_t handle)
+```
+
+#### gma_x4500_bind_blend_state / gma_x4500_bind_rasterizer_state / gma_x4500_bind_depth_stencil_state
+
+binduje stan blendowania, rasterizera lub depth-stencil do potoku 3D.
+
+```
+void gma_x4500_bind_blend_state(gma_handle_t handle);
+void gma_x4500_bind_rasterizer_state(gma_handle_t handle);
+void gma_x4500_bind_depth_stencil_state(gma_handle_t handle)
+```
+
+#### gma_x4500_bind_sampler_and_texture / gma_x4500_bind_constant_buffer
+
+binduje probke tekstury i teksture do slotu lub constant buffer do slotu.
+
+```
+void gma_x4500_bind_sampler_and_texture(uint32_t slot, gma_handle_t sampler, gma_handle_t texture);
+void gma_x4500_bind_constant_buffer(uint32_t slot, gma_handle_t handle)
+```
+
+### konfiguracja potoku 3D
+
+#### gma_x4500_set_viewport
+
+ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi.
+
+```
+void gma_x4500_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth)
+```
+
+#### gma_x4500_set_scissor
+
+ustawia prostokat przyciecia renderowania (scissor).
+
+```
+void gma_x4500_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom)
+```
+
+#### gma_x4500_set_primitive_topology
+
+ustawia typ primitivu do rysowania (punkt, linia, trojkat itp.).
+
+```
+void gma_x4500_set_primitive_topology(uint32_t topology)
+```
+
+### rysowanie 3D
+
+#### gma_x4500_clear_render_target
+
+czyści render target podanym kolorem.
+
+```
+void gma_x4500_clear_render_target(gma_handle_t rt, uint32_t color)
+```
+
+#### gma_x4500_clear_depth_stencil
+
+czyści depth-stencil podanymi wartosciami glebi i stencil.
+
+```
+void gma_x4500_clear_depth_stencil(gma_handle_t ds, float depth, uint8_t stencil)
+```
+
+#### gma_x4500_draw
+
+rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex.
+
+```
+void gma_x4500_draw(uint32_t vertex_count, uint32_t start_vertex)
+```
+
+#### gma_x4500_draw_indexed
+
+rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex.
+
+```
+void gma_x4500_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)
+```
+
+### command buffer (akceleracja 3D w strumieniu)
+
+#### gma_x4500_command_begin / gma_x4500_command_end
+
+rozpoczyna nagrywanie polecen do command buffer lub zakoncza nagrywanie i wykonuje wszystkie polecenia.
+
+```
+void gma_x4500_command_begin(void);
+void gma_x4500_command_end(void)
+```
+
+### presentation (swap chain)
+
+#### gma_x4500_swap_chain_create / gma_x4500_swap_chain_destroy / gma_x4500_present
+
+tworzy swap chain (podwojne buforowanie z opcja vsync), niszczy swap chain lub przebija tylny bufor na przedni (present).
+
+```
+gma_handle_t gma_x4500_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync);
+void gma_x4500_swap_chain_destroy(gma_handle_t handle);
+void gma_x4500_present(gma_handle_t chain)
+```
+
+### informacje o akceleracji 3D
+
+#### gma_x4500_context_get / gma_x4500_3d_available
+
+pobiera biezacy kontekst 3D lub zwraca 1 gdy akceleracja 3D jest dostepna (Gen4 pipeline).
+
+```
+void gma_x4500_context_get(struct gma_x4500_context *out);
+int gma_x4500_3d_available(void)
+```
+
 ## struktura plikow
 
 ```
