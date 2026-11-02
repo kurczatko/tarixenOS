@@ -2,6 +2,7 @@
 #include "e1000.h"
 #include "rtl8139.h"
 #include "internet/rtl8168b.h"
+#include "internet/rtl8188ce.h"
 
 #define FRAME_MAX 1518
 #define IP_OFFSET 14
@@ -212,6 +213,9 @@ int net_init(void)
     if (rtl8168b_init() && rtl8168b_get_mac(mac_address)) {
         net_send_fn = rtl8168b_send;
         net_receive_fn = rtl8168b_receive;
+    } else if (rtl8188ce_init() && rtl8188ce_get_mac(mac_address)) {
+        net_send_fn = rtl8188ce_send;
+        net_receive_fn = rtl8188ce_receive;
     } else if (e1000_init() && e1000_get_mac(mac_address)) {
         net_send_fn = e1000_send;
         net_receive_fn = e1000_receive;

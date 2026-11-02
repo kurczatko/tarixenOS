@@ -1032,6 +1032,78 @@ struktura `rtl8168b_stats` zawiera:
 | rx_errors | bledy odbioru |
 | resets | liczba resetow chipa |
 
+## sterownik RTL8188CE - drivers/internet/rtl8188ce.cpp
+
+sterownik karty sieciowej Realtek RTL8188CE (PCIe 802.11n WiFi) napisany w C++. obsluguje wykrycie urzadzenia na PCI, mapowanie MMIO, odczyt adresu MAC, inicjalizacje modulu WiFi (kontroler, kanal, interwal beaconow), wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna i zainicjowana.
+
+### rtl8188ce_init
+
+inicjalizuje sterownik RTL8188CE: wyszukuje urzadzenie na magistrali PCI, mapuje adresy MMIO, resetuje chip, czytuje adres MAC, inicjalizuje modul WiFi (wlancza kontroler, ustawia kanal domyslny 1 dla 2.4 GHz i interwal beaconow), wlacza TX i RX, oraz ustawia adresy buforow odbiorczych i deskryptorow nadawczych.
+
+```
+int rtl8188ce_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### rtl8188ce_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int rtl8188ce_is_ready(void)
+```
+
+### rtl8188ce_get_mac
+
+pobiera adres MAC karty WiFi do tablicy 6 bajtow.
+
+```
+int rtl8188ce_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### rtl8188ce_send
+
+wysyla ramke ethernet przez karte WiFi. oczekuje az karta zwolni deskryptor nadawczy (bity ownership w rejestrze TX_STATUS).
+
+```
+int rtl8188ce_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie nadawania, -1 przy blednych argumentach.
+
+### rtl8188ce_receive
+
+odbiera nastepna dostepna ramke z bufora odbiorczego do podanego bufora. tryb polling (bez przerwan), sprawdza rejestr ISR i potwierdza przerwanie odbioru.
+
+```
+int rtl8188ce_receive(void *frame, uint16_t capacity)
+```
+
+zwraca dlugosc odebranej ramki w bajtach, 0 gdy brak danych, -1 przy blednych argumentach.
+
+### rtl8188ce_stats_get
+
+pobiera statystyki sterownika (liczniki pakietow i bajtow TX/RX oraz bledy).
+
+```
+void rtl8188ce_stats_get(struct rtl8188ce_stats *out)
+```
+
+struktura `rtl8188ce_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| tx_packets | liczba wyslanych pakietow |
+| tx_bytes | liczba wyslanych bajtow |
+| tx_errors | bledy nadawania |
+| rx_packets | liczba odebranych pakietow |
+| rx_bytes | liczba odebranych bajtow |
+| rx_errors | bledy odbioru |
+| resets | liczba resetow chipa |
+
 ## system plikow - system_plikow/system_plikow.c
 
 system plikow FAT32.
