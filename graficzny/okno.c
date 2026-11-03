@@ -1,6 +1,7 @@
 #include "okno.h"
 #include "czcionka.h"
 #include "rysowanie.h"
+#include "pulpit.h"
 
 #define KOLOR_RAMKI 0x00787C82
 #define KOLOR_PASKA 0x00787C82
@@ -184,6 +185,7 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->tekst_dlugosc = 0;
     okno->tekst_maks = 0;
     okno_przenies_na_wierzch(okno);
+    pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
 
@@ -217,6 +219,7 @@ void okno_zamknij(struct okno *okno)
     int zamkniety_szerokosc = okno->szerokosc;
     int zamkniety_wysokosc = okno->wysokosc;
     okno->otwarte = 0;
+    pulp_zglosz_zmiane();
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         if (okna[indeks] == okno) {
             for (int pozostale = indeks; pozostale < liczba_okien - 1; pozostale++)
@@ -433,6 +436,7 @@ void okno_zminimalizuj(struct okno *okno)
         }
     }
     odtworz_fragment_tla_bufor(zamkniety_x, zamkniety_y, zamkniety_szerokosc, zamkniety_wysokosc);
+    pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
 
@@ -441,6 +445,7 @@ void okno_przywroc(struct okno *okno)
     if (!okno || !okno->otwarte || !okno->zminimalizowane) return;
     okno->zminimalizowane = 0;
     okno_przenies_na_wierzch(okno);
+    pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
 
@@ -457,6 +462,7 @@ void okno_maksymalizuj(struct okno *okno)
     okno->wysokosc = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
     okno->zmaksymalizowane = 1;
     okno_przenies_na_wierzch(okno);
+    pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
 
@@ -469,6 +475,7 @@ void okno_przywroc_rozmiar(struct okno *okno)
     okno->wysokosc = okno->wysokosc_poprzednia;
     okno->zmaksymalizowane = 0;
     okno_przenies_na_wierzch(okno);
+    pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
 

@@ -6,6 +6,8 @@
 void pulp_init(void);
 void pulp_rysuj_ikony(void);
 void pulp_odswiez(void);
+uint8_t pulp_czy_trzeba_odswiezyc(void);
+void pulp_zglosz_zmiane(void);
 /* przeciąganie ikon na pulpicie */
 int pulp_mouse_press(int x, int y);
 void pulp_mouse_ruch(int x, int y);

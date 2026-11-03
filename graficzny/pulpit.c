@@ -282,9 +282,22 @@ void pulp_rysuj_ikony(void)
     pulp_rysuj_wszystkie_ikony();
 }
 
+static uint8_t pulp_trzeba_odswiezyc = 0;
+
 void pulp_odswiez(void)
 {
     pulp_rysuj_wszystkie_ikony();
+    pulp_trzeba_odswiezyc = 0;
+}
+
+uint8_t pulp_czy_trzeba_odswiezyc(void)
+{
+    return pulp_trzeba_odswiezyc;
+}
+
+void pulp_zglosz_zmiane(void)
+{
+    pulp_trzeba_odswiezyc = 1;
 }
 
 int pulp_mouse_press(int x, int y)

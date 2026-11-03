@@ -142,6 +142,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             menu_start_przełącz();
         }
         keyboard_discard_pending();
-        if (!aktywne_okno || !aktywne_okno->otwarte) pulp_odswiez();
+        if (!aktywne_okno || !aktywne_okno->otwarte) {
+            if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
+        }
     }
 }
