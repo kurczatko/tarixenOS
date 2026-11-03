@@ -2627,3 +2627,235 @@ funkcja C do obslugi przerwan:
 ```
 extern "C" void alc880_irq(void);
 ```
+
+## sterownik dzwieku Realtek ALC1150 - drivers/karty_dzwiekowe/alc1150.cpp
+
+sterownik karty dzwiekowej Realtek ALC1150 (HD Audio codec) napisany w C++. obsluguje pelna konfiguracje kodeka przez magistrale Intel HDA: wykrycie urzadzenia na PCI, inicjalizacje kontrolera HDA, odkrycie widgetow audio, konfiguracje pinow jack, mixer, strumienie PCM odtwarzania i nagrywania, wyjscie cyfrowe SPDIF, wykrywanie wlaczenia jack (jack detection), zarzadzanie zasilaniem (power management), pause/resume strumieni oraz statystyki sterownika. klasa ALC1150 jest singletonem dostepna przez `ALC1150::instance()`.
+
+### ALC1150::probe
+
+sprawdza czy urzadzenie to Realtek ALC1150 (vendor 0x10EC, device 0x1150).
+
+```
+uint8_t probe(uint16_t vendor, uint16_t device);
+```
+
+zwraca 1 gdy urzadzenie zostalo rozpoznane, 0 gdy nie.
+
+### ALC1150::init
+
+inicjalizuje sterownik ALC1150: wyszukuje kontroler Intel HDA na PCI, mapuje adresy MMIO, resetuje i wlacza kontroler, wykrywa adres kodeka, odkrywa widgety audio, parsuje konfiguracje pinow, konfiguruje domyslne piny, inicjalizuje mixer, jack detection, SPDIF i zarzadzanie zasilaniem.
+
+```
+void init(void);
+```
+
+### ALC1150::deinit
+
+zatrzymuje odtwarzanie i nagrywanie, zwalnia bufory DMA i dezaktywuje sterownik.
+
+```
+void deinit(void);
+```
+
+### ALC1150::irq_handler
+
+obsluguje przerwanie sprzegtu z kontrolera HDA i wykrywa zmiany stanu jack.
+
+```
+void irq_handler(void);
+```
+
+### ALC1150::pcm_open / pcm_close
+
+otwiera strumien PCM do odtwarzania lub nagrywania z podanymi parametrami (liczba kanalow, czestotliwosc, format) i zamyka strumien.
+
+```
+int pcm_open(uint16_t channels, uint32_t rate, uint16_t format, uint8_t playback);
+void pcm_close(uint8_t playback);
+```
+
+`playback` = 1 dla odtwarzania, 0 dla nagrywania. zwraca indeks strumienia lub -1 przy bledzie.
+
+### ALC1150::pcm_write / pcm_read
+
+zapisuje dane do bufora odtwarzania lub odczytuje dane z bufora nagrywania.
+
+```
+int pcm_write(const void* data, uint32_t bytes);
+int pcm_read(void* data, uint32_t bytes);
+```
+
+zwraca liczbe skopiowanych bajtow lub -1 przy bledzie.
+
+### ALC1150::pcm_pause / pcm_resume
+
+wstrzymuje lub wznawia odtwarzanie strumienia PCM.
+
+```
+int pcm_pause(uint8_t playback, uint8_t pause);
+int pcm_resume(uint8_t playback);
+```
+
+### ALC1150::mixer_get_control_count / mixer_get_control
+
+pobiera liczbe sterownikow mixer oraz informacje o sterowniku po indeksie.
+
+```
+int mixer_get_control_count(void);
+int mixer_get_control(uint8_t index, struct alc1150_mixer_control* ctrl);
+```
+
+### ALC1150::mixer_set_volume / mixer_get_volume
+
+ustawia lub pobiera wzmocnienie danego sterownika mixer.
+
+```
+int mixer_set_volume(uint8_t index, int32_t gain);
+int mixer_get_volume(uint8_t index, int32_t* gain);
+```
+
+### ALC1150::mixer_set_mute / mixer_get_mute
+
+ustawia lub pobiera stan wyciszenia danego sterownika mixer.
+
+```
+int mixer_set_mute(uint8_t index, uint8_t mute);
+int mixer_get_mute(uint8_t index, uint8_t* mute);
+```
+
+### ALC1150::jack_get_count / jack_get_status / jack_get_config / jack_enable_unsolicited
+
+pobiera liczbe wykrytych jack, sprawdza czy dany jack ma wlaczone wtyczke, pobiera konfiguracje pinu jack oraz wlacza/wylacza niesprosowane odpowiedzi dla jack.
+
+```
+int jack_get_count(void);
+int jack_get_status(uint8_t index, uint8_t* present);
+int jack_get_config(uint8_t index, struct alc1150_pin_config* config);
+int jack_enable_unsolicited(uint8_t index, uint8_t enable);
+```
+
+### ALC1150::spdif_open / spdif_close / spdif_write
+
+otwiera wyjscie cyfrowe SPDIF, zamyka je oraz zapisuje dane audio do strumienia SPDIF.
+
+```
+int spdif_open(uint32_t rate, uint16_t format);
+int spdif_write(const void* data, uint32_t bytes);
+void spdif_close(void);
+```
+
+### ALC1150::spdif_set_category / spdif_set_copyright / spdif_set_nonaudio / spdif_set_preemphasis
+
+konfiguruje parametry strumienia cyfrowego SPDIF (kategoria, copyright, non-audio, pre-emphasis).
+
+```
+int spdif_set_category(uint8_t category);
+int spdif_set_copyright(uint8_t copyright);
+int spdif_set_nonaudio(uint8_t nonaudio);
+int spdif_set_preemphasis(uint8_t preemphasis);
+```
+
+### ALC1150::set_master_volume / get_master_volume
+
+ustawia lub pobiera glosnosc glowna w procentach (0-100).
+
+```
+void set_master_volume(uint8_t percent);
+uint8_t get_master_volume(void);
+```
+
+### ALC1150::power_set_state / power_get_state / widget_power_set
+
+ustawia lub pobiera stan zasilania kodeka (D0-D3) oraz ustawia stan zasilania konkretnego widgetu.
+
+```
+void power_set_state(uint8_t state);
+uint8_t power_get_state(void);
+void widget_power_set(uint8_t nid, uint8_t state);
+```
+
+### ALC1150::stats_get
+
+pobiera statystyki sterownika (liczba wyslanych verbow, bledy, przerwania, przepelnienia bufora, zmiany jack, pakiety SPDIF).
+
+```
+void stats_get(struct alc1150_stats* out);
+```
+
+struktura `alc1150_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| verbs_sent | liczba wyslanych verbow HDA |
+| verbs_failed | bledy wysylania verbow |
+| interrupts | liczba przerwan |
+| buffer_underruns | niedobory bufora |
+| buffer_overruns | przepelnienia bufora |
+| jack_changes | zmiany stanu jack |
+| spdif_packets | liczba pakietow SPDIF |
+| spdif_errors | bledy SPDIF |
+
+struktura `alc1150_mixer_control` zawiera:
+
+| pole | opis |
+|------|------|
+| nid | id widgetu |
+| index | indeks sterownika |
+| direction | kierunek (0=input, 1=output) |
+| min_gain | minimalne wzmocnienie |
+| max_gain | maksymalne wzmocnienie |
+| current_gain | aktualne wzmocnienie |
+| mute | stan wyciszenia |
+| name | nazwa sterownika |
+
+struktura `alc1150_pin_config` zawiera:
+
+| pole | opis |
+|------|------|
+| nid | id pinu |
+| sequence | sekwencja priorytetu |
+| default_association | domyselne skojarzenie |
+| misc | rozne flagi |
+| color | kolor gniazda |
+| connection_type | typ polaczenia |
+| location | lokalizacja (zewn./wewn.) |
+| port_connectivity | typ connectivitiy portu |
+| default_device | domyslne urzadzenie |
+
+widgety ALC1150:
+
+| typ | opis |
+|------|------|
+| output | konwerter cyfrowo-analogowy (DAC) |
+| input | konwerter analogowo-cyfrowy (ADC) |
+| mixer | mikser audio |
+| selector | selektor wejsc |
+| pin_complex | pin gniazda audio |
+| power_widget | widget zasilania |
+| volume_knob | pokretlo glosnosci |
+
+parametry HDA:
+
+| parametr | opis |
+|----------|------|
+| vendor_id | id dostawcy kodeka |
+| revision_id | rewizja kodeka |
+| audio_widget_cap | moznosci widgetu audio |
+| pin_cap | moznosci pinu |
+| amp_in_cap / amp_out_cap | moznosci wzmacniacza wejsc/wyjsc |
+| connection_list_len | dlugosc listy polaczen |
+
+widgety ALC1150 (domyslne NID):
+
+- DAC: 0x02, 0x03, 0x04, 0x05, 0x06
+- ADC: 0x07, 0x08, 0x09
+- Piny: 0x0C - 0x23
+- Mixery: 0x24 - 0x2B
+- Selektory: 0x2C - 0x2F
+
+funkcja C do obslugi przerwan:
+
+```
+extern "C" void alc1150_irq(void);
+```
