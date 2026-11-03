@@ -41,6 +41,7 @@ struct okno {
 void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
                  const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc);
 void okno_narysuj(struct okno *okno);
+void okno_odrysuj_wszystkie(void);
 void okno_zamknij(struct okno *okno);
 int okno_obsluz_klikniecie(int x, int y);
 void okno_obsluz_ruch(int x, int y);

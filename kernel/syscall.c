@@ -103,6 +103,12 @@ void tapeta_picker_rysuj(int x, int y, int szerokosc, int wysokosc)
     (void)szerokosc;
     (void)wysokosc;
     rysuj_tekst_chicago(x, y, "WYBIERZ TAPETE", 0x00000000);
+    uint32_t kolor_ciemnej = tapeta_czy_jasna() ? 0x00C0C0C0 : 0x003B82F6;
+    uint32_t kolor_jasnej = tapeta_czy_jasna() ? 0x003B82F6 : 0x00C0C0C0;
+    rysuj_prostokat(x + 8, y + 100, 144, 24, kolor_ciemnej);
+    rysuj_tekst_chicago(x + 18, y + 108, "CIEMNA", 0x00000000);
+    rysuj_prostokat(x + 176, y + 100, 144, 24, kolor_jasnej);
+    rysuj_tekst_chicago(x + 186, y + 108, "JASNA", 0x00000000);
     for (int indeks = 0; indeks < 8; indeks++)
         rysuj_prostokat(x + 8 + (indeks % 4) * 32, y + 18 + (indeks / 4) * 32, 24, 24, kolory[indeks]);
     for (int dy = -KOLO_PROMIEN; dy <= KOLO_PROMIEN; dy++) {
@@ -129,6 +135,11 @@ void tapeta_picker_klik(int x, int y)
     };
     int kolumna;
     int wiersz;
+    if (y >= 130 && y < 154) {
+        if (x >= 16 && x < 160 && tapeta_ustaw_obraz(0)) tapeta_zapisz();
+        else if (x >= 184 && x < 328 && tapeta_ustaw_obraz(1)) tapeta_zapisz();
+        return;
+    }
     if (x >= 16 && x < 144 && y >= 48 && y < 112) {
         kolumna = (x - 16) / 32;
         wiersz = (y - 48) / 32;

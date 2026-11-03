@@ -56,9 +56,11 @@ static void narysuj_kursor_bitmapa(int x, int y);
 uint32_t *obraz = (uint32_t *)0x00400000;
 #define TAPETA_BITMAPA_ADRES 0x00810000
 #define TAPETA_BITMAPA_BAJTY (EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4u)
-#define PLIK_TAPETA_BITMAPA "TAPETA.RAW"
+#define PLIK_TAPETA_CIEMNA "TAPETA.RAW"
+#define PLIK_TAPETA_JASNA "TAPETAJ.RAW"
 static uint32_t *tapeta_bitmapa = (uint32_t *)TAPETA_BITMAPA_ADRES;
 static int tapeta_bitmapa_wczytana;
+static int tapeta_jasna;
 static uint32_t kolor_tapety = KOLOR_TLA;
 static int tapeta_gradientowa = 1;
 
@@ -244,15 +246,6 @@ struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
     return 0;
 }
 
-static void kopiuj_pamiec(volatile uint8_t *dst, const uint32_t *src, uint32_t bajty)
-{
-    volatile uint32_t *d = (volatile uint32_t *)dst;
-    uint32_t dwords = bajty / 4;
-    for (uint32_t i = 0; i < dwords; i++) {
-        d[i] = src[i];
-    }
-}
-
 static void zapisz_piksel_framebuffera(int x, int y, uint32_t kolor)
 {
     uint32_t czerwony = (kolor >> 16) & 0xFF;
@@ -269,14 +262,23 @@ static void zapisz_piksel_framebuffera(int x, int y, uint32_t kolor)
         piksel[bajt] = (uint8_t)(wartosc >> (bajt * 8));
 }
 
-    static int framebuffer_ma_szybki_format(void)
-    {
-        return framebuffer_bytes_per_pixel == 4 &&
+static void kopiuj_pamiec(volatile uint8_t *dst, const uint32_t *src, uint32_t bajty)
+{
+    volatile uint32_t *d = (volatile uint32_t *)dst;
+    uint32_t dwords = bajty / 4;
+    for (uint32_t i = 0; i < dwords; i++) {
+        d[i] = src[i];
+    }
+}
+
+static int framebuffer_ma_szybki_format(void)
+{
+    return framebuffer_bytes_per_pixel == 4 &&
            framebuffer_pitch == EKRAN_SZEROKOSC * 4 &&
            red_mask_size == 8 && red_field_position == 16 &&
            green_mask_size == 8 && green_field_position == 8 &&
            blue_mask_size == 8 && blue_field_position == 0;
-    }
+}
 
 void odswiez_fragment_widoku(int x, int y, int szerokosc, int wysokosc)
 {
@@ -448,7 +450,12 @@ void ustaw_kolor_tapety(uint32_t kolor)
         }
     }
     narysuj_napis_systemowy();
-    odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    if (okno_liczba_okien() > 0) {
+        okno_odrysuj_wszystkie();
+    } else {
+        odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC,
+                                EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    }
 }
 
 uint32_t pobierz_kolor_tapety(void)
@@ -457,6 +464,26 @@ uint32_t pobierz_kolor_tapety(void)
 }
 
 #define PLIK_TAPETA "TAPETA.CFG"
+
+static void narysuj_tapete_tlo(void);
+
+int tapeta_czy_jasna(void)
+{
+    return tapeta_jasna;
+}
+
+int tapeta_ustaw_obraz(int jasna)
+{
+    const char *plik = jasna ? PLIK_TAPETA_JASNA : PLIK_TAPETA_CIEMNA;
+    fs_reset_directory();
+    int bajty = read_file(plik, (char *)tapeta_bitmapa, TAPETA_BITMAPA_BAJTY);
+    if (bajty != (int)TAPETA_BITMAPA_BAJTY) return 0;
+    tapeta_jasna = jasna != 0;
+    tapeta_bitmapa_wczytana = 1;
+    tapeta_gradientowa = 0;
+    narysuj_tapete_tlo();
+    return 1;
+}
 
 static uint32_t parsuj_hex(char **p)
 {
@@ -502,17 +529,19 @@ static void narysuj_tapete_tlo(void)
         }
     }
     narysuj_napis_systemowy();
-    odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    if (okno_liczba_okien() > 0) {
+        okno_odrysuj_wszystkie();
+    } else {
+        odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC,
+                                EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    }
 }
 
 int tapeta_wczytaj(void)
 {
-    fs_reset_directory();
-    int bitmapa_bajty = read_file(PLIK_TAPETA_BITMAPA, (char *)tapeta_bitmapa,
-                                  TAPETA_BITMAPA_BAJTY);
-    tapeta_bitmapa_wczytana = bitmapa_bajty == (int)TAPETA_BITMAPA_BAJTY;
-
     char buf[64];
+    char tryb = '2';
+    fs_reset_directory();
     int n = read_file(PLIK_TAPETA, buf, sizeof(buf) - 1);
     if (n > 0) {
         buf[n] = 0;
@@ -520,12 +549,26 @@ int tapeta_wczytaj(void)
         while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
         kolor_tapety = parsuj_hex(&p);
         while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
-        tapeta_gradientowa = (*p == '1') ? 1u : 0u;
-        tapeta_bitmapa_wczytana = (*p == '2') && tapeta_bitmapa_wczytana;
-    } else if (tapeta_bitmapa_wczytana) {
+        if (*p) tryb = *p;
+    }
+    tapeta_jasna = tryb == '3';
+    tapeta_gradientowa = tryb == '1';
+    tapeta_bitmapa_wczytana = 0;
+    if (tryb == '2' || tryb == '3') {
+        const char *plik = tapeta_jasna ? PLIK_TAPETA_JASNA : PLIK_TAPETA_CIEMNA;
+        fs_reset_directory();
+        int bitmapa_bajty = read_file(plik, (char *)tapeta_bitmapa,
+                                      TAPETA_BITMAPA_BAJTY);
+        tapeta_bitmapa_wczytana = bitmapa_bajty == (int)TAPETA_BITMAPA_BAJTY;
+        if (!tapeta_bitmapa_wczytana && tapeta_jasna) {
+            tapeta_jasna = 0;
+            fs_reset_directory();
+            bitmapa_bajty = read_file(PLIK_TAPETA_CIEMNA, (char *)tapeta_bitmapa,
+                                      TAPETA_BITMAPA_BAJTY);
+            tapeta_bitmapa_wczytana = bitmapa_bajty == (int)TAPETA_BITMAPA_BAJTY;
+        }
+        if (!tapeta_bitmapa_wczytana && n <= 0) return 0;
         tapeta_gradientowa = 0;
-    } else {
-        return 0;
     }
     narysuj_tapete_tlo();
     return 1;
@@ -542,7 +585,7 @@ void tapeta_zapisz(void)
         buf[pos++] = "0123456789ABCDEF"[(v >> (28 - i * 4)) & 0xF];
     }
     buf[pos++] = ' ';
-    buf[pos++] = tapeta_bitmapa_wczytana ? '2' : (tapeta_gradientowa ? '1' : '0');
+    buf[pos++] = tapeta_bitmapa_wczytana ? (tapeta_jasna ? '3' : '2') : (tapeta_gradientowa ? '1' : '0');
     buf[pos++] = '\n';
     buf[pos] = 0;
     fs_reset_directory();

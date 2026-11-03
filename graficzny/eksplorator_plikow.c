@@ -48,8 +48,6 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
     rysuj_tekst_chicago(x + 100, y + 20, "TXT+", 0x00FFFFFF);
     rysuj_prostokat(x + 168, y + 14, 56, 20, 0x00334155);
     rysuj_tekst_chicago(x + 184, y + 20, "WROC", 0x00FFFFFF);
-    rysuj_prostokat(x + 232, y + 14, 62, 20, 0x00334155);
-    rysuj_tekst_chicago(x + 248, y + 20, "C+", 0x00FFFFFF);
 
     if (tryb_tworz) {
         rysuj_tekst_chicago(x, y + 40, "NAZWA:", 0x00000000);
@@ -97,7 +95,6 @@ static void obsluz_klik_plikow(int x, int y)
     if (y >= 52 && y < 72) {
         if (x >= 16 && x < 94) tryb_tworz = 1;
         else if (x >= 100 && x < 178) tryb_tworz = 2;
-        else if (x >= 238 && x < 300) tryb_tworz = 3;
         else if (x >= 184 && x < 224) fs_parent_directory();
         nazwa_nowego[0] = 0;
         dlugosc_nazwy = 0;

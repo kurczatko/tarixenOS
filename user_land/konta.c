@@ -6,7 +6,6 @@
 #include "../system_plikow/system_plikow.h"
 
 #define PLIK_HASLA "HASLO.TXT"
-#define SEKTOR_HASLA 10000
 #define KONTO_SZEROKOSC 420
 #define KONTO_WYSOKOSC 190
 
@@ -30,14 +29,6 @@ static int tekst_rowne(const char *a, const char *b)
 static void konta_czytaj_zapamietane(void)
 {
     char buf[512];
-    fs_read_sector(SEKTOR_HASLA, buf);
-    uint8_t dlugosc = (uint8_t)buf[0];
-    if (dlugosc > 0 && dlugosc < 64) {
-        for (int i = 0; i < dlugosc; i++) zapamietane_haslo[i] = (char)buf[1 + i];
-        zapamietane_haslo[dlugosc] = 0;
-        zapamietane_dlugosc = dlugosc;
-        return;
-    }
     fs_reset_directory();
     int n = read_file(PLIK_HASLA, buf, sizeof(buf) - 1);
     if (n > 0) {
@@ -56,12 +47,6 @@ static void konta_czytaj_zapamietane(void)
 
 static void konta_zapisz_haslo(void)
 {
-    char buf[512];
-    for (int i = 0; i < 512; i++) buf[i] = 0;
-    buf[0] = (char)haslo_dlugosc;
-    for (int i = 0; i < haslo_dlugosc; i++) buf[1 + i] = haslo[i];
-    fs_write_sector(SEKTOR_HASLA, buf);
-
     fs_reset_directory();
     if (write_file(PLIK_HASLA, haslo, (uint32_t)haslo_dlugosc) != 0) {
         if (create_file(PLIK_HASLA, (uint32_t)haslo_dlugosc) != 0 ||

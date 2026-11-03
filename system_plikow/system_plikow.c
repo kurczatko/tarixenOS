@@ -160,10 +160,11 @@ int create_file(const char *name, uint32_t size) {
 }
 
 int read_file(const char *name, char *buffer, uint32_t size) {
-    char sector[512]; uint32_t sector_number, done = 0, cluster; struct fat32_entry *entry = find_entry(name, current_dir, sector, &sector_number);
+    char sector[512]; uint32_t sector_number, done = 0, cluster, file_size; struct fat32_entry *entry = find_entry(name, current_dir, sector, &sector_number);
     if (!entry || (entry->attributes & 0x10)) return -1;
+    file_size = entry->size;
     cluster = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low;
-    while (done < size && done < entry->size && cluster < FAT32_EOC) { read_sector(cluster_sector(cluster), sector); for (uint32_t i = 0; i < 512 && done < size && done < entry->size; i++) buffer[done++] = sector[i]; cluster = fat_entry(cluster); }
+    while (done < size && done < file_size && cluster < FAT32_EOC) { read_sector(cluster_sector(cluster), sector); for (uint32_t i = 0; i < 512 && done < size && done < file_size; i++) buffer[done++] = sector[i]; cluster = fat_entry(cluster); }
     return done;
 }
 

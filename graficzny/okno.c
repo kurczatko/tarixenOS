@@ -16,9 +16,6 @@ static int liczba_okien;
 static uint8_t przeciaganie;
 static int przesuniecie_x;
 static int przesuniecie_y;
-static int ramka_x;
-static int ramka_y;
-static uint8_t ramka_widoczna;
 static uint8_t zmienianie_rozmiaru;
 static int kierunek_zmiany;
 static char schowek[512];
@@ -106,7 +103,7 @@ static void okno_odrysuj_scene(int x1, int y1, int szerokosc1, int wysokosc1,
     odswiez_fragment_widoku(lewy, gora, prawy - lewy, dol - gora);
 }
 
-static void okno_odrysuj_wszystkie(void)
+void okno_odrysuj_wszystkie(void)
 {
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         struct okno *okno = okna[indeks];
@@ -118,31 +115,6 @@ static void okno_odrysuj_wszystkie(void)
             narysuj_okno_bez_odswiezania(okna[indeks]);
     pasek_zadan_rysuj_ikony_minimalizowanych();
     odswiez_widok();
-}
-
-static void narysuj_przerywana_ramke(int x, int y, int poprzedni_x, int poprzedni_y,
-                                     int szerokosc, int wysokosc)
-{
-    int obszar_x = poprzedni_x < x ? poprzedni_x : x;
-    int obszar_y = poprzedni_y < y ? poprzedni_y : y;
-    int obszar_prawy = (poprzedni_x + szerokosc) > (x + szerokosc) ?
-                       poprzedni_x + szerokosc : x + szerokosc;
-    int obszar_dol = (poprzedni_y + wysokosc) > (y + wysokosc) ?
-                     poprzedni_y + wysokosc : y + wysokosc;
-    odrysuj_okna_w_obszarze(obszar_x, obszar_y, obszar_prawy - obszar_x,
-                            obszar_dol - obszar_y);
-    for (int i = 0; i < szerokosc; i++) {
-        uint32_t kolor = ((i / 4) % 2 == 0) ? 0x00000000 : 0x00FFFFFF;
-        rysuj_piksel(x + i, y, kolor);
-        rysuj_piksel(x + i, y + wysokosc - 1, kolor);
-    }
-    for (int i = 0; i < wysokosc; i++) {
-        uint32_t kolor = ((i / 4) % 2 == 0) ? 0x00000000 : 0x00FFFFFF;
-        rysuj_piksel(x, y + i, kolor);
-        rysuj_piksel(x + szerokosc - 1, y + i, kolor);
-    }
-    odswiez_fragment_widoku(obszar_x, obszar_y, obszar_prawy - obszar_x,
-                            obszar_dol - obszar_y);
 }
 
 void okno_ustaw_aktywne(struct okno *okno)
@@ -291,11 +263,6 @@ int okno_obsluz_klikniecie(int x, int y)
         przeciaganie = 1;
         przesuniecie_x = x - trafione->x;
         przesuniecie_y = y - trafione->y;
-        ramka_x = trafione->x;
-        ramka_y = trafione->y;
-        ramka_widoczna = 1;
-        narysuj_przerywana_ramke(ramka_x, ramka_y, ramka_x, ramka_y,
-                         trafione->szerokosc, trafione->wysokosc);
         return 1;
     }
     if (!trafione->zmaksymalizowane) {
@@ -360,16 +327,16 @@ void okno_obsluz_ruch(int x, int y)
         if (ny + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
             ny = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
 
-        if (nx == ramka_x && ny == ramka_y) return;
+        if (nx == aktywne_okno->x && ny == aktywne_okno->y) return;
 
-        int stara_ramka_x = ramka_x;
-        int stara_ramka_y = ramka_y;
-        ramka_x = nx;
-        ramka_y = ny;
-        ramka_widoczna = 1;
-
-        narysuj_przerywana_ramke(ramka_x, ramka_y, stara_ramka_x, stara_ramka_y,
-                                 aktywne_okno->szerokosc, aktywne_okno->wysokosc);
+        int stare_x = aktywne_okno->x;
+        int stare_y = aktywne_okno->y;
+        int szerokosc = aktywne_okno->szerokosc;
+        int wysokosc = aktywne_okno->wysokosc;
+        aktywne_okno->x = nx;
+        aktywne_okno->y = ny;
+        okno_odrysuj_scene(stare_x, stare_y, szerokosc, wysokosc,
+                   nx, ny, szerokosc, wysokosc);
     }
 
     if (zmienianie_rozmiaru) {
@@ -395,11 +362,6 @@ void okno_obsluz_ruch(int x, int y)
 
 void okno_zakoncz_przeciaganie(void)
 {
-    int stare_x;
-    int stare_y;
-    int szerokosc;
-    int wysokosc;
-
     if (!przeciaganie && !zmienianie_rozmiaru) return;
 
     przeciaganie = 0;
@@ -407,15 +369,9 @@ void okno_zakoncz_przeciaganie(void)
 
     if (!aktywne_okno || !aktywne_okno->otwarte) return;
 
-    stare_x = aktywne_okno->x;
-    stare_y = aktywne_okno->y;
-    szerokosc = aktywne_okno->szerokosc;
-    wysokosc = aktywne_okno->wysokosc;
-    aktywne_okno->x = ramka_x;
-    aktywne_okno->y = ramka_y;
-    ramka_widoczna = 0;
-    okno_odrysuj_scene(stare_x, stare_y, szerokosc, wysokosc,
-                       ramka_x, ramka_y, szerokosc, wysokosc);
+    odtworz_fragment_tla_bufor(0, 0, EKRAN_SZEROKOSC,
+                               EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    okno_odrysuj_wszystkie();
 }
 
 void okno_zminimalizuj(struct okno *okno)

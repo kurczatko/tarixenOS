@@ -39,6 +39,8 @@ void ustaw_status_internetu(uint8_t dostepny);
 void ustaw_czas_paska(const char *czas);
 int tapeta_wczytaj(void);
 void tapeta_zapisz(void);
+int tapeta_czy_jasna(void);
+int tapeta_ustaw_obraz(int jasna);
 void pasek_zadan_rysuj_ikony_minimalizowanych(void);
 struct okno *pasek_zadan_ikona_na_pozycji(int x, int y);
 void kursor_tekstowy_tick(void);
