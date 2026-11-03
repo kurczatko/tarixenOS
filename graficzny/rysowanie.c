@@ -10,6 +10,11 @@
 #define KOLOR_PASKA_ZADAN 0x002D3E50
 #define KOLOR_TEKST_BIALY 0x00FFFFFF
 
+#define NAPIS_SZEROKOSC (27 * 8)
+#define NAPIS_X (EKRAN_SZEROKOSC - NAPIS_SZEROKOSC - 16)
+#define NAPIS_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16)
+#define NAPIS_WYSOKOSC 8
+
 static volatile uint8_t *pamiec_graficzna = (volatile uint8_t *)0xFD000000;
 static uint32_t framebuffer_pitch = EKRAN_SZEROKOSC * 4;
 static uint8_t framebuffer_bytes_per_pixel = 4;
@@ -301,9 +306,8 @@ void odswiez_fragment_widoku(int x, int y, int szerokosc, int wysokosc)
 
 static void narysuj_napis_systemowy(void)
 {
-    int szerokosc_napisu = 27 * 8;
-    int tekst_x = EKRAN_SZEROKOSC - szerokosc_napisu - 16;
-    int tekst_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16;
+    int tekst_x = NAPIS_X;
+    int tekst_y = NAPIS_Y;
     rysuj_tekst_chicago(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", KOLOR_TEKST_BIALY);
 }
 
@@ -346,6 +350,11 @@ void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
                 obraz[offset + px] = tapeta_gradientowa ? kolor_tla_dla_x(x + px) : kolor_tapety;
             }
         }
+    }
+
+    if (x < NAPIS_X + NAPIS_SZEROKOSC && x + szerokosc > NAPIS_X &&
+        y < NAPIS_Y + NAPIS_WYSOKOSC && y + wysokosc > NAPIS_Y) {
+        narysuj_napis_systemowy();
     }
 }
 
