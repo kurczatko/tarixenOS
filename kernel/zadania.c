@@ -55,7 +55,7 @@ static void zadania_u32_do_tekstu(uint32_t v, char *buf)
 static void zadania_narysuj(int x, int y, int szerokosc, int wysokosc)
 {
     (void)wysokosc;
-    int bx = zadania_przycisk_x(szerokosc);
+    int bx = x + zadania_przycisk_x(szerokosc);
     char buf[16];
     char nazwa[ZADANIA_NAZWA_MAKS + 1];
     int n;
@@ -91,7 +91,7 @@ static void zadania_narysuj(int x, int y, int szerokosc, int wysokosc)
 
 static void zadania_klik(int x, int y)
 {
-    int bx = zadania_przycisk_x(okno_zadania.szerokosc);
+    int bx = 8 + zadania_przycisk_x(okno_zadania.szerokosc);
     int cy = y - 30;
     int wy = ZADANIA_WIERSZ_POCZ;
     for (int i = 0; i < MAX_PROCESSES; i++) {
