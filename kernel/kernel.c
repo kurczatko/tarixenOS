@@ -41,9 +41,14 @@
 #include "syscall.h"
 #include "../user_land/tapeta.h"
 #include "proces.h"
+#include "driver_manager.h"
 #include "timer.h"
 #include "pik.h"
 #include "../drivers/qemu_vga.h"
+#include "../drivers/internet/rtl8111f.h"
+#include "../drivers/internet/rtl8111e.h"
+#include "../drivers/internet/rtl8168b.h"
+#include "../drivers/internet/rtl8188ce.h"
 
 extern struct okno *aktywne_okno;
 extern uint32_t __bss_start;
@@ -84,24 +89,32 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     * wiec prosze sie nie spłakiwać ze zżera 400 terabajtów ramu
     */
     init_fs();
-    floppy_init();
-    nvme_init();
-    intel_uhd_init();
-    p4p_init();
-    i915_init();
-    gma_x4500_init();
-    radeon_hd_8370d_init();
-    rx_9070_xt_init();
-    radeon_6870_init();
-    qemu_vga_init();
-    __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    driver_manager_register("floppy", floppy_init, 0, 0, 4);
+    driver_manager_register("nvme", nvme_init, 0, 0, 4);
+    driver_manager_register("intel_uhd", intel_uhd_init, 0, 0, 4);
+    driver_manager_register("p4p_motherboard", p4p_init, p4p_shutdown, 0, 4);
+    driver_manager_register("i915", i915_init, 0, 0, 4);
+    driver_manager_register("gma_x4500", gma_x4500_init, 0, 0, 4);
+    driver_manager_register("radeon_hd_8370d", radeon_hd_8370d_init, 0, 0, 4);
+    driver_manager_register("rx_9070_xt", rx_9070_xt_init, rx_9070_xt_shutdown, 0, 4);
+    driver_manager_register("radeon_6870", radeon_6870_init, radeon_6870_shutdown, 0, 4);
+    driver_manager_register("qemu_vga", qemu_vga_init, 0, 0, 4);
+    driver_manager_register("rtl8111f_net", rtl8111f_init, rtl8111f_shutdown, 0, 2);
+    driver_manager_register("rtl8111e_net", rtl8111e_init, 0, 0, 2);
+    driver_manager_register("rtl8168b_net", rtl8168b_init, 0, 0, 2);
+    driver_manager_register("rtl8188ce_net", rtl8188ce_init, 0, 0, 2);
+    driver_manager_register("bluetooth", bluetooth_init, 0, bluetooth_poll, 2);
+    driver_manager_register("mouse", mouse_init, 0, mouse_poll, 2);
+    driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
+    driver_manager_register("usb", usb_init, 0, usb_poll, 2);
+    driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
+    driver_manager_register("usb_keyboard", usb_keyboard_init, 0, 0, 4);
+    driver_manager_register("intel_hda", init_intel_hda, 0, 0, 4);
+    driver_manager_register("alc650", alc650_init, alc650_shutdown, 0, 4);
     tapeta_wczytaj();
     gdt_install();
     idt_install();
     syscall_install();
-    net_init();
-    ustaw_status_internetu(net_ready());
-    bluetooth_init();
     bluetooth_ui_init();
     pulp_init();
     tapeta_app();
@@ -109,19 +122,11 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     menu_start();
 
     __asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    mouse_init();
     __asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    keyboard_init();
-    usb_init();
-    usb_mouse_init();
-    usb_keyboard_init();
     __asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     __asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    init_intel_hda();
-    alc650_init();
-    __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
-    __asm__ volatile ("movb $'M', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     konta_start();
 
     pik_init();
@@ -130,9 +135,17 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
 
     proces_init();
 
+    driver_manager_init_all();
+
+    if (!net_ready()) {
+        net_init();
+    }
+    ustaw_status_internetu(net_ready());
+
     while(1) {
         char tekst_czasu[9];
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
+        driver_manager_poll_all();
         mouse_poll();
         usb_poll();
         bluetooth_poll();

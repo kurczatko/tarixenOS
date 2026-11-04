@@ -1139,6 +1139,154 @@ struktura `rtl8168b_stats` zawiera:
 | rx_errors | bledy odbioru |
 | resets | liczba resetow chipa |
 
+## sterownik Realtek RTL8111F - drivers/internet/rtl8111f.cpp
+
+sterownik karty sieciowej Realtek RTL8111F (PCIe Gigabit Ethernet) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x10EC, urzadzenia 0x8168/0x8167/0x8169/0x8171/0x8172), mapowanie MMIO, soft-reset chipa, odczyt adresu MAC, dostep do rejestrow PHY, auto-negocjacje, monitorowanie lacza (link status), predkosc i tryb duplex, bufor odbiorczy z deskryptorami nadawczymi (8 deskryptorow TX), wysylanie i odbieranie ramek ethernet w trybie polling, statystyki TX/RX z licznikami bledow (underrun, aborted, carrier), test petli (loopback), konfiguracja multicast, wylaczenie sterownika oraz resetowanie statystyk. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed RTL8111E/RTL8168B, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
+
+### rtl8111f_init
+
+inicjalizuje sterownik RTL8111F: wyszukuje urzadzenie na magistrali PCI, mapuje adresy MMIO, aktywuje magistrale PCI (bus master + memory space), resetuje chip (zatrzymanie TX/RX, soft reset), czytuje adres MAC z rejestrow chipu, czysci przerwania, konfiguruje TCR (bez loopback) oraz RCR (akceptuje wlasny MAC, broadcast, multicast, ramki fizyczne, bufor 16K), ustawia adres bufora odbiorczego i deskryptory nadawcze, wlacza start, TX i RX.
+
+```
+int rtl8111f_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### rtl8111f_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int rtl8111f_is_ready(void)
+```
+
+### rtl8111f_get_mac
+
+pobiera adres MAC karty sieciowej do bufora 6-bajtowego.
+
+```
+int rtl8111f_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### rtl8111f_send
+
+wysyla ramke ethernet przez karte. oczekuje az deskryptor nadawczy zostanie zwolniony przez kartę (wlasciciel = sterownik), kopiuje ramke do bufora nadawczego, ustawia bity OWN i dlugosc w deskryptorze TSD oraz oczekuje na zakonczenie nadawania przez karte. aktualizuje statystyki TX (pakiety, bajty, bledy, underrun, aborted, carrier).
+
+```
+int rtl8111f_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie nadawania (deskryptor zajety), -1 przy blednych argumentach.
+
+### rtl8111f_receive
+
+odbiera nastepna dostepna ramke z bufora odbiorczego do podanego bufora. tryb polling (bez przerwan), sprawdza rejestr ISR, potwierdza przerwanie odbioru, parsuje naglowek ramki (status + dlugosc) i kopiuje dane do bufora wyjsciowego. aktualizuje statystyki RX (pakiety, bajty, bledy).
+
+```
+int rtl8111f_receive(void *frame, uint16_t capacity)
+```
+
+zwraca dlugosc odebranej ramki w bajtach, 0 gdy brak danych, -1 przy blednych argumentach.
+
+### rtl8111f_link_up
+
+sprawdza stan lacza (link status) poprzez odczyt rejestru BMSR PHY. aktualizuje wewnetrzny stan lacza i zwraca 1 gdy lacze jest aktywne.
+
+```
+int rtl8111f_link_up(void)
+```
+
+### rtl8111f_link_info
+
+pobiera pelne informacje o laczu do struktury `rtl8111f_link_info` (link_up, full_duplex, autoneg_done, speed_mbps).
+
+```
+int rtl8111f_link_info(struct rtl8111f_link_info *info)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### rtl8111f_speed_mbps
+
+zwraca predkosc lacza w Mbps (10, 100 lub 1000) lub 0 gdy lacze jest nieaktywne.
+
+```
+int rtl8111f_speed_mbps(void)
+```
+
+### rtl8111f_duplex_full
+
+zwraca 1 gdy lacze pracuje w trybie full-duplex, 0 gdy half-duplex lub lacze nieaktywne.
+
+```
+int rtl8111f_duplex_full(void)
+```
+
+### rtl8111f_autonegotiate
+
+uruchamia auto-negocjacje PHY (reset + autoneg), czeka na zakonczenie negocjacji (BMSR_AN_DONE i BMSR_LINK) i aktualizuje informacje o laczu.
+
+```
+int rtl8111f_autonegotiate(void)
+```
+
+zwraca 1 gdy auto-negocjacje zakonczyly sie sukcesem i lacze jest aktywne, 0 w przeciwnym razie.
+
+### rtl8111f_reset_link
+
+resetuje PHY i ponownie uruchamia auto-negocjacje.
+
+```
+int rtl8111f_reset_link(void)
+```
+
+zwraca 1 gdy lacze zostalo przywrocone, 0 przy bledzie.
+
+### rtl8111f_loopback_test
+
+wykonuje test petli (loopback): wlacza loopback w TCR, wysyla ramke testowa, odbiera ja z powrotem i porownuje zawartosc. nastepnie wraca do poprzedniej wartosci TCR.
+
+```
+int rtl8111f_loopback_test(const void *frame, uint16_t length)
+```
+
+zwraca 1 gdy test powiodl sie (ramka wyslana i odebrana identycznie), 0 przy bledzie, -1 przy blednych argumentach.
+
+### rtl8111f_set_multicast
+
+konfiguruje filtr multicast (hash table MAR0/MAR1). obecna implementacja ustawia wszystkie bity na 1 (akceptuje wszystkie adresy multicast).
+
+```
+void rtl8111f_set_multicast(const uint8_t *addresses, uint32_t count)
+```
+
+### rtl8111f_stats_get
+
+pobiera statystyki sterownika do struktury `rtl8111f_stats` (liczniki pakietow i bajtow TX/RX, bledy nadawania i odbioru, unterrun, aborted, carrier, rx_missed, rx_crc_errors, rx_frame_errors, rx_fifo_errors, resets, link_changes, autoneg_failures).
+
+```
+void rtl8111f_stats_get(struct rtl8111f_stats *out)
+```
+
+### rtl8111f_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void rtl8111f_stats_reset(void)
+```
+
+### rtl8111f_shutdown
+
+zatrzymuje kartę (stop TX/RX, soft reset) i oznacz sterownik jako niegotowy.
+
+```
+void rtl8111f_shutdown(void)
+```
+
 ## sterownik RTL8188CE - drivers/internet/rtl8188ce.cpp
 
 sterownik karty sieciowej Realtek RTL8188CE (PCIe 802.11n WiFi) napisany w C++. obsluguje wykrycie urzadzenia na PCI, mapowanie MMIO, odczyt adresu MAC, inicjalizacje modulu WiFi (kontroler, kanal, interwal beaconow), wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna i zainicjowana.
@@ -3095,6 +3243,52 @@ void radeon_6790_context_get(struct radeon_6790_context *out);
 int radeon_6790_3d_available(void)
 ```
 
+## menedzer sterownikow - kernel/driver_manager.cpp
+
+menedzer sterownikow odpowiedzialny za rejestracje, wykrywanie sprzetu, tworzenie procesow sterownikow oraz ich cykl zycia. kazdy sterownik jest rejestrowany za pomoca `driver_manager_register()` i tworzony jako osobny proces ring-0 przy wykryciu wspieranego sprzetu. sterowniki sa harmonogramowane przez `proces_tick()` razem z procesami uzytkownika i mozna je zakonczyc przez menedzer zadan (`zadania.c`).
+
+rejestracja sterownika wymaga podania nazwy, funkcji inicjalizacji, funkcji zamykania (moze byc 0), funkcji poll (moze byc 0) oraz interwalu pollowania w tikach. funkcja inicjalizacji jest wywolywana raz w kontekscie jadra przed utworzeniem procesu. funkcja jest wywolywana w kontekscie procesu sterownika (ring 0, page directory jadra, wlasny stos kernela). jezeli sterownik nie ma funkcji poll, uzywana jest domyslna funkcja bezczynna (`proces_yield`).
+
+```
+void driver_manager_register(const char *name, driver_init_fn init, driver_shutdown_fn shutdown, driver_poll_fn poll, uint32_t poll_interval)
+```
+
+inicjalizuje menedzer sterownikow: iteruje po zarejestrowanych sterownikach, wywoluje ich funkcje inicjalizacji i tworzy proces ring-0 dla kazdego sterownik ktorego sprzet zostal wykryty. zwraca liczbe uruchomionych sterownikow.
+
+```
+int driver_manager_init_all(void)
+```
+
+wywolywane w kazdym tiku timera z glownej petli jadra. sprawdza stan procesow sterownikow - jezeli proces zostal zakonczony (np. przez menedzer zadan), wywoluje funkcje zamykania sterownika i oznacza go jako nieaktywny. wywoluje funkcje poll aktywnych sterownikow zgodnie z ich interwalem.
+
+```
+void driver_manager_poll_all(void)
+```
+
+wywoluje funkcje zamykania sterownika powiazanego z podanym PID. uzywane przez menedzer zadan gdy uzytkownik kliknie ZABIJ przy procesie sterownika.
+
+```
+void driver_manager_shutdown_by_pid(uint32_t pid)
+```
+
+zwraca 1 jezeli podany PID nalezy do aktywnego sterownika, 0 w przeciwnym razie.
+
+```
+int driver_manager_is_driver(uint32_t pid)
+```
+
+zwraca wskaznik na deskryptor sterownika dla podanego PID lub 0 jezeli nie znaleziono.
+
+```
+struct driver_desc *driver_manager_find_by_pid(uint32_t pid)
+```
+
+wywoluje funkcje zamykania wszystkich aktywnych sterownikow. uzywane przy zamykaniu systemu.
+
+```
+void driver_manager_shutdown_all(void)
+```
+
 ## struktura plikow
 
 ```
@@ -3103,6 +3297,7 @@ tarixenOS/
 ├── kernel/
 │   ├── kernel.c          # glowna petla jadra, kernel_main
 │   ├── proces.cpp          # zaawansowany harmonogram procesow (scheduler, C++)
+│   ├── driver_manager.cpp  # menedzer sterownikow jako procesy ring-0
 │   ├── paging.c          # stronicowanie pamieci
 │   ├── syscall.c         # wywolania systemowe
 │   ├── timer.c           # timer systemowy

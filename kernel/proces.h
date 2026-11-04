@@ -103,6 +103,10 @@ struct proces {
     uint64_t nr_migrations;
     uint64_t nr_blocked;
     uint32_t sleep_ticks;
+    uint8_t is_driver;
+    uint32_t driver_handle;
+    uint32_t driver_poll_interval;
+    uint32_t driver_last_poll;
 };
 
 extern struct proces *current_process;
@@ -125,6 +129,8 @@ void proces_block(void);
 void proces_wakeup(struct proces *p);
 struct proces *proces_find(uint32_t pid);
 int proces_get_stats(uint32_t pid, struct proces *out);
+struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, uint32_t arg, uint32_t poll_interval);
+uint32_t proces_get_kernel_page_dir(void);
 
 #ifdef __cplusplus
 }

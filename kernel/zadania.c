@@ -3,6 +3,7 @@
 #include "../graficzny/okno.h"
 #include "../graficzny/rysowanie.h"
 #include "../kernel/proces.h"
+#include "../kernel/driver_manager.h"
 
 #define ZADANIA_SZEROKOSC 560
 #define ZADANIA_WYSOKOSC 420
@@ -18,14 +19,6 @@
 #define KOLOR_WIERSZ_PARZYSTY 0x00EEF2F6
 
 static struct okno okno_zadania;
-
-static const char *zadania_stan_nazwa(proces_state_t stan)
-{
-    if (stan == PROCES_READY) return "GOTOWY";
-    if (stan == PROCES_RUNNING) return "URUCHOMIONY";
-    if (stan == PROCES_BLOCKED) return "ZABLOKOWANY";
-    return "ZAKONCZONY";
-}
 
 static int zadania_przycisk_x(int szerokosc)
 {
@@ -52,17 +45,20 @@ static void zadania_u32_do_tekstu(uint32_t v, char *buf)
     buf[j] = 0;
 }
 
-static void zadania_narysuj(int x, int y, int szerokosc, int wysokosc)
+static void zadania_narysywaj(int x, int y, int szerokosc, int wysokosc)
 {
     (void)wysokosc;
     int bx = x + zadania_przycisk_x(szerokosc);
     char buf[16];
     char nazwa[ZADANIA_NAZWA_MAKS + 1];
+    char nazwa_pelna[ZADANIA_NAZWA_MAKS + 16];
     int n;
+    int len;
 
     rysuj_tekst_chicago(x + 4, y, "PID", KOLOR_TEKST_ZADANIA);
     rysuj_tekst_chicago(x + 30, y, "NAZWA", KOLOR_TEKST_ZADANIA);
     rysuj_tekst_chicago(x + 150, y, "STAN", KOLOR_TEKST_ZADANIA);
+    rysuj_tekst_chicago(x + 210, y, "TYP", KOLOR_TEKST_ZADANIA);
 
     int wy = y + ZADANIA_WIERSZ_POCZ;
     int numer = 0;
@@ -80,8 +76,23 @@ static void zadania_narysuj(int x, int y, int szerokosc, int wysokosc)
             n++;
         }
         nazwa[n] = 0;
-        rysuj_tekst_chicago(x + 30, wy + 2, nazwa, KOLOR_TEKST_ZADANIA);
-        rysuj_tekst_chicago(x + 150, wy + 2, zadania_stan_nazwa(p->state), KOLOR_TEKST_ZADANIA);
+        if (p->is_driver) {
+            for (len = 0; nazwa[len] && len < ZADANIA_NAZWA_MAKS; len++) {
+                nazwa_pelna[len] = nazwa[len];
+            }
+            const char *mark = " [STEROWNIK]";
+            int m = 0;
+            while (mark[m] && len + m < ZADANIA_NAZWA_MAKS + 15) {
+                nazwa_pelna[len + m] = mark[m];
+                m++;
+            }
+            nazwa_pelna[len + m] = 0;
+            rysuj_tekst_chicago(x + 30, wy + 2, nazwa_pelna, KOLOR_TEKST_ZADANIA);
+            rysuj_tekst_chicago(x + 210, wy + 2, "STEROWNIK", KOLOR_TEKST_ZADANIA);
+        } else {
+            rysuj_tekst_chicago(x + 30, wy + 2, nazwa, KOLOR_TEKST_ZADANIA);
+            rysuj_tekst_chicago(x + 210, wy + 2, "UZYTKOWNIK", KOLOR_TEKST_ZADANIA);
+        }
         rysuj_prostokat(bx, wy + 1, ZADANIA_PRZYCISK_W, ZADANIA_PRZYCISK_H, KOLOR_PRZYCISKU_ZABIJ);
         rysuj_tekst_chicago(bx + 8, wy + 4, "ZABIJ", KOLOR_TEKST_PRZYCISKU);
         wy += ZADANIA_WIERSZ_WYS;
@@ -100,6 +111,7 @@ static void zadania_klik(int x, int y)
         if (cy >= wy && cy < wy + ZADANIA_WIERSZ_WYS &&
             x >= bx && x < bx + ZADANIA_PRZYCISK_W) {
             if (p->window) okno_zamknij(p->window);
+            driver_manager_shutdown_by_pid(p->pid);
             proces_zakoncz(p->pid);
             okno_narysuj(&okno_zadania);
             return;
@@ -111,6 +123,6 @@ static void zadania_klik(int x, int y)
 void zadania_otworz(void)
 {
     okno_stworz(&okno_zadania, 180, 120, ZADANIA_SZEROKOSC, ZADANIA_WYSOKOSC,
-                "ZARZADZANIE ZADANIAMI", zadania_narysuj);
+                "ZARZADZANIE ZADANIAMI", zadania_narysywaj);
     okno_ustaw_obsluge_klikniecia(&okno_zadania, zadania_klik);
 }

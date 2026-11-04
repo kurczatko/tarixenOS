@@ -10,6 +10,9 @@ static uint32_t process_count = 0;
 static uint32_t kernel_page_dir_phys = 0;
 static uint64_t global_ticks = 0;
 
+static uint32_t driver_kernel_stacks[8][1024] __attribute__((aligned(16)));
+static uint32_t driver_stack_count = 0;
+
 static uint32_t prio_bitmap[(NR_PRIORITIES + 31) / 32] = {0};
 static struct proces *prio_head[NR_PRIORITIES] = {0};
 static struct proces *prio_tail[NR_PRIORITIES] = {0};
@@ -33,9 +36,9 @@ static inline void prio_bitmap_clear(int prio) {
 }
 
 static inline int prio_find_highest(void) {
-    for (int i = ((int)NR_PRIORITIES + 31) / 32 - 1; i >= 0; i--) {
+    for (int i = 0; i < ((int)NR_PRIORITIES + 31) / 32; i++) {
         if (prio_bitmap[i]) {
-            return i * 32 + (31 - __builtin_clz(prio_bitmap[i]));
+            return i * 32 + __builtin_ctz(prio_bitmap[i]);
         }
     }
     return -1;
@@ -171,6 +174,10 @@ void proces_init(void) {
         p->nr_migrations = 0;
         p->nr_blocked = 0;
         p->sleep_ticks = 0;
+        p->is_driver = 0;
+        p->driver_handle = 0xFFFFFFFFU;
+        p->driver_poll_interval = 0;
+        p->driver_last_poll = 0;
         p->sleep_until = 0;
         p->wait_start = 0;
         p->sum_exec_runtime = 0;
@@ -252,6 +259,10 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
     p->nr_migrations = 0;
     p->nr_blocked = 0;
     p->sleep_ticks = 0;
+    p->is_driver = 0;
+    p->driver_handle = 0xFFFFFFFFU;
+    p->driver_poll_interval = 0;
+    p->driver_last_poll = 0;
     p->ctx_switches = 0;
 
     for (uint32_t i = 0; i < 31 && name && name[i]; i++) {
@@ -474,6 +485,98 @@ uint32_t *proces_klonuj_page_directory(void) {
     new_dir[0xFD000000 >> 22] = ((uint32_t)fb_pt | PAGE_PRESENT | PAGE_READWRITE);
 
     return new_dir;
+}
+
+uint32_t proces_get_kernel_page_dir(void)
+{
+    return kernel_page_dir_phys;
+}
+
+struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, uint32_t arg, uint32_t poll_interval)
+{
+    if (process_count >= MAX_PROCESSES) return 0;
+    if (driver_stack_count >= 8) return 0;
+
+    struct proces *p = proces_alloc_slot();
+    if (!p) return 0;
+
+    p->pid = next_pid++;
+    p->state = PROCES_READY;
+    p->entry_point = entry_point;
+    p->arg = arg;
+    p->window = 0;
+    p->page_directory = (uint32_t *)kernel_page_dir_phys;
+    p->sched_class = SCHED_CRITICAL;
+    p->priority = 10;
+    p->static_priority = 10;
+    p->time_slice = 4U;
+    p->vruntime = 0;
+    p->sum_exec_runtime = 0;
+    p->exec_start = global_ticks;
+    p->wait_start = 0;
+    p->sleep_until = 0;
+    p->period = 0;
+    p->deadline = 0;
+    p->cpu = 0;
+    p->preempt_count = 0;
+    p->prio_inherited = 0;
+    p->original_prio = p->priority;
+    p->policy = 0;
+    p->nr_wakeups = 0;
+    p->nr_migrations = 0;
+    p->nr_blocked = 0;
+    p->sleep_ticks = 0;
+    p->ctx_switches = 0;
+    p->is_driver = 1;
+    p->driver_handle = 0xFFFFFFFFU;
+    p->driver_poll_interval = poll_interval;
+    p->driver_last_poll = 0;
+
+    for (uint32_t i = 0; i < 31 && name && name[i]; i++) {
+        p->name[i] = name[i];
+    }
+    p->name[31] = 0;
+    if (!name) p->name[0] = 0;
+
+    for (uint32_t i = 0; i < MAX_OKNA_PROCESU; i++) {
+        p->okna_uzyte[i] = 0;
+    }
+
+    p->kernel_stack = (uint32_t)&driver_kernel_stacks[driver_stack_count][0] + 4096U - 16U;
+    driver_stack_count++;
+
+    uint32_t *stack = (uint32_t *)p->kernel_stack;
+    stack--;
+    *stack = GDT_RING0_DATA;
+    stack--;
+    *stack = 0U;
+    stack--;
+    *stack = 0x202U;
+    stack--;
+    *stack = GDT_RING0_CODE;
+    stack--;
+    *stack = entry_point;
+
+    p->regs.esp = (uint32_t)(stack + 4);
+    p->regs.ebp = (uint32_t)(stack + 4);
+    p->regs.eax = arg;
+    p->regs.ebx = 0;
+    p->regs.ecx = 0;
+    p->regs.edx = 0;
+    p->regs.esi = 0;
+    p->regs.edi = 0;
+    p->regs.eflags = 0x202U;
+    p->regs.cs = GDT_RING0_CODE;
+    p->regs.ds = GDT_RING0_DATA;
+    p->regs.es = GDT_RING0_DATA;
+    p->regs.fs = GDT_RING0_DATA;
+    p->regs.gs = GDT_RING0_DATA;
+    p->regs.ss = GDT_RING0_DATA;
+    p->regs.eip = entry_point;
+
+    runq_enqueue(p);
+    process_count++;
+    return p;
 }
 
 void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
