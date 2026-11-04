@@ -3,6 +3,7 @@
 #include "../graficzny/czcionka.h"
 #include "../graficzny/okno.h"
 #include "../graficzny/rysowanie.h"
+#include "proces.h"
 
 #define KALKULATOR_SZEROKOSC 320
 #define KALKULATOR_WYSOKOSC 420
@@ -266,6 +267,7 @@ void kalkulator_otworz(void)
     kalkulator_nowe_wejscie = 0;
     okno_stworz(&okno_kalkulator, 56, 50, KALKULATOR_SZEROKOSC,
                 KALKULATOR_WYSOKOSC, "KALKULATOR", kalkulator_narysuj);
+    proces_rejestruj_okno("KALKULATOR", &okno_kalkulator);
     okno_ustaw_obsluge_klikniecia(&okno_kalkulator, kalkulator_klik);
     okno_ustaw_pole_tekstowe_enter(&okno_kalkulator, (okno_pole_tekstowe)kalkulator_pole_tekstowe_enter);
     okno_ustaw_pole_tekstowe_wyjdz(&okno_kalkulator, (okno_pole_tekstowe)kalkulator_pole_tekstowe_wyjdz);

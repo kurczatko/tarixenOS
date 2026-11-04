@@ -5,6 +5,7 @@
 #include "../system_plikow/system_plikow.h"
 #include "../drivers/keyboard.h"
 #include "../include/printf/types.h"
+#include "proces.h"
 
 extern uint32_t *obraz;
 
@@ -303,6 +304,7 @@ void malowanie_otworz(void)
     malowanie_kolor = 0;
     malowanie_ustaw_status("gotowy");
     okno_stworz(&okno_malowanie, 100, 60, WIN_W, WIN_H, "MALOWANIE", malowanie_rysuj_zawartosc);
+    proces_rejestruj_okno("MALOWANIE", &okno_malowanie);
     okno_ustaw_obsluge_klikniecia(&okno_malowanie, malowanie_klik);
     okno_ustaw_obsluge_ruchu(&okno_malowanie, malowanie_ruch);
 }

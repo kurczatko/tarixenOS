@@ -4,6 +4,7 @@
 #include "../graficzny/okno.h"
 #include "../graficzny/rysowanie.h"
 #include "../system_plikow/system_plikow.h"
+#include "proces.h"
 
 #define NOTATNIK_PLIK "NOTATKA.NTF"
 #define NOTATNIK_MAKS 512
@@ -269,6 +270,7 @@ static void notatnik_otworz_biezacy_plik(void)
     notatnik_odczytaj();
     okno_stworz(&okno_notatnik, 56, 50, NOTATNIK_SZEROKOSC,
                 NOTATNIK_WYSOKOSC, "NOTATNIK", notatnik_narysuj);
+    proces_rejestruj_okno("NOTATNIK", &okno_notatnik);
     okno_ustaw_obsluge_klikniecia(&okno_notatnik, notatnik_klik);
     okno_ustaw_pole_tekstowe_wyjdz(&okno_notatnik, (okno_pole_tekstowe)notatnik_pole_tekstowe_wyjdz);
     okno_ustaw_pole_tekstowe_znak(&okno_notatnik, (okno_pole_tekstowe_znak)notatnik_pole_tekstowe_znak);

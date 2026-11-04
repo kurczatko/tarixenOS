@@ -8,6 +8,7 @@
 #include "../drivers/keyboard.h"
 #include "../kompilator/cc_os.h"
 #include "../drivers/floppy.h"
+#include "../kernel/proces.h"
 
 struct okno pliki;
 static int wybrany_element = -1;
@@ -159,6 +160,7 @@ void eksplorator_plikow(void)
     tryb_tworz = 0;
     status_plikow[0] = 0;
     okno_stworz(&pliki, 300, 300, 300, 300, "Pliki", rysuj_zawartosc_plikow);
+    proces_rejestruj_okno("PLIKI", &pliki);
     okno_ustaw_obsluge_klikniecia(&pliki, obsluz_klik_plikow);
 }
 

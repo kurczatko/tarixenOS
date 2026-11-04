@@ -7,6 +7,7 @@
 #include "../graficzny/czcionka.h"
 #include "browser_css.h"
 #include "browser_js.h"
+#include "proces.h"
 
 #define BROWSER_WIDTH 760
 #define BROWSER_HEIGHT 570
@@ -1076,6 +1077,7 @@ void browser_open(void)
     else set_status("Wpisz adres i nacisnij IDZ");
     okno_stworz(&browser_window, 120, 80, BROWSER_WIDTH, BROWSER_HEIGHT,
                 "PRZEGLADARKA HTTP/HTTPS", browser_draw);
+    proces_rejestruj_okno("WWW", &browser_window);
     okno_ustaw_obsluge_klikniecia(&browser_window, browser_click);
 }
 

@@ -146,6 +146,50 @@ void proces_zakoncz(uint32_t pid) {
     }
 }
 
+static int proces_nazwa_rowna(const char *a, const char *b) {
+    for (int i = 0; i < 32; i++) {
+        if (a[i] != b[i]) return 0;
+        if (a[i] == 0) return 1;
+    }
+    return 1;
+}
+
+void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i].pid != 0 && process_table[i].state != PROCES_TERMINATED &&
+            proces_nazwa_rowna(process_table[i].name, nazwa)) {
+            process_table[i].window = okno;
+            process_table[i].state = PROCES_READY;
+            return;
+        }
+    }
+
+    int slot = -1;
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i].pid == 0 || process_table[i].state == PROCES_TERMINATED) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot == -1) return;
+
+    struct proces *p = &process_table[slot];
+    p->pid = next_pid++;
+    p->state = PROCES_READY;
+    p->window = okno;
+    p->entry_point = 0;
+    p->arg = 0;
+    p->kernel_stack = 0;
+    p->user_stack = 0;
+    p->page_directory = 0;
+    for (int i = 0; i < 31 && nazwa[i]; i++) p->name[i] = nazwa[i];
+    p->name[31] = 0;
+    for (int i = 0; i < MAX_OKNA_PROCESU; i++) {
+        p->okna_uzyte[i] = 0;
+    }
+    process_count++;
+}
+
 void proces_tick(void) {
     if (!current_process) return;
 

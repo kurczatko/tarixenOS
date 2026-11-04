@@ -5,6 +5,7 @@
 #include "../graficzny/okno.h"
 #include "../graficzny/czcionka.h"
 #include "../include/printf/types.h"
+#include "../proces.h"
 
 extern uint32_t *obraz;
 
@@ -325,6 +326,7 @@ void gra(void)
 {
     keyboard_init();
     okno_stworz(&okno_gra, 100, 100, 640, 480, "GRA", gra_rysuj_zawartosc);
+    proces_rejestruj_okno("GRA", &okno_gra);
     
     for (int i = 0; i < MAX_PILKI; i++) {
         pilki[i].aktywna = 0;

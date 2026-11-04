@@ -63,4 +63,6 @@ uint32_t proces_pobierz_pid(void);
 
 uint32_t *proces_klonuj_page_directory(void);
 
+void proces_rejestruj_okno(const char *nazwa, struct okno *okno);
+
 #endif
