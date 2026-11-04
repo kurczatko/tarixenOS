@@ -3842,3 +3842,236 @@ i915_init();
 ```
 
 Nagłówek `drivers/plyty_glowne/intel_915.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/plyty_glowne/intel_915.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/plyty_glowne/*.cpp)`).
+
+## karta graficzna - drivers/karty_graficzne/radeon_rx_9070_xt.cpp
+
+Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16GB GDDR6 (architektura RDNA 4 / Navi 48) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP GFX, CP COMPUTE, CP DMA), ray tracing (RT), mesh shaders, variable rate shading (VRS), delta color compression (DCC), przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami i kompresja (ASTC, DXT), shadery (vertex, pixel, geometry, compute, ray gen, any hit, closest hit, miss, callable, intersection, mesh, amplification), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, HDR, triple buffer). Sterownik zarządza 16 GB pamięci GDDR6 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_rx_9070_xt.h i jest inicjalizowany z kernel/kernel.c przez `rx_9070_xt_init()`.
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `int rx_9070_xt_init(void)` | Inicjalizuje sterownik Radeon RX 9070 XT: wyszukuje urzadzenie na PCI (vendor 0x1002, Navi 48 XT), mapuje adresy MMIO, czysci przerwania, konfiguruje zasilanie (D0), zegary GPU i pamieci, inicjalizuje silnik wyswietlania DCN (CRTC, plane, surface, 1920x1080, FreeSync, HDR), resetuje i inicjalizuje Command Processor (ring buffory GFX/COMPUTE/DMA), konfiguruje potok 3D (color buffer, depth buffer, blend, rasterizer, shader SQ), inicjalizuje kursor sprzetowy. Zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie. |
+| `int rx_9070_xt_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy. |
+| `void rx_9070_xt_shutdown(void)` | Zatrzymuje Command Processor (ME i PFP Halt), przechodzi w stan zasilania D3 i oznacza sterownik jako nieinicjalizowany. |
+
+### Podstawowa grafika 2D
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_putpixel(uint32_t x, uint32_t y, uint32_t color)` | Rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem. |
+| `void rx_9070_xt_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Wypelnia prostokat o podanym rozmiarze i kolorze. Uzywa ring buffer CP GFX gdy sterownik jest zainicjowany, w przeciwnym razie petla CPU. |
+| `void rx_9070_xt_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)` | Kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) uzywajac ring buffer CP GFX sprzetowego. |
+| `void rx_9070_xt_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)` | Ustawia kursor sprzetowy na pozycji (x, y) z obrazem 64x64 (kopiowany do pamieci ramki graficznej). |
+| `void rx_9070_xt_cursor_hide(void)` | Ukrywa kursor sprzetowy. |
+| `void *rx_9070_xt_get_fb(void)` | Zwraca wskaznik na ramke graficzna (framebuffer). |
+| `uint32_t rx_9070_xt_get_width(void)` | Zwraca szerokosc ekranu (1920). |
+| `uint32_t rx_9070_xt_get_height(void)` | Zwraca wysokosc ekranu (1080). |
+| `uint16_t rx_9070_xt_get_device_id(void)` | Zwraca ID urzadzenia graficznego. |
+| `uint8_t rx_9070_xt_get_revision(void)` | Zwraca rewizje karty graficznej. |
+| `void rx_9070_xt_info_get(struct rx_9070_xt_info *out)` | Pobiera pelne informacje o urzadzeniu (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, architecture, vram_size, vram_used, gfx_clock_mhz, memory_clock_mhz, temperature_c, fan_rpm). |
+
+### Zarządzanie pamięcią VRAM (16 GB GDDR6)
+
+| funkcja | opis |
+|---------|------|
+| `uint64_t rx_9070_xt_vram_alloc(uint64_t size, uint32_t type)` | Alokuje obszar pamieci VRAM o podanym rozmiarze i typie (wyrownanie do strony 4 KB). Zwraca offset w VRAM lub 0xFFFFFFFFFFFFFFFF przy bledzie. |
+| `void rx_9070_xt_vram_free(uint64_t handle)` | Zwalnia obszar pamieci VRAM o podanym offsecie (oznacza slot jako wolny). |
+| `uint64_t rx_9070_xt_vram_used(void)` | Zwraca liczbe bajtow VRAM aktualnie uzytych. |
+| `uint64_t rx_9070_xt_vram_total(void)` | Zwraca calkowita pojemnosc VRAM (16 GB). |
+
+### Tworzenie i niszczenie zasobow 3D
+
+| funkcja | opis |
+|---------|------|
+| `rx_9070_xt_handle_t rx_9070_xt_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data)` | Tworzy vertex buffer (wierzcholki). Zwraca handle lub RX_9070_XT_HANDLE_NULL przy bledzie. |
+| `void rx_9070_xt_vertex_buffer_destroy(rx_9070_xt_handle_t handle)` | Niszczy vertex buffer o podanym handle i zwalnia jego pamiec VRAM. |
+| `void rx_9070_xt_vertex_buffer_update(rx_9070_xt_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane vertex buffera od podanego offsetu. |
+| `rx_9070_xt_handle_t rx_9070_xt_index_buffer_create(uint32_t index_count, uint32_t format, const void *data)` | Tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe). Zwraca handle. |
+| `void rx_9070_xt_index_buffer_destroy(rx_9070_xt_handle_t handle)` | Niszczy index buffer i zwalnia jego pamiec VRAM. |
+| `void rx_9070_xt_index_buffer_update(rx_9070_xt_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane index buffera od podanego offsetu. |
+| `rx_9070_xt_handle_t rx_9070_xt_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data)` | Tworzy teksture 2D o podanym rozmiarze, formacie i liczbie poziomow mipmap. Zwraca handle. |
+| `void rx_9070_xt_texture_destroy(rx_9070_xt_handle_t handle)` | Niszczy teksture i zwalnia jej pamiec VRAM. |
+| `void rx_9070_xt_texture_update(rx_9070_xt_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data)` | Aktualizuje zawartosc tekstury (upload z pamieci systemowej do VRAM). |
+| `void rx_9070_xt_texture_generate_mipmaps(rx_9070_xt_handle_t handle)` | Generuje mipmapy dla tekstury (powtarzajace polowowanie wymiarow). |
+| `rx_9070_xt_handle_t rx_9070_xt_render_target_create(uint32_t width, uint32_t height, uint32_t format, uint8_t alpha_blend, uint8_t dcc)` | Tworzy render target (bufor koloru do renderowania 3D z obsluga przezroczystosci alpha i DCC). Zwraca handle. |
+| `void rx_9070_xt_render_target_destroy(rx_9070_xt_handle_t handle)` | Niszczy render target i zwalnia jego pamiec VRAM. |
+| `rx_9070_xt_handle_t rx_9070_xt_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format, uint8_t compression)` | Tworzy depth-stencil buffer (bufor glebi i stencil z opcjonalna kompresja). Zwraca handle. |
+| `void rx_9070_xt_depth_stencil_destroy(rx_9070_xt_handle_t handle)` | Niszczy depth-stencil i zwalnia jego pamiec VRAM. |
+| `rx_9070_xt_handle_t rx_9070_xt_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size)` | Tworzy shader (vertex/pixel/geometry/compute/ray/mesh/amplification) z kodu bajtowego GPU. Zwraca handle. |
+| `void rx_9070_xt_shader_destroy(rx_9070_xt_handle_t handle)` | Niszczy shader. |
+| `void rx_9070_xt_shader_compile(rx_9070_xt_handle_t handle)` | Oznacza shader jako skompilowany (gotowy do uzycia w potoku). |
+| `rx_9070_xt_handle_t rx_9070_xt_sampler_state_create(uint32_t filter_min, uint32_t filter_mag, uint32_t filter_mip, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint32_t max_anisotropy, uint8_t compare_enable, uint8_t compare_func)` | Tworzy stan probki tekstury (filtrowanie min/mag/mip, adresowanie, anisotropia, porownanie). Zwraca handle. |
+| `void rx_9070_xt_sampler_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan probki tekstury. |
+| `rx_9070_xt_handle_t rx_9070_xt_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor)` | Tworzy stan blendowania (przezroczystosc alpha, operacje blendowania, staly kolor blendowania). Zwraca handle. |
+| `void rx_9070_xt_blend_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan blendowania. |
+| `rx_9070_xt_handle_t rx_9070_xt_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage, uint8_t vrs)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage, VRS). Zwraca handle. |
+| `void rx_9070_xt_rasterizer_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan rasterizera. |
+| `rx_9070_xt_handle_t rx_9070_xt_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)` | Tworzy stan depth-stencil (testy glebi i stencil z przodem i tylem). Zwraca handle. |
+| `void rx_9070_xt_depth_stencil_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan depth-stencil. |
+| `rx_9070_xt_handle_t rx_9070_xt_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats)` | Tworzy input layout (mapowanie atrybutow vertex do slotow). Zwraca handle. |
+| `void rx_9070_xt_input_layout_destroy(rx_9070_xt_handle_t handle)` | Niszczy input layout. |
+| `rx_9070_xt_handle_t rx_9070_xt_constant_buffer_create(uint32_t size)` | Tworzy constant buffer (stale shadera / uniforms) z pamiecia VRAM. Zwraca handle. |
+| `void rx_9070_xt_constant_buffer_destroy(rx_9070_xt_handle_t handle)` | Niszczy constant buffer i zwalnia jego pamiec VRAM. |
+| `void rx_9070_xt_constant_buffer_update(rx_9070_xt_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane constant buffera od podanego offsetu. |
+| `rx_9070_xt_handle_t rx_9070_xt_acceleration_structure_create(uint32_t geometry_count, const uint32_t *vertex_buffers, const uint32_t *index_buffers, const uint32_t *vertex_counts, const uint32_t *index_counts)` | Tworzy strukture przyspieszania ray tracingu (BVH) z podanych buforow wierzcholkow i indeksow. Zwraca handle. |
+| `void rx_9070_xt_acceleration_structure_destroy(rx_9070_xt_handle_t handle)` | Niszczy strukture przyspieszania ray tracingu. |
+| `void rx_9070_xt_acceleration_structure_build(rx_9070_xt_handle_t handle)` | Buduje strukture przyspieszania ray trackingu na GPU (emit polecenia do ring buffer CP GFX). |
+
+### Bindowanie stanow potoku 3D
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_bind_vertex_buffer(rx_9070_xt_handle_t handle)` | Binduje vertex buffer do potoku 3D. |
+| `void rx_9070_xt_bind_index_buffer(rx_9070_xt_handle_t handle)` | Binduje index buffer do potoku 3D. |
+| `void rx_9070_xt_bind_input_layout(rx_9070_xt_handle_t handle)` | Binduje input layout do potoku 3D. |
+| `void rx_9070_xt_bind_vertex_shader(rx_9070_xt_handle_t handle)` | Binduje shader vertex do potoku 3D. |
+| `void rx_9070_xt_bind_pixel_shader(rx_9070_xt_handle_t handle)` | Binduje shader pixel do potoku 3D. |
+| `void rx_9070_xt_bind_geometry_shader(rx_9070_xt_handle_t handle)` | Binduje shader geometry do potoku 3D. |
+| `void rx_9070_xt_bind_compute_shader(rx_9070_xt_handle_t handle)` | Binduje shader compute do potoku 3D. |
+| `void rx_9070_xt_bind_ray_gen_shader(rx_9070_xt_handle_t handle)` | Binduje shader ray generation do potoku ray tracingu. |
+| `void rx_9070_xt_bind_any_hit_shader(rx_9070_xt_handle_t handle)` | Binduje shader any-hit do potoku ray tracingu. |
+| `void rx_9070_xt_bind_closest_hit_shader(rx_9070_xt_handle_t handle)` | Binduje shader closest-hit do potoku ray tracingu. |
+| `void rx_9070_xt_bind_miss_shader(rx_9070_xt_handle_t handle)` | Binduje shader miss do potoku ray tracingu. |
+| `void rx_9070_xt_bind_callable_shader(rx_9070_xt_handle_t handle)` | Binduje shader callable do potoku ray tracingu. |
+| `void rx_9070_xt_bind_intersection_shader(rx_9070_xt_handle_t handle)` | Binduje shader intersection do potoku ray tracingu. |
+| `void rx_9070_xt_bind_mesh_shader(rx_9070_xt_handle_t handle)` | Binduje shader mesh do potoku 3D. |
+| `void rx_9070_xt_bind_amplification_shader(rx_9070_xt_handle_t handle)` | Binduje shader amplification do potoku 3D. |
+| `void rx_9070_xt_bind_render_target(rx_9070_xt_handle_t handle)` | Binduje render target do potoku 3D. |
+| `void rx_9070_xt_bind_depth_stencil(rx_9070_xt_handle_t handle)` | Binduje depthstencil do potoku 3D. |
+| `void rx_9070_xt_bind_blend_state(rx_9070_xt_handle_t handle)` | Binduje stan blendowania do potoku 3D. |
+| `void rx_9070_xt_bind_rasterizer_state(rx_9070_xt_handle_t handle)` | Binduje stan rasterizera do potoku 3D. |
+| `void rx_9070_xt_bind_depth_stencil_state(rx_9070_xt_handle_t handle)` | Binduje stan depth-stencil do potoku 3D. |
+| `void rx_9070_xt_bind_acceleration_structure(rx_9070_xt_handle_t handle)` | Binduje strukture przyspieszania ray tracingu do potoku. |
+| `void rx_9070_xt_bind_sampler_and_texture(uint32_t slot, rx_9070_xt_handle_t sampler, rx_9070_xt_handle_t texture)` | Binduje probke tekstury i teksture do slotu. |
+| `void rx_9070_xt_bind_constant_buffer(uint32_t slot, rx_9070_xt_handle_t handle)` | Binduje constant buffer do slotu. |
+
+### Konfiguracja potoku 3D
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth)` | Ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi. |
+| `void rx_9070_xt_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom)` | Ustawia prostokat przyciecia renderowania (scissor). |
+| `void rx_9070_xt_set_primitive_topology(uint32_t topology)` | Ustawia typ primitivu do rysowania (punkt, linia, trojkat, kwadrat itp.). |
+| `void rx_9070_xt_set_alpha_blend_global(uint8_t enable)` | Wlacza/wylacza globalne blendowanie alfa (przezroczystosc) dla calego potoku 3D. |
+| `void rx_9070_xt_set_ray_tracing(uint8_t enable)` | Wlacza/wylacza ray tracing (RT) w potoku graficznym. |
+| `void rx_9070_xt_set_mesh_shader(uint8_t enable)` | Wlacza/wylacza mesh shaders w potoku graficznym. |
+| `void rx_9070_xt_set_variable_rate_shading(uint8_t enable)` | Wlacza/wylacza variable rate shading (VRS). |
+| `void rx_9070_xt_set_delta_color_compression(uint8_t enable)` | Wlacza/wylacza delta color compression (DCC) dla render targetow. |
+| `void rx_9070_xt_set_hdr(uint8_t enable)` | Wlacza/wylacza HDR (High Dynamic Range) na wyjsciu display. |
+| `void rx_9070_xt_set_freesync(uint8_t enable)` | Wlacza/wylacza FreeSync (zmienna czestotliwosc odswiezania) na CRTC. |
+
+### Rysowanie 3D
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_clear_render_target(rx_9070_xt_handle_t rt, uint32_t color)` | Czyści render target podanym kolorem. |
+| `void rx_9070_xt_clear_depth_stencil(rx_9070_xt_handle_t ds, float depth, uint8_t stencil)` | Czyści depth-stencil podanymi wartosciami glebi i stencil. |
+| `void rx_9070_xt_draw(uint32_t vertex_count, uint32_t start_vertex)` | Rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. |
+| `void rx_9070_xt_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)` | Rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex. |
+| `void rx_9070_xt_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)` | Rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji poczynajac od start_instance. |
+| `void rx_9070_xt_draw_indirect(uint32_t buffer_addr, uint32_t draw_count, uint32_t stride)` | Rysuje z parametrami pobranymi z bufora indirect (draw indirect). |
+
+### Compute i ray tracing
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_compute_dispatch(uint32_t group_x, uint32_t group_y, uint32_t group_z)` | Uruchamia obliczenia compute (dispatch) z podana liczba grup watkow w X, Y, Z. |
+| `void rx_9070_xt_compute_dispatch_indirect(uint32_t buffer_addr)` | Uruchamia obliczenia compute z parametrami z bufora indirect. |
+| `void rx_9070_xt_ray_trace(uint32_t width, uint32_t height, uint32_t depth, uint32_t accel_struct, uint32_t ray_gen_shader)` | Uruchamia ray tracing (rzucone promienie) z podana struktura przyspieszania i shaderem ray gen. |
+| `void rx_9070_xt_mesh_draw(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)` | Rysuje uzywajac mesh shaders (mesh draw z podana liczba grup watkow). |
+
+### Synchronizacja (fences, semaphory)
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_fence_create(rx_9070_xt_handle_t *out)` | Tworzy fence (synchronizacja GPU) i zwraca jego handle. |
+| `void rx_9070_xt_fence_signal(rx_9070_xt_handle_t handle, uint32_t value)` | Sygnalizuje fence z podana wartoscia (oznacza zakonczenie pracy GPU). |
+| `int rx_9070_xt_fence_wait(rx_9070_xt_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizację fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
+| `void rx_9070_xt_fence_destroy(rx_9070_xt_handle_t handle)` | Niszczy fence o podanym handle. |
+| `void rx_9070_xt_semaphore_create(rx_9070_xt_handle_t *out)` | Tworzy semafor (synchronizacja miedzy etapami potoku) i zwraca jego handle. |
+| `void rx_9070_xt_semaphore_signal(rx_9070_xt_handle_t handle, uint32_t value)` | Sygnalizuje semafor z podana wartoscia. |
+| `void rx_9070_xt_semaphore_wait(rx_9070_xt_handle_t handle, uint32_t value)` | Czeka na sygnalizację semafora do podanej wartosci (blokujace). |
+| `void rx_9070_xt_semaphore_destroy(rx_9070_xt_handle_t handle)` | Niszczy semafor o podanym handle. |
+
+### Zarządzanie zasilaniem, zegarami, temperatura, wentylator, RGB
+
+| funkcja | opis |
+|---------|------|
+| `int rx_9070_xt_wait_idle(uint32_t timeout_us)` | Czeka az GPU bedzie bzczynne (ring buffer pusty) z timeoutem. Zwraca 1 gdy GPU jest idle, 0 przy timeoutcie. |
+| `uint64_t rx_9070_xt_timestamp(void)` | Pobiera aktualny znacznik czasu z rejestru timestamp GPU. |
+| `void rx_9070_xt_power_set_state(uint8_t state)` | Ustawia stan zasilania GPU (D0-D3). |
+| `uint8_t rx_9070_xt_power_get_state(void)` | Zwraca aktualny stan zasilania GPU. |
+| `void rx_9070_xt_set_clock_gfx(uint32_t mhz)` | Ustawia taktowanie rdzenia grafiki (GFX clock) w MHz. |
+| `void rx_9070_xt_set_clock_memory(uint32_t mhz)` | Ustawia taktowanie pamieci (memory clock) w MHz. |
+| `uint32_t rx_9070_xt_get_clock_gfx(void)` | Zwraca aktualne taktowanie rdzenia grafiki w MHz. |
+| `uint32_t rx_9070_xt_get_clock_memory(void)` | Zwraca aktualne taktowanie pamieci w MHz. |
+| `uint32_t rx_9070_xt_get_temperature(void)` | Pobiera aktualna temperature GPU z czujnika termicznego (w stopniach Celsjusza). |
+| `void rx_9070_xt_set_fan_speed(uint32_t rpm)` | Ustawia predkosc wentylatora GPU w obrotach na minute (RPM). |
+| `uint32_t rx_9070_xt_get_fan_speed(void)` | Zwraca aktualna predkosc wentylatora GPU w RPM. |
+| `void rx_9070_xt_rgb_set(uint32_t color, uint8_t mode)` | Ustawia sterowanie RGB na karcie (kolor i tryb swiecenia). |
+| `void rx_9070_xt_rgb_off(void)` | Wylacza sterowanie RGB na karcie. |
+
+### Funkcje sprawdzania obslugi cech (feature detection)
+
+| funkcja | opis |
+|---------|------|
+| `int rx_9070_xt_feature_ray_tracing(void)` | Zwraca 1 gdy ray tracing jest wspierany i wlaczony. |
+| `int rx_9070_xt_feature_mesh_shader(void)` | Zwraca 1 gdy mesh shaders sa wspierane i wlaczone. |
+| `int rx_9070_xt_feature_variable_rate_shading(void)` | Zwraca 1 gdy variable rate shading jest wspierany i wlaczony. |
+| `int rx_9070_xt_feature_sampler_feedback(void)` | Zwraca 1 gdy sampler feedback jest wspierany. |
+| `int rx_9070_xt_feature_hdr(void)` | Zwraca 1 gdy HDR jest wspierany i wlaczony. |
+| `int rx_9070_xt_feature_freesync(void)` | Zwraca 1 gdy FreeSync jest wspierany i wlaczony. |
+| `int rx_9070_xt_feature_delta_color_compression(void)` | Zwraca 1 gdy delta color compression jest wspierane i wlaczone. |
+
+### Presentation (swap chain)
+
+| funkcja | opis |
+|---------|------|
+| `rx_9070_xt_handle_t rx_9070_xt_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync, uint8_t alpha_premultiplied, uint8_t hdr, uint8_t triple_buffer)` | Tworzy swap chain (podwojne/trojne buforowanie z opcja vsync, premultiplied alpha i HDR). Zwraca handle. |
+| `void rx_9070_xt_swap_chain_destroy(rx_9070_xt_handle_t handle)` | Niszczy swap chain i zwalnia pamiec VRAM bufora tylnego. |
+| `void rx_9070_xt_present(rx_9070_xt_handle_t chain)` | Przebija tylny bufor na przedni (present) z oczekiwaniem na vsync (opcjonalnie) przez ring buffer CP GFX. |
+
+### Command buffer
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_command_begin(void)` | Rozpoczyna nagrywanie polecen do command buffer. |
+| `void rx_9070_xt_command_end(void)` | Zakoncza nagrywanie i wykonuje wszystkie polecenia command buffer przez ring buffer CP GFX. |
+
+### Informacje o akceleracji 3D
+
+| funkcja | opis |
+|---------|------|
+| `void rx_9070_xt_context_get(struct rx_9070_xt_context *out)` | Pobiera biezacy kontekst 3D (stan potoku). |
+| `int rx_9070_xt_3d_available(void)` | Zwraca 1 gdy akceleracja 3D jest dostepna (sterownik zainicjowany). |
+
+### Stale i typy
+
+| nazwa | opis |
+|-------|------|
+| `RX_9070_XT_VENDOR_ID` | ID dostawcy AMD (0x1002). |
+| `RX_9070_XT_DEVICE_ID_NAVI48_XT` | ID urzadzenia Navi 48 XT (0x747F) oraz warianty 0x747E/0x747D/0x747C/0x747B. |
+| `RX_9070_XT_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (16 GB GDDR6). |
+| `RX_9070_XT_FB_WIDTH / RX_9070_XT_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1920x1080). |
+| `RX_9070_XT_FB_PITCH` | Pitch ramki graficznej (7680 bajtow). |
+| `RX_9070_XT_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
+| `rx_9070_xt_handle_t` | Typ handle zasobu (uint32_t). |
+| `RX_9070_XT_*` | Stale dla formatow vertex, indeksow, primitivow, tekstur, shaderow, blendowania, operacji blendowania, porownan glebi, wypelnienia, cullowania, operacji stencil (patrz naglowek radeon_rx_9070_xt.h). |
+
+### Integracja z jądrem
+
+Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `radeon_hd_8370d_init()`:
+
+```
+rx_9070_xt_init();
+```
+
+Nagłówek `drivers/karty_graficzne/radeon_rx_9070_xt.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_rx_9070_xt.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+
+## konwencja pisania kodu
+
+- komentarze po polsku
+- commity po polsku
+- kod w C (C++ tylko z pozwolenia, nie w miejscach krytycznych)
+- komentarze tylko tam gdzie kod jest mniej czytelny
