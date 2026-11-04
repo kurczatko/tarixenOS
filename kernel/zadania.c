@@ -94,7 +94,9 @@ static void zadania_narysywaj(int x, int y, int szerokosc, int wysokosc)
             rysuj_tekst_chicago(x + 210, wy + 2, "UZYTKOWNIK", KOLOR_TEKST_ZADANIA);
         }
         rysuj_prostokat(bx, wy + 1, ZADANIA_PRZYCISK_W, ZADANIA_PRZYCISK_H, KOLOR_PRZYCISKU_ZABIJ);
-        rysuj_tekst_chicago(bx + 8, wy + 4, "ZABIJ", KOLOR_TEKST_PRZYCISKU);
+        if (!p->is_driver) {
+            rysuj_tekst_chicago(bx + 8, wy + 4, "ZABIJ", KOLOR_TEKST_PRZYCISKU);
+        }
         wy += ZADANIA_WIERSZ_WYS;
         numer++;
     }
@@ -110,6 +112,7 @@ static void zadania_klik(int x, int y)
         if (p->pid == 0 || p->state == PROCES_TERMINATED) continue;
         if (cy >= wy && cy < wy + ZADANIA_WIERSZ_WYS &&
             x >= bx && x < bx + ZADANIA_PRZYCISK_W) {
+            if (p->is_driver) continue;
             if (p->window) okno_zamknij(p->window);
             driver_manager_shutdown_by_pid(p->pid);
             proces_zakoncz(p->pid);
