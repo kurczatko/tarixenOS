@@ -47,11 +47,23 @@ uruchamia pierwszy proces uzytkownika. ustawia TSS (esp0, cr3), pobiera rejestry
 void proces_uruchom_pierwszy(struct proces *p)
 ```
 
-## zarządzanie procesami - kernel/proces.c
+## zaawansowany harmonogram procesow - kernel/proces.cpp
+
+sterownik harmonogramu procesow (scheduler) napisany w C++ zastępuje uproszczony round-robin z kernel/proces.c. implementuje wielopoziomowa kolejke z opinia zwrotna (MLFQ), sprawiedliwe dzielenie CPU w stylu CFS (Completely Fair Scheduler), stale priorytety dla procesow czasu rzeczywistego, kolejki oczekiwania, dziedziczenie priorytetu, obudzenie po czasie, statystyki per-proces oraz dynamiczne dostosowanie kwantumu czasu. harmonogram dziala w trybie wywlaszczajacym (preempcyjnym) wywolywany z obslugi przerwania timera (timer_handler -> proces_tick). kontekst sprzetowy (rejestry, CR3, TSS esp0) jest przelaczany przez `kernel/timer_entry.S` na podstawie wskaznika `current_process` wybranego przez `proces_tick`.
+
+klasy planowania:
+- SCHED_CRITICAL - najwyzszy priorytet, procesy krytyczne systemu, kwantum 2 tiki, FIFO w ramach priorytetu.
+- SCHED_REALTIME - procesy czasu rzeczywistego, stale priorytety, kwantum 2 tiki, FIFO w ramach priorytetu.
+- SCHED_INTERACTIVE - procesy interaktywne, wiekszy kwantum (6 tikow), kolejka CFS posortowana po vruntime.
+- SCHED_NORMAL - procesy zwykle, domyslny kwantum 4 tiki, kolejka CFS posortowana po vruntime.
+- SCHED_BACKGROUND - procesy w tle, kwantum 8 tikow, nizszy priorytet.
+- SCHED_IDLE - proces bezczynny (idle), najnizszy priorytet, uruchamiany gdy brak gotowych procesow.
+
+zakres priorytetow: 0 (najwyzszy) do 139 (najnizszy). idle ma priorytet 139.
 
 ### proces_init
 
-inicjalizuje tablice procesow. wszystkie procesy ustawiane na zakonczone, pid na 0, licznik na 0.
+inicjalizuje harmonogram: zeruje tablice procesow, czysci kolejki gotowosci i oczekiwania, odczytuje page directory jadra z CR3, tworzy proces bezczynny (idle).
 
 ```
 void proces_init(void)
@@ -59,7 +71,7 @@ void proces_init(void)
 
 ### proces_stworz
 
-tworzy nowy proces. szuka wolnego slotu w tablicy, nadaje pid, kopiuje page directory, ustawia stos. zwraca wskaznik na proces lub 0 gdy nie ma miejsca.
+tworzy nowy proces. przydziela slot, nadaje pid, kopiuje page directory jadra, ustawia ramke rejestrow (esp, ebp, eip, cs, ds, es, fs, gs, ss, eflags) dla powrotu do userspace przez iret, przydziela domyslna klase SCHED_NORMAL i priorytet 120, dodaje do kolejki gotowosci. zwraca wskaznik na proces lub 0 przy brak miejsca.
 
 ```
 struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t arg)
@@ -67,7 +79,7 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
 
 ### proces_zakoncz
 
-oznacza proces o danym pid jako zakonczony i zwalnia jego slot.
+oznacza proces o danym pid jako zakonczony (TERMINATED), usuwa z kolejki gotowosci lub oczekiwania, zwalnia slot. jesli proces byl biezacy, wylacza current_process.
 
 ```
 void proces_zakoncz(uint32_t pid)
@@ -75,7 +87,7 @@ void proces_zakoncz(uint32_t pid)
 
 ### proces_tick
 
-przełącza nastepny proces gotowy do uruchomienia. round-robin po tablicy procesow.
+glowna petla harmonogramu wywolywana co tik timera (100 Hz). zwieksza licznik tikow, obudza procesy ktorych czas snju nastapil, aktualizuje vruntime i suma_exec_runtime procesu biezacego, wyczerpuje kwantum czasu i nastepnym tiku przenosi proces do kolejki gotowosci, wybiera nastepny proces do uruchomienia (najwyzszy priorytet, w ramach klasy NORMAL/INTERACTIVE proces z najmniejszym vruntime) i ustawia current_process. timer_entry.S wykonuje rzeczywiste przelaczenie kontekstu (rejestry, CR3, TSS).
 
 ```
 void proces_tick(void)
@@ -83,7 +95,7 @@ void proces_tick(void)
 
 ### proces_aktualny
 
-zwraca wskaznik na aktualnie dzialajacy proces.
+zwraca wskaznik na aktualnie wykonywany proces.
 
 ```
 struct proces *proces_aktualny(void)
@@ -91,7 +103,7 @@ struct proces *proces_aktualny(void)
 
 ### proces_yield
 
-wymusza przełączenie kontekstu poprzez przerwanie softwarowe int 0x80 z eax=29.
+wywolanie systemowe (int 0x80, eax=29). przenosi proces biezacy do kolejki gotowosci, resetuje jego kwantum i wybiera nastepny proces.
 
 ```
 void proces_yield(void)
@@ -99,11 +111,106 @@ void proces_yield(void)
 
 ### proces_pobierz_pid
 
-zwraca pid aktualnego procesu lub 0 gdy brak procesu.
+zwraca pid aktualnego procesu lub 0.
 
 ```
 uint32_t proces_pobierz_pid(void)
 ```
+
+### proces_sleep_until
+
+wstawia proces biezacy w stan SLEEPING na az do podanego tikta, dodaje do kolejki oczekiwania i przełacza na nastepny proces.
+
+```
+void proces_sleep_until(uint64_t ticks)
+```
+
+### proces_set_priority
+
+zmienia priorytet procesu o danym pid i przepisuje go w kolejce gotowosci. zwraca poprzedni priorytet lub -1 przy bledzie.
+
+```
+int proces_set_priority(uint32_t pid, int32_t priority)
+```
+
+### proces_set_sched_class
+
+zmienia klase planowania procesu (CRITICAL/REALTIME/INTERACTIVE/NORMAL/BACKGROUND/IDLE) i dopasowuje kwantum czasu.
+
+```
+int proces_set_sched_class(uint32_t pid, sched_class_t cls)
+```
+
+### proces_block
+
+wstawia proces biezacy w stan BLOCKED (oczekiwanie na zasob), dodaje do kolejki oczekiwania i przełacza na nastepny proces.
+
+```
+void proces_block(void)
+```
+
+### proces_wakeup
+
+obudza proces z kolejki oczekiwania (BLOCKED lub SLEEPING), ustawia stan READY i dodaje do kolejki gotowosci.
+
+```
+void proces_wakeup(struct proces *p)
+```
+
+### proces_find
+
+szuka procesu po pid. zwraca wskaznik lub 0.
+
+```
+struct proces *proces_find(uint32_t pid)
+```
+
+### proces_get_stats
+
+kopiuje pelna strukture procesu (statystyki, priorytet, vruntime, czas wykonania) do bufora wyjsciowego. zwraca 0 lub -1.
+
+```
+int proces_get_stats(uint32_t pid, struct proces *out)
+```
+
+### proces_klonuj_page_directory
+
+klonuje page directory jadra dla nowego procesu: kopiuje wpisy jadra, mapuje pamiec userspace (1MB-4MB) oraz ramke graficzna (0xFD000000). zwraca nowy page directory.
+
+```
+uint32_t *proces_klonuj_page_directory(void)
+```
+
+### proces_rejestruj_okno
+
+rejestruje okno dla procesu o podanej nazwie lub tworzy nowy proces okna. ustawia wskaznik okna i dodaje proces do kolejki gotowosci.
+
+```
+void proces_rejestruj_okno(const char *nazwa, struct okno *okno)
+```
+
+### struktura proces
+
+| pole | typ | opis |
+|------|-----|------|
+| pid | uint32_t | unikalny identyfikator procesu |
+| state | proces_state_t | stan (TERMINATED/READY/RUNNING/BLOCKED/SLEEPING/ZOMBIE) |
+| sched_class | sched_class_t | klasa planowania (CRITICAL/REALTIME/INTERACTIVE/NORMAL/BACKGROUND/IDLE) |
+| priority | int32_t | priorytet 0-139 (0 najwyzszy) |
+| static_priority | int32_t | bazowy priorytet bez dziedziczenia |
+| time_slice | uint32_t | pozostaly kwantum czasu w tikach |
+| vruntime | uint64_t | wirtualny czas wykonania (CFS, sprawiedliwe dzielenie) |
+| sum_exec_runtime | uint64_t | calkowity czas wykonania w ns |
+| sleep_until | uint64_t | tik obudzenia dla procesu spiacego |
+| page_directory | uint32_t * | adres page directory procesu |
+| kernel_stack | uint32_t | wierzcholek stosu jadra (TSS esp0) |
+| user_stack | uint32_t | wierzcholek stosu userspace |
+| entry_point | uint32_t | adres wejscia procesu |
+| ctx_switches | uint64_t | liczba przełączen kontekstu |
+| nr_wakeups | uint64_t | liczba obudzen |
+| nr_blocked | uint64_t | liczba zablokowan |
+| run_next / run_prev | struct proces * | lacza kolejki gotowosci |
+| wait_next / wait_prev | struct proces * | lacza kolejke oczekiwania |
 
 ## stronicowanie - kernel/paging.c
 
@@ -2995,7 +3102,7 @@ tarixenOS/
 ├── boot.asm              # bootloader i wejscie w tryb chroniony
 ├── kernel/
 │   ├── kernel.c          # glowna petla jadra, kernel_main
-│   ├── proces.c          # zarządzanie procesami
+│   ├── proces.cpp          # zaawansowany harmonogram procesow (scheduler, C++)
 │   ├── paging.c          # stronicowanie pamieci
 │   ├── syscall.c         # wywolania systemowe
 │   ├── timer.c           # timer systemowy
@@ -4960,12 +5067,3 @@ PHY jest dostępny przez rejestr `REG_PHYAR` (bit 31 = zajęty, bit 30 = zapis, 
 integracja z przegladarka:
 
 `drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
-
-przyklad uruchomienia:
-
-```
-make
-cd build
-qemu-system-x86_64 -m 2G -boot c -drive file=tarixenOS.img,format=raw -machine pc -display sdl
-```
-
