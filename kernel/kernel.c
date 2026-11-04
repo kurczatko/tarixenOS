@@ -1,4 +1,5 @@
 #include "../../drivers/keyboard.h"
+#include "../drivers/plyty_glowne/asus_p4p800.h"
 #include "../drivers/mouse.h"
 #include "../drivers/usb/core/usb.h"
 #include "../drivers/usb/core/hid.h"
@@ -71,6 +72,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     floppy_init();
     nvme_init();
     intel_uhd_init();
+    p4p_init();
     gma_x4500_init();
     radeon_hd_8370d_init();
     qemu_vga_init();

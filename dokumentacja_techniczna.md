@@ -3364,3 +3364,175 @@ funkcja C do obslugi przerwan:
 ```
 extern "C" void hda_codec_irq(void);
 ```
+
+## sterownik plyty glownej ASUS P4P800 - drivers/plyty_glowne/asus_p4p800.cpp
+
+Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_init(void)` | Inicjalizuje wszystkie podsystemy plyty glownej (chipset, ACPI, SMBus, AGP, audio, ethernet, IDE, USB, floppy, RTC, HWMON). Zwraca 1 po udanej inicjalizacji. |
+| `int p4p_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy. |
+| `void p4p_shutdown(void)` | Wylacza plyte glowna przez ACPI (stan S5) lub fallback przez klawiatura 0x64. |
+| `void p4p_reset(void)` | Restartuje komputer przez port reset 0xCF9 i klawiatura 0x64. |
+| `uint32_t p4p_get_chipset_id(void)` | Zwraca polaczone ID MCH i ICH (MCH << 16 | ICH). |
+| `void p4p_info_get(struct p4p_info *out)` | Kopiuje strukture z informacjami o wykrytych urzadzeniach i adresach bazowych. |
+| `void p4p_stats_get(struct p4p_stats *out)` | Kopiuje statystyki wszystkich podsystemow (PCI, audio, ethernet, IDE, USB, floppy, HWMON, IRQ). |
+
+### PCI
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_pci_find_device(uint16_t vendor, uint16_t device, uint8_t index, uint8_t *bus, uint8_t *slot, uint8_t *func)` | Wyszukuje urządzenie PCI po vendor/device ID, zwraca index dla wielu urządzeń tego samego typu. |
+| `uint32_t p4p_pci_read32(...)` / `void p4p_pci_write32(...)` | Odczyt/zapis 32-bitowy do rejestru konfiguracji PCI. |
+| `uint16_t p4p_pci_read16(...)` / `void p4p_pci_write16(...)` | Odczyt/zapis 16-bitowy do rejestru konfiguracji PCI. |
+| `uint8_t p4p_pci_read8(...)` / `void p4p_pci_write8(...)` | Odczyt/zapis 8-bitowy do rejestru konfiguracji PCI. |
+| `int p4p_pci_set_bus_master(uint8_t bus, uint8_t slot, uint8_t func, uint8_t enable)` | Wlacza/wylacza bus mastering dla urzadzenia PCI (bit 2 w rejestrze command). |
+
+### Chipset (Intel i848P + ICH4)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_chipset_probe(void)` | Wykrywa MCH i ICH4, zapisuje ID, rewizje, adres ACPI i wlacza bus mastering. |
+| `void p4p_chipset_configure_memory(void)` | Konfiguruje rejestry sterowania pamieci chipsetu (rejestr 0x5C MCH). |
+
+### ACPI
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_acpi_available(void)` | Sprawdza dostepnosc ACPI i wlacza SCI (System Control Interrupt). |
+| `void p4p_acpi_sleep(uint8_t state)` | Wprowadza system w stan uśpienia ACPI (S1-S5) przez rejestr PM1A_CNT. |
+| `void p4p_acpi_reboot(void)` | Restart komputera przez port 0xCF9 i klawiatura. |
+| `void p4p_acpi_shutdown(void)` | Wylaczenie systemu przez ACPI S5 lub fallback. |
+
+### SMBus (ICH4)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_smbus_init(void)` | Wykrywa i inicjalizuje kontroler SMBus ICH4. |
+| `int p4p_smbus_read_byte(uint8_t device, uint8_t offset, uint8_t *value)` | Odczyt bajtu z urzadzenia SMBus. |
+| `int p4p_smbus_write_byte(uint8_t device, uint8_t offset, uint8_t value)` | Zapis bajtu do urzadzenia SMBus. |
+
+### AGP (Intel i848P)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_agp_init(void)` | Inicjalizuje aperture AGP i wykrywa jego adres bazowy. |
+| `uint32_t p4p_agp_aperture(void)` | Zwraca rozmiar aperture AGP. |
+| `int p4p_agp_bind(uint32_t gatt_index, uint32_t physical_addr)` | Bindowanie strony GATT do adresu fizycznego. |
+| `int p4p_agp_unbind(uint32_t gatt_index)` | Unbindowanie strony GATT. |
+
+### Audio AC'97 (ICH4 + kodek)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_audio_init(void)` | Inicjalizuje kontroler AC'97 i resetuje kodek (cold reset). |
+| `int p4p_audio_is_ready(void)` | Zwraca 1 gdy audio jest gotowe. |
+| `int p4p_audio_codec_read(uint8_t reg, uint16_t *value)` | Odczyt rejestru kodeka AC'97. |
+| `int p4p_audio_codec_write(uint8_t reg, uint16_t value)` | Zapis rejestru kodeka AC'97. |
+| `int p4p_audio_codec_reset(int cold)` | Cold lub warm reset kodeka AC'97. |
+| `int p4p_audio_set_volume(uint8_t channel, uint8_t percent)` | Ustawia glosnosc kanalu (0-3: master, master mono, PCM out, PCM in). |
+| `uint8_t p4p_audio_get_volume(uint8_t channel)` | Zwraca aktualna glosnosc kanalu. |
+| `int p4p_audio_playback_start(const void *buffer, uint32_t bytes, uint32_t rate, uint8_t channels, uint8_t bits)` | Rozpoczyna odtwarzanie PCM z bufora przez DMA kontrolera BM. |
+| `int p4p_audio_playback_stop(void)` | Zatrzymuje odtwarzanie PCM. |
+| `int p4p_audio_capture_start(void *buffer, uint32_t bytes, uint32_t rate, uint8_t channels, uint8_t bits)` | Rozpoczyna nagrywanie PCM do bufora przez DMA. |
+| `int p4p_audio_capture_stop(void)` | Zatrzymuje nagrywanie PCM. |
+| `void p4p_audio_stats_get(struct p4p_audio_stats *out)` | Statystyki audio (codec_reads, codec_writes, playback_bytes, capture_bytes, errors). |
+
+### Ethernet (Intel 82562ET)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_eth_init(void)` | Inicjalizuje kontroler ethernetu, resetuje port i wlacza CU/RU. |
+| `int p4p_eth_is_ready(void)` | Zwraca 1 gdy ethernet jest gotowy. |
+| `int p4p_eth_get_mac(uint8_t mac[6])` | Pobiera adres MAC z kontrolera. |
+| `int p4p_eth_link_up(void)` | Zwraca 1 gdy lacze ethernetowe jest aktywne. |
+| `uint32_t p4p_eth_speed_mbps(void)` | Zwraca predkosc lacza w Mbps (100). |
+| `int p4p_eth_send(const void *frame, uint16_t length)` | Wysyla ramke ethernetowa. |
+| `int p4p_eth_receive(void *frame, uint16_t capacity)` | Odbiera ramke ethernetowa. |
+| `void p4p_eth_stats_get(struct p4p_eth_stats *out)` | Statystyki ethernetu (tx/rx pakiety, bajty, błędy, resety). |
+
+### IDE (ICH4, PIO + DMA)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_ide_init(void)` | Inicjalizuje kontrolery IDE (kanaly primary i secondary) i bus mastering. |
+| `int p4p_ide_is_ready(void)` | Zwraca 1 gdy IDE jest gotowe. |
+| `int p4p_ide_identify(uint8_t channel, uint8_t drive, uint16_t *buffer)` | Wysyla polecenie IDENTIFY i pobiera 512 bajtow identyfikacji dysku. |
+| `int p4p_ide_read_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, void *buffer)` | Czytanie sektorow LBA w trybie PIO. |
+| `int p4p_ide_write_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, const void *buffer)` | Zapis sektorow LBA w trybie PIO. |
+| `int p4p_ide_dma_read_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, void *buffer)` | Czytanie sektorow przez DMA bus mastering. |
+| `int p4p_ide_dma_write_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, const void *buffer)` | Zapis sektorow przez DMA bus mastering. |
+| `void p4p_ide_reset(uint8_t channel)` | Reset kontrolera IDE przez port alternativ status. |
+| `void p4p_ide_stats_get(struct p4p_ide_stats *out)` | Statystyki IDE (reads, writes, sektory, DMA transfery, błędy). |
+
+### USB (ICH4 UHCI x3 + EHCI)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_usb_init(void)` | Wykrywa i inicjalizuje trzy kontrolery UHCI oraz EHCI. |
+| `int p4p_usb_is_ready(void)` | Zwraca 1 gdy USB jest gotowe. |
+| `uint8_t p4p_usb_root_port_count(void)` | Zwraca liczba portow roota (6). |
+| `int p4p_usb_port_reset(uint8_t port)` | Reset portu USB (bit reset w PORTSC). |
+| `int p4p_usb_port_power(uint8_t port, uint8_t on)` | Wlacza/wylacza zasilanie portu USB. |
+| `uint32_t p4p_usb_port_status(uint8_t port)` | Zwraca rejestr statusu portu USB. |
+| `int p4p_usb_control_transfer(...)` | Transfer sterowniczy USB (placeholder gotowy do rozszerzenia). |
+| `int p4p_usb_bulk_transfer(...)` | Transfer masowy USB (placeholder gotowy do rozszerzenia). |
+| `void p4p_usb_stats_get(struct p4p_usb_stats *out)` | Statystyki USB (porty, resety, transfery, błędy). |
+
+### Stacja dyskowetek (FDC)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_floppy_init(void)` | Inicjalizuje kontroler FDC (0x3F0), reset i specify. |
+| `int p4p_floppy_is_ready(void)` | Zwraca 1 gdy FDC jest gotowe. |
+| `int p4p_floppy_recalibrate(uint8_t drive)` | Rekalibracja napedu dyskowetki (seek do track 0). |
+| `int p4p_floppy_seek(uint8_t drive, uint8_t track)` | Posuniecie glowicy napedu na zadany track. |
+| `int p4p_floppy_read_sectors(uint8_t drive, uint8_t head, uint8_t track, uint8_t sector, uint8_t count, void *buffer)` | Czytanie sektorow z dyskowetki. |
+| `int p4p_floppy_write_sectors(uint8_t drive, uint8_t head, uint8_t track, uint8_t sector, uint8_t count, const void *buffer)` | Zapis sektorow na dyskietke. |
+| `uint8_t p4p_floppy_status(void)` | Zwraca rejestr statusu FDC (Status A). |
+| `void p4p_floppy_stats_get(struct p4p_floppy_stats *out)` | Statystyki FDC (reads, writes, seeks, błędy). |
+
+### RTC / CMOS
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_rtc_init(void)` | Inicjalizuje RTC (tryb 24h, format binarny). |
+| `int p4p_rtc_is_ready(void)` | Zwraca 1 gdy RTC jest gotowe. |
+| `int p4p_rtc_get_time(struct p4p_rtc_time *out)` | Pobiera aktualny czas i date z RTC. |
+| `int p4p_rtc_set_time(const struct p4p_rtc_time *t)` | Ustawia czas i date w RTC. |
+| `int p4p_rtc_nvram_read(uint8_t offset, uint8_t *value)` | Odczyt bajtu z pamieci CMOS/NVRAM. |
+| `int p4p_rtc_nvram_write(uint8_t offset, uint8_t value)` | Zapis bajtu do pamieci CMOS/NVRAM. |
+| `int p4p_rtc_alarm_set(const struct p4p_rtc_time *t)` | Ustawia alarm RTC. |
+| `int p4p_rtc_irq_enable(uint8_t mask, uint8_t enable)` | Wlacza/wylacza przerwania RTC (update, alarm, periodic). |
+| `uint8_t p4p_rtc_irq_status(void)` | Zwraca rejestr statusu C RTC (flagi przerwan). |
+
+### Monitorowanie sprzętowe (HWMON, Super I/O)
+
+| funkcja | opis |
+|---------|------|
+| `int p4p_hwmon_init(void)` | Inicjalizuje Super I/O i wlacza logiczne urzadzenie HWMON. |
+| `int p4p_hwmon_is_ready(void)` | Zwraca 1 gdy HWMON jest gotowe. |
+| `int p4p_hwmon_read_temperature(uint8_t sensor, int32_t *millicelsius)` | Odczyt temperatury z czujnika w milicelcjuszach. |
+| `int p4p_hwmon_read_voltage(uint8_t sensor, int32_t *millivolt)` | Odczyt napiecia (placeholder). |
+| `int p4p_hwmon_read_fan(uint8_t fan, uint32_t *rpm)` | Odczyt obrotow wentylatora (placeholder). |
+| `void p4p_hwmon_stats_get(struct p4p_hwmon_stats *out)` | Statystyki HWMON (temperatury, napiecia, wentylatory, błędy). |
+
+### Obsluga przerwan (IRQ)
+
+| funkcja | opis |
+|---------|------|
+| `void p4p_irq_handler(uint8_t irq)` | Dysponuje przerwanie do zarejestrowanego handlera dla danego IRQ. |
+| `int p4p_irq_register(uint8_t irq, void (*handler)(uint8_t irq))` | Rejestruje handler przerwania dla IRQ 0-15. |
+
+### Integracja z jądrem
+
+Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `intel_uhd_init()`:
+
+```
+p4p_init();
+```
+
+Nagłówek `drivers/plyty_glowne/asus_p4p800.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra.
