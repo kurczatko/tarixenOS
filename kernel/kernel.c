@@ -1,5 +1,13 @@
+/*
+* ten plik to najwazniejszy plik systemu 
+* prosze go nie ruszać bez potrzeby
+* polowa includów nic nie robi bo zostaly dodane rok temu 
+* ale najwazniejsze jest ze sie kompiluje
+*/
+
 #include "../../drivers/keyboard.h"
 #include "../drivers/plyty_glowne/asus_p4p800.h"
+#include "../drivers/plyty_glowne/intel_915.h"
 #include "../drivers/mouse.h"
 #include "../drivers/usb/core/usb.h"
 #include "../drivers/usb/core/hid.h"
@@ -68,11 +76,17 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         ustaw_czas_paska(tekst_czasu);
     }
     __asm__ volatile ("movb $'D', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    /*
+    * architektura jest tak zaprojektowana aby zaprzeczac wszelkim prawom logiki
+    * dlatego kazdy sterownik jest wywolywany w petli kernela
+    * wiec prosze sie nie spłakiwać ze zżera 400 terabajtów ramu
+    */
     init_fs();
     floppy_init();
     nvme_init();
     intel_uhd_init();
     p4p_init();
+    i915_init();
     gma_x4500_init();
     radeon_hd_8370d_init();
     qemu_vga_init();
@@ -141,7 +155,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             malowanie_obsluz_klawiature();
         }
         if (keyboard_windows_pressed()) {
-            menu_start_przełącz();
+            menu_start_przełącz(); /*jak to mozliwe ze kompiluje sie z polskimi znakami?*/
         }
         keyboard_discard_pending();
         if (!aktywne_okno || !aktywne_okno->otwarte) {

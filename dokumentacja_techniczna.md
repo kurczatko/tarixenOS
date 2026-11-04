@@ -3536,3 +3536,309 @@ p4p_init();
 ```
 
 Nagłówek `drivers/plyty_glowne/asus_p4p800.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra.
+
+## sterownik plyty glownej Intel 915 - drivers/plyty_glowne/intel_915.cpp
+
+Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915GV/915GL + ICH6). Sterownik jest napisany w C++ i obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset MCH/ICH6, pamieci RAM (PAM, DRB, DRA, TOLUD, GME, stolen memory), ACPI, SMBus, AGP, graficzne Intel GMA 900 z framebufferem, blitterem, kursorem sprzetowym i overlayem, AC'97 audio, IDE z PIO i DMA, SATA, USB UHCI x3 + EHCI, TCO watchdog, GPIO, PIRQ routing, SMI, RTC/CMOS, FWH/BIOS lock, monitorowanie sprzetowe (HWMON) oraz obsluge przerwan IRQ. Eksportuje interfejs C przez naglwek intel_915.h i jest inicjalizowany z kernel/kernel.c przez `i915_init()`.
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `int i915_init(void)` | Inicjalizuje wszystkie podsystemy plyty glownej (chipset, pamiec, ACPI, SMBus, AGP, grafika, audio, IDE, SATA, USB, TCO, RTC, HWMON, BIOS). Zwraca 1 po udanej inicjalizacji. |
+| `int i915_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy. |
+| `void i915_shutdown(void)` | Wylacza plyte glowna przez ACPI (stan S5) lub fallback przez klawiatura 0x64. |
+| `void i915_reset(void)` | Restartuje komputer przez port reset 0xCF9 i klawiatura 0x64. |
+| `uint32_t i915_get_chipset_id(void)` | Zwraca polaczone ID MCH i ICH (MCH << 16 | ICH). |
+| `void i915_info_get(struct i915_info *out)` | Kopiuje strukture z informacjami o wykrytych urzadzeniach i adresach bazowych. |
+| `void i915_stats_get(struct i915_stats *out)` | Kopiuje statystyki wszystkich podsystemow (PCI, pamiec, audio, ethernet, IDE, USB, floppy, HWMON, grafika, IRQ, ACPI, TCO, SMBus). |
+
+### PCI
+
+| funkcja | opis |
+|---------|------|
+| `int i915_pci_find_device(uint16_t vendor, uint16_t device, uint8_t index, uint8_t *bus, uint8_t *slot, uint8_t *func)` | Wyszukuje urzadzenie PCI po vendor/device ID, zwraca index dla wielu urzadzen tego samego typu. |
+| `uint32_t i915_pci_read32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)` | Odczyt 32-bitowy z rejestru konfiguracji PCI z licznikiem statystyk. |
+| `void i915_pci_write32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t value)` | Zapis 32-bitowy do rejestru konfiguracji PCI z licznikiem statystyk. |
+| `uint16_t i915_pci_read16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)` | Odczyt 16-bitowy z rejestru konfiguracji PCI. |
+| `void i915_pci_write16(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint16_t value)` | Zapis 16-bitowy do rejestru konfiguracji PCI. |
+| `uint8_t i915_pci_read8(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset)` | Odczyt 8-bitowy z rejestru konfiguracji PCI. |
+| `void i915_pci_write8(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint8_t value)` | Zapis 8-bitowy do rejestru konfiguracji PCI. |
+| `int i915_pci_set_bus_master(uint8_t bus, uint8_t slot, uint8_t func, uint8_t enable)` | Wlacza/wylacza bus mastering dla urzadzenia PCI (bit 2 w rejestrze command). |
+| `uint8_t i915_pci_read_revision(uint8_t bus, uint8_t slot, uint8_t func)` | Odczyt rejestru revision ID urzadzenia PCI. |
+| `int i915_pci_route_irq(uint8_t bus, uint8_t slot, uint8_t func, uint8_t *irq)` | Odczyt linii przerwania IRQ i pinu dla urzadzenia PCI. |
+
+### Chipset (Intel 82915 + ICH6)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_chipset_probe(void)` | Wykrywa MCH (82915G/915P/915X/915GV/915GL) i ICH6, zapisuje ID, rewizje, adres ACPI i wlacza bus mastering. |
+| `void i915_chipset_configure_memory(void)` | Konfiguruje rejestry sterowania pamieci chipsetu (GGC i DEVEN MCH). |
+
+### Pamieć (PAM, DRAM, AGP)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_pam_read(uint8_t reg, uint8_t *value)` | Odczyt rejestru PAM (Programmable Attribute Map) chipsetu MCH. |
+| `int i915_pam_write(uint8_t reg, uint8_t value)` | Zapis rejestru PAM chipsetu MCH. |
+| `int i915_memory_map(struct i915_dram_info *out)` | Wykrywa konfiguracja pamieci DRAM (DRB, DRA), oblicza laczna pojemnosc i timingi. |
+| `int i915_memory_remap_enable(uint8_t enable)` | Wlacza/wylacza remapowanie pamieci chipsetu. |
+| `int i915_memory_set_timings(uint32_t tcl, uint32_t trcd, uint32_t trp, uint32_t tras)` | Ustawia timingi pamieci DRAM (TCL, TRCD, TRP, TRAS). |
+| `int i915_memory_get_timings(uint32_t *tcl, uint32_t *trcd, uint32_t *trp, uint32_t *tras)` | Pobiera aktualne timingi pamieci DRAM. |
+| `int i915_memory_scrub(uint32_t start, uint32_t size)` | Wyzerowanie (scrub) obszaru pamieci fizycznej. |
+| `int i915_memory_interrupt_enable(uint8_t enable)` | Wlacza/wylacza przerwania kontrolera pamieci. |
+| `int i915_gme_enable(uint8_t enable)` | Wlacza/wylacza Graficzną Engine MCH (GME). |
+| `uint32_t i915_stolen_memory_size(void)` | Zwraca rozmiar pamieci ukradzionej (stolen memory) dla grafiki. |
+| `int i915_agp_init(void)` | Inicjalizuje aperture AGP i wykrywa jego adres bazowy. |
+| `uint32_t i915_agp_aperture(void)` | Zwraca rozmiar aperture AGP. |
+| `int i915_agp_bind(uint32_t gatt_index, uint32_t physical_addr)` | Bindowanie strony GATT do adresu fizycznego. |
+| `int i915_agp_unbind(uint32_t gatt_index)` | Unbindowanie strony GATT. |
+
+### Grafika Intel GMA 900 (zintegrowana w MCH)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_graphics_init(void)` | Inicjalizuje kontroler graficzny: MMIO, DPLL, timingi pipe A, płaszczyzna A, ring buffer blitera, kursor sprzetowy. |
+| `int i915_graphics_is_ready(void)` | Zwraca 1 gdy sterownik graficzny jest gotowy. |
+| `void i915_graphics_putpixel(uint32_t x, uint32_t y, uint32_t color)` | Rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem. |
+| `void i915_graphics_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Wypelnia prostokat o podanym rozmiarze i kolorze (uzywa blitera sprzetowego lub fallback CPU). |
+| `void i915_graphics_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)` | Kopiuje blok pikseli (XY_SRC_COPY_BLT) uzywajac blitera sprhetowego. |
+| `void i915_graphics_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)` | Ustawia kursor sprhetowy na pozycji (x, y) z obrazem 64x64. |
+| `void i915_graphics_cursor_move(uint32_t x, uint32_t y)` | Przesuwa kursor sprhetowy na nowa pozycje bez zmiany obrazu. |
+| `void i915_graphics_cursor_hide(void)` | Ukrywa kursor sprhetowy. |
+| `void i915_graphics_overlay_enable(uint8_t enable)` | Wlacza/wylacza overlay wideo. |
+| `int i915_graphics_overlay_set_buffer(uint32_t addr, uint32_t width, uint32_t height, uint32_t pitch)` | Ustawia bufor overlay wideo. |
+| `void i915_graphics_display_timings(uint32_t width, uint32_t height, uint32_t refresh)` | Konfiguruje timingi wyswietlania (placeholder). |
+| `void i915_graphics_pipe_config(uint8_t pipe, uint8_t enable)` | Konfiguruje pipe wyświetlania (A lub B). |
+| `void i915_graphics_plane_config(uint8_t plane, uint32_t addr, uint32_t width, uint32_t height, uint32_t stride)` | Konfiguruje płaszczyzne wyswietlania. |
+| `void i915_graphics_blt_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Blitter: wypelnienie prostokatem (XY_FILL_BLT). |
+| `void i915_graphics_blt_copy(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)` | Blitter: kopiowanie bloku pikseli (XY_SRC_COPY_BLT). |
+| `void *i915_graphics_get_fb(void)` | Zwraca wskaznik na ramke graficzna (framebuffer). |
+| `uint32_t i915_graphics_get_width(void)` | Zwraca szerokosc ekranu (1024). |
+| `uint32_t i915_graphics_get_height(void)` | Zwraca wysokosc ekranu (768). |
+| `uint32_t i915_graphics_get_pitch(void)` | Zwraca pitch (odstep miedzy wierszami) ramki graficznej (4096). |
+| `uint16_t i915_graphics_get_device_id(void)` | Zwraca ID urzadzenia graficznego. |
+| `uint8_t i915_graphics_get_revision(void)` | Zwraca rewizje karty graficznej. |
+| `void i915_graphics_info_get(struct i915_graphics_info *out)` | Pobiera pelne informacje o urzadzeniu graficznym. |
+| `void i915_graphics_stats_get(struct i915_graphics_stats *out)` | Pobiera statystyki grafiki (putpixels, fillrects, blts, cursor_moves, overlay_updates, ring_flushes, błędy). |
+| `void i915_graphics_vga_enable(uint8_t enable)` | Wlacza/wylacza tryb VGA kompatybilny. |
+| `void i915_graphics_ring_flush(void)` | Wymusza wykonanie polecen w ring bufferze blitera. |
+
+### IDE (ICH6, PIO + DMA)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_ide_init(void)` | Inicjalizuje kontrolery IDE (primary i secondary) oraz bus mastering. |
+| `int i915_ide_is_ready(void)` | Zwraca 1 gdy IDE jest gotowe. |
+| `int i915_ide_identify(uint8_t channel, uint8_t drive, uint16_t *buffer)` | Wysyla polecenie IDENTIFY i pobiera 512 bajtow identyfikacji dysku. |
+| `int i915_ide_read_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, void *buffer)` | Czytanie sektorow LBA w trybie PIO. |
+| `int i915_ide_write_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, const void *buffer)` | Zapis sektorow LBA w trybie PIO. |
+| `int i915_ide_dma_read_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, void *buffer)` | Czytanie sektorow przez DMA bus mastering. |
+| `int i915_ide_dma_write_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, const void *buffer)` | Zapis sektorow przez DMA bus mastering. |
+| `int i915_ide_flush(uint8_t channel)` | Wymusza zapis bufora dysku (flush cache). |
+| `void i915_ide_reset(uint8_t channel)` | Reset kontrolera IDE przez port alternativ status. |
+| `int i915_ide_set_dma(uint8_t channel, uint8_t drive, uint8_t mode)` | Ustawia tryb transferu DMA (UDMA mode). |
+| `uint8_t i915_ide_get_udma_mode(uint8_t channel)` | Zwraca aktualny tryb UDMA dla kanalu. |
+| `void i915_ide_stats_get(struct i915_ide_stats *out)` | Statystyki IDE (reads, writes, sektory, DMA transfery, błędy). |
+
+### SATA (ICH6)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_sata_init(void)` | Inicjalizuje kontroler SATA ICH6. |
+| `int i915_sata_is_ready(void)` | Zwraca 1 gdy SATA jest gotowe. |
+| `uint8_t i915_sata_port_count(void)` | Zwraca liczba portow SATA (4). |
+| `int i915_sata_read_sectors(uint8_t port, uint32_t lba, uint8_t count, void *buffer)` | Czytanie sektorow z portu SATA (placeholder). |
+| `int i915_sata_write_sectors(uint8_t port, uint32_t lba, uint8_t count, const void *buffer)` | Zapis sektorow na port SATA (placeholder). |
+| `int i915_sata_set_mode(uint8_t port, uint8_t ahci_mode)` | Ustawia tryb pracy portu SATA (AHCI/IDE). |
+
+### USB (ICH6 UHCI x3 + EHCI)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_usb_init(void)` | Wykrywa i inicjalizuje trzy kontrolery UHCI oraz EHCI. |
+| `int i915_usb_is_ready(void)` | Zwraca 1 gdy USB jest gotowe. |
+| `uint8_t i915_usb_root_port_count(void)` | Zwraca liczba portow roota (6). |
+| `int i915_usb_port_reset(uint8_t port)` | Reset portu USB (bit reset w PORTSC). |
+| `int i915_usb_port_power(uint8_t port, uint8_t on)` | Wlacza/wylacza zasilanie portu USB. |
+| `uint32_t i915_usb_port_status(uint8_t port)` | Zwraca rejestr statusu portu USB. |
+| `int i915_usb_control_transfer(uint8_t addr, uint8_t endpoint, uint8_t direction, uint8_t request_type, uint8_t request, uint16_t value, uint16_t index, uint16_t length, void *data)` | Transfer sterowniczy USB. |
+| `int i915_usb_bulk_transfer(uint8_t addr, uint8_t endpoint, uint8_t direction, uint32_t length, void *data)` | Transfer masowy USB. |
+| `void i915_usb_stats_get(struct i915_usb_stats *out)` | Statystyki USB (porty, resety, transfery, błędy). |
+
+### Audio AC'97 (ICH6 + kodek)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_audio_init(void)` | Inicjalizuje kontroler AC'97 i resetuje kodek (cold reset). |
+| `int i915_audio_is_ready(void)` | Zwraca 1 gdy audio jest gotowe. |
+| `int i915_audio_codec_read(uint8_t reg, uint16_t *value)` | Odczyt rejestru kodeka AC'97. |
+| `int i915_audio_codec_write(uint8_t reg, uint16_t value)` | Zapis rejestru kodeka AC'97. |
+| `int i915_audio_codec_reset(int cold)` | Cold lub warm reset kodeka AC'97. |
+| `int i915_audio_set_volume(uint8_t channel, uint8_t percent)` | Ustawia glosnosc kanalu (0-3: master, master mono, PCM out, PCM in). |
+| `uint8_t i915_audio_get_volume(uint8_t channel)` | Zwraca aktualna glosnosc kanalu. |
+| `int i915_audio_playback_start(const void *buffer, uint32_t bytes, uint32_t rate, uint8_t channels, uint8_t bits)` | Rozpoczyna odtwarzanie PCM z bufora przez DMA kontrolera BM. |
+| `int i915_audio_playback_stop(void)` | Zatrzymuje odtwarzanie PCM. |
+| `int i915_audio_capture_start(void *buffer, uint32_t bytes, uint32_t rate, uint8_t channels, uint8_t bits)` | Rozpoczyna nagrywanie PCM do bufora przez DMA. |
+| `int i915_audio_capture_stop(void)` | Zatrzymuje nagrywanie PCM. |
+| `void i915_audio_stats_get(struct i915_audio_stats *out)` | Statystyki audio (codec_reads, codec_writes, playback_bytes, capture_bytes, errors). |
+
+### SMBus (ICH6)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_smbus_init(void)` | Wykrywa i inicjalizuje kontroler SMBus ICH6. |
+| `int i915_smbus_read_byte(uint8_t device, uint8_t offset, uint8_t *value)` | Odczyt bajtu z urzadzenia SMBus. |
+| `int i915_smbus_write_byte(uint8_t device, uint8_t offset, uint8_t value)` | Zapis bajtu do urzadzenia SMBus. |
+| `int i915_smbus_read_word(uint8_t device, uint8_t offset, uint16_t *value)` | Odczyt slowa (16 bit) z urzadzenia SMBus. |
+| `int i915_smbus_write_word(uint8_t device, uint8_t offset, uint16_t value)` | Zapis slowa (16 bit) do urzadzenia SMBus. |
+| `int i915_smbus_spd_read(uint8_t offset, uint8_t *value)` | Odczyt bajtu z modulu pamieci SPD przez SMBus. |
+| `int i915_smbus_spd_write(uint8_t offset, uint8_t value)` | Zapis bajtu do modulu pamieci SPD przez SMBus. |
+| `void i915_smbus_stats_get(void)` | Aktualizuje licznik operacji SMBus w statystykach. |
+
+### ACPI (ICH6)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_acpi_available(void)` | Sprawdza dostepnosc ACPI i wlacza SCI (System Control Interrupt). |
+| `void i915_acpi_sleep(uint8_t state)` | Wprowadza system w stan uspienia ACPI (S1-S5) przez rejestr PM1A_CNT. |
+| `void i915_acpi_reboot(void)` | Restart komputera przez port 0xCF9 i klawiatura. |
+| `void i915_acpi_shutdown(void)` | Wylaczenie systemu przez ACPI S5 lub fallback. |
+| `int i915_acpi_sci_enable(uint8_t enable)` | Wlacza/wylacza przerwania SCI ACPI. |
+| `uint16_t i915_acpi_read_pm1a_cnt(void)` | Odczyt rejestru PM1A_CNT ACPI. |
+| `void i915_acpi_write_pm1a_cnt(uint16_t value)` | Zapis rejestru PM1A_CNT ACPI. |
+
+### TCO Watchdog (ICH6)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_tco_init(void)` | Inicjalizuje TCO watchdog ICH6. |
+| `int i915_tco_is_ready(void)` | Zwraca 1 gdy TCO jest gotowe. |
+| `int i915_tco_watchdog_start(uint32_t seconds)` | Uruchamia watchdog TCO na podana liczbe sekund. |
+| `int i915_tco_watchdog_feed(void)` | Karmi (resetuje licznik) watchdog TCO. |
+| `int i915_tco_watchdog_stop(void)` | Zatrzymuje watchdog TCO. |
+| `int i915_tco_irq_status(void)` | Zwraca status przerwan TCO. |
+
+### GPIO
+
+| funkcja | opis |
+|---------|------|
+| `int i915_gpio_read(uint8_t pin, uint8_t *value)` | Odczyt stanu pinu GPIO. |
+| `int i915_gpio_write(uint8_t pin, uint8_t value)` | Zapis stanu pinu GPIO (0/1). |
+| `int i915_gpio_direction(uint8_t pin, uint8_t output)` | Ustawia kierunek pinu GPIO (wejscie/wyjscie). |
+
+### PIRQ i SMI
+
+| funkcja | opis |
+|---------|------|
+| `int i915_pirq_read_router(uint8_t pirq, uint8_t *route)` | Odczyt trasy PIRQ (PIRQA-PIRQD). |
+| `int i915_pirq_write_router(uint8_t pirq, uint8_t route)` | Zapis trasy PIRQ. |
+| `int i915_smi_enable(uint8_t enable)` | Wlacza/wylacza System Management Interrupt. |
+| `uint8_t i915_smi_status(void)` | Zwraca status SMI. |
+
+### FWH / BIOS lock
+
+| funkcja | opis |
+|---------|------|
+| `int i915_fwh_read(uint32_t offset, uint8_t *value)` | Odczyt bajtu z pamieci FWH (firmware hub). |
+| `int i915_fwh_write(uint32_t offset, uint8_t value)` | Zapis bajtu do pamieci FWH. |
+| `int i915_bios_lock(void)` | Blokuje zapisy do obszaru BIOS (ustawia bit lock w ICH6). |
+| `int i915_bios_unlock(void)` | Odblokowuje zapisy do obszaru BIOS. |
+
+### RTC / CMOS
+
+| funkcja | opis |
+|---------|------|
+| `int i915_rtc_init(void)` | Inicjalizuje RTC (tryb 24h, format binarny). |
+| `int i915_rtc_is_ready(void)` | Zwraca 1 gdy RTC jest gotowe. |
+| `int i915_rtc_get_time(struct i915_rtc_time *out)` | Pobiera aktualny czas i date z RTC. |
+| `int i915_rtc_set_time(const struct i915_rtc_time *t)` | Ustawia czas i date w RTC. |
+| `int i915_rtc_nvram_read(uint8_t offset, uint8_t *value)` | Odczyt bajtu z pamieci CMOS/NVRAM. |
+| `int i915_rtc_nvram_write(uint8_t offset, uint8_t value)` | Zapis bajtu do pamieci CMOS/NVRAM. |
+| `int i915_rtc_alarm_set(const struct i915_rtc_time *t)` | Ustawia alarm RTC. |
+| `int i915_rtc_irq_enable(uint8_t mask, uint8_t enable)` | Wlacza/wylacza przerwania RTC (update, alarm, periodic). |
+| `uint8_t i915_rtc_irq_status(void)` | Zwraca rejestr statusu C RTC (flagi przerwan). |
+
+### Monitorowanie sprzętowe (HWMON, Super I/O)
+
+| funkcja | opis |
+|---------|------|
+| `int i915_hwmon_init(void)` | Inicjalizuje Super I/O i wlacza logiczne urzadzenie HWMON. |
+| `int i915_hwmon_is_ready(void)` | Zwraca 1 gdy HWMON jest gotowe. |
+| `int i915_hwmon_read_temperature(uint8_t sensor, int32_t *millicelsius)` | Odczyt temperatury z czujnika w milicelcjuszach. |
+| `int i915_hwmon_read_voltage(uint8_t sensor, int32_t *millivolt)` | Odczyt napiecia (placeholder). |
+| `int i915_hwmon_read_fan(uint8_t fan, uint32_t *rpm)` | Odczyt obrotow wentylatora (placeholder). |
+| `void i915_hwmon_stats_get(struct i915_hwmon_stats *out)` | Statystyki HWMON (temperatury, napiecia, wentylatory, błędy). |
+
+### Obsługa przerwan (IRQ)
+
+| funkcja | opis |
+|---------|------|
+| `void i915_irq_handler(uint8_t irq)` | Dysponuje przerwanie do zarejestrowanego handlera dla danego IRQ. |
+| `int i915_irq_register(uint8_t irq, void (*handler)(uint8_t irq))` | Rejestruje handler przerwania dla IRQ 0-15. |
+| `int i915_irq_unregister(uint8_t irq)` | Wyrejestrowuje handler przerwania dla danego IRQ. |
+
+### Struktury danych
+
+Struktura `i915_info` zawiera:
+
+| pole | opis |
+|------|------|
+| vendor_id | id dostawcy (0x8086 Intel) |
+| mch_device_id | id urzadzenia MCH (chipset norte) |
+| ich_device_id | id urzadzenia ICH6 (chipset polnocny) |
+| graphics_device_id | id urzadzenia graficznego GMA 900 |
+| mch_revision | rewizja MCH |
+| ich_revision | rewizja ICH6 |
+| graphics_revision | rewizja grafiki |
+| acpi_base | adres bazowy ACPI PM |
+| smbus_base | adres bazowy SMBus |
+| ac97_mixer_base | adres bazowy miksera AC'97 |
+| ac97_bm_base | adres bazowy bus mastering AC'97 |
+| ide_base[2] | adresy bazowe kanalow IDE |
+| bm_ide_base[2] | adresy bazowe bus mastering IDE |
+| sata_base | adres bazowy SATA |
+| uhci_base[4] | adresy bazowe kontrolerow UHCI |
+| ehci_base | adres bazowy kontrolera EHCI |
+| eth_base | adres bazowy ethernetu |
+| floppy_base | adres bazowy FDC |
+| agp_aperture | rozmiar aperture AGP |
+| gfx_mmio_base | adres bazowy MMIO grafiki |
+| gfx_fb_addr | adres ramki graficznej |
+| dram | informacje o pamieci DRAM |
+| graphics | informacje o urzadzeniu graficznym |
+| ide | informacje o kontrolerze IDE |
+| usb | informacje o kontrolerze USB |
+| audio | informacje o kontrolerze audio |
+| acpi | informacje o kontrolerze ACPI |
+
+Struktura `i915_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| audio | statystyki audio AC'97 |
+| eth | statystyki ethernetu |
+| ide | statystyki IDE |
+| usb | statystyki USB |
+| floppy | statystyki FDC |
+| hwmon | statystyki monitorowania sprzetowego |
+| graphics | statystyki grafiki GMA 900 |
+| pci_reads | liczba odczytow konfiguracji PCI |
+| pci_writes | liczba zapisow konfiguracji PCI |
+| memory_ops | liczba operacji na pamieci chipsetu |
+| smbus_ops | liczba operacji SMBus |
+| acpi_events | liczba zdarzen ACPI |
+| tco_resets | liczba resetow TCO watchdog |
+| irq_dispatched | liczba dyspatchowanych przerwan |
+| init_count | liczba wyolan inicjalizacji |
+| errors | liczba bledow sterownika |
+
+### Integracja z jądrem
+
+Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `p4p_init()`:
+
+```
+i915_init();
+```
+
+Nagłówek `drivers/plyty_glowne/intel_915.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/plyty_glowne/intel_915.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/plyty_glowne/*.cpp)`).
