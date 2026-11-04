@@ -30,6 +30,7 @@
 #include "../drivers/karty_graficzne/gma_x4500.h"
 #include "../drivers/karty_graficzne/radeon_hd_8370d.h"
 #include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
+#include "../drivers/karty_graficzne/radeon_hd_6870.h"
 #include "../drivers/bluetooth/bluetooth.h"
 #include "browser.h"
 #include "zegar.h"
@@ -91,6 +92,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     gma_x4500_init();
     radeon_hd_8370d_init();
     rx_9070_xt_init();
+    radeon_6870_init();
     qemu_vga_init();
     __asm__ volatile ("movb $'E', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     tapeta_wczytaj();

@@ -3,6 +3,7 @@
 #include "rtl8139.h"
 #include "internet/rtl8168b.h"
 #include "internet/rtl8188ce.h"
+#include "internet/rtl8111e.h"
 
 #define FRAME_MAX 1518
 #define IP_OFFSET 14
@@ -210,7 +211,10 @@ static int __attribute__((unused)) dhcp_configure(void)
 
 int net_init(void)
 {
-    if (rtl8168b_init() && rtl8168b_get_mac(mac_address)) {
+    if (rtl8111e_init() && rtl8111e_get_mac(mac_address)) {
+        net_send_fn = rtl8111e_send;
+        net_receive_fn = rtl8111e_receive;
+    } else if (rtl8168b_init() && rtl8168b_get_mac(mac_address)) {
         net_send_fn = rtl8168b_send;
         net_receive_fn = rtl8168b_receive;
     } else if (rtl8188ce_init() && rtl8188ce_get_mac(mac_address)) {

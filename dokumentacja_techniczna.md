@@ -2338,6 +2338,656 @@ void radeon_hd_8370d_context_get(struct radeon_hd_8370d_context *out);
 int radeon_hd_8370d_3d_available(void)
 ```
 
+## karta graficzna - drivers/karty_graficzne/radeon_hd_6790.cpp
+
+sterownik karty graficznej AMD Radeon HD 6790 (Barts, Northern Islands, VLIW4) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP) i DMA, przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami i kompresja DXT, shadery (vertex/pixel/geometry/compute/hull/domain), render targety, depth-stencil z depth bounds, tessellation, stream output, zapytania okluzyjne, statystyki potoku, MSAA, command buffer, presentation oraz presentation. sterownik opiera sie na architekturze Northern Islands (Barts Pro, device id 0x683F).
+
+### radeon_6790_init
+
+inicjalizuje sterownik Radeon HD 6790: wyszukuje urzadzenie na PCI (vendor 0x1002, urzadzenia 0x683F/0x6840/0x683E/0x6841), mapuje adresy MMIO, czysci przerwania, inicjalizuje zasilanie i zegary, konfiguruje silnik wyswietlania (DCN CRTC, plane, surface), resetuje i inicjalizuje ring buffer Command Processor oraz ring buffer DMA, konfiguruje pelny potok 3D (color buffer, depth buffer, blend, rasterizer, shader SQ, tekstury, samplery, tessellation, stream output) oraz inicjalizuje kursor sprzetowy.
+
+```
+int radeon_6790_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### radeon_6790_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int radeon_6790_is_ready(void)
+```
+
+### radeon_6790_shutdown
+
+zatrzymuje Command Processor i DMA, przechodzi w stan zasilania D3 i oznacz sterownik jako niezalogowany.
+
+```
+void radeon_6790_shutdown(void)
+```
+
+### radeon_6790_putpixel
+
+rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem.
+
+```
+void radeon_6790_putpixel(uint32_t x, uint32_t y, uint32_t color)
+```
+
+### radeon_6790_fillrect
+
+wypelnia prostokat o podanym rozmiarze i kolorze. uzywa ring buffer CP gdy sterownik jest zainicjowany, w przeciwnym razie petla CPU.
+
+```
+void radeon_6790_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)
+```
+
+### radeon_6790_blt
+
+kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) uzywajac ring buffer CP sprzetowego.
+
+```
+void radeon_6790_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
+```
+
+### radeon_6790_cursor_set
+
+ustawia kursor sprzetowy na pozycji (x, y) z podanym obrazem 64x64. obraz jest kopiowany do pamieci ramki graficznej.
+
+```
+void radeon_6790_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)
+```
+
+### radeon_6790_cursor_hide
+
+ukrywa kursor sprzetowy.
+
+```
+void radeon_6790_cursor_hide(void)
+```
+
+### radeon_6790_get_fb
+
+zwraca wskaznik na ramke graficzna (framebuffer).
+
+```
+void *radeon_6790_get_fb(void)
+```
+
+### radeon_6790_get_width / radeon_6790_get_height
+
+zwracaja szerokosc i wysokosc ekranu (1920x1080).
+
+```
+uint32_t radeon_6790_get_width(void);
+uint32_t radeon_6790_get_height(void);
+```
+
+### radeon_6790_get_device_id / radeon_6790_get_revision
+
+zwracaja id urzadzenia i revisje karty graficznej.
+
+```
+uint16_t radeon_6790_get_device_id(void);
+uint8_t radeon_6790_get_revision(void);
+```
+
+### radeon_6790_info_get
+
+pobiera pelne informacje o urzadzeniu do struktury radeon_6790_info (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, architecture, vram_size, vram_used, gfx_clock_mhz, memory_clock_mhz, temperature_c, fan_rpm).
+
+```
+void radeon_6790_info_get(struct radeon_6790_info *out)
+```
+
+### zarzadzanie pamieci wideo (VRAM)
+
+#### radeon_6790_vram_alloc
+
+alokuje blok pamieci wideo o podanym rozmiarze i typie. zwraca offset w VRAM lub 0xFFFFFFFFFFFFFFFF przy bledzie.
+
+```
+uint64_t radeon_6790_vram_alloc(uint64_t size, uint32_t type)
+```
+
+#### radeon_6790_vram_free
+
+zwalnia blok pamieci wideo o podanym offsetcie.
+
+```
+void radeon_6790_vram_free(uint64_t handle)
+```
+
+#### radeon_6790_vram_used / radeon_6790_vram_total
+
+zwracaja uzywana i calkowita ilosc pamieci wideo.
+
+```
+uint64_t radeon_6790_vram_used(void);
+uint64_t radeon_6790_vram_total(void);
+```
+
+## akceleracja 3D - drivers/karty_graficzne/radeon_6790.cpp
+
+### tworzenie i niszczenie zasobow 3D
+
+#### radeon_6790_vertex_buffer_create
+
+tworzy vertex buffer (wierzcholki). zwraca handle lub RADEON_6790_HANDLE_NULL przy bledzie.
+
+```
+radeon_6790_handle_t radeon_6790_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data)
+```
+
+#### radeon_6790_vertex_buffer_destroy / radeon_6790_vertex_buffer_update
+
+niszczy vertex buffer lub aktualizuje jego dane od podanego offsetu.
+
+```
+void radeon_6790_vertex_buffer_destroy(radeon_6790_handle_t handle);
+void radeon_6790_vertex_buffer_update(radeon_6790_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### radeon_6790_index_buffer_create
+
+tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe). zwraca handle.
+
+```
+radeon_6790_handle_t radeon_6790_index_buffer_create(uint32_t index_count, uint32_t format, const void *data)
+```
+
+#### radeon_6790_index_buffer_destroy / radeon_6790_index_buffer_update
+
+niszczy index buffer lub aktualizuje jego dane.
+
+```
+void radeon_6790_index_buffer_destroy(radeon_6790_handle_t handle);
+void radeon_6790_index_buffer_update(radeon_6790_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### radeon_6790_texture_create
+
+tworzy teksture 2D o podanym rozmiarze, formacie i liczbie poziom mipmap. obsluguje kompresje DXT i generowanie mipmap. zwraca handle.
+
+```
+radeon_6790_handle_t radeon_6790_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data)
+```
+
+#### radeon_6790_texture_destroy / radeon_6790_texture_update / radeon_6790_texture_generate_mipmaps
+
+niszczy teksture, aktualizuje jej zawartosc (upload z pamieci systemowej do FB) lub generuje mipmapy.
+
+```
+void radeon_6790_texture_destroy(radeon_6790_handle_t handle);
+void radeon_6790_texture_update(radeon_6790_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data);
+void radeon_6790_texture_generate_mipmaps(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_render_target_create / radeon_6790_render_target_destroy
+
+tworzy lub niszczy render target (bufor koloru do renderowania 3D z obsluga przezroczystosci alpha i wielowarstwowosci).
+
+```
+radeon_6790_handle_t radeon_6790_render_target_create(uint32_t width, uint32_t height, uint32_t format, uint8_t alpha_blend);
+void radeon_6790_render_target_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_depth_stencil_create / radeon_6790_depth_stencil_destroy
+
+tworzy lub niszczy depth-stencil buffer (bufor glebi i stencil z obsluga kompresji i depth bounds).
+
+```
+radeon_6790_handle_t radeon_6790_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format, uint8_t compression);
+void radeon_6790_depth_stencil_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_shader_create / radeon_6790_shader_destroy / radeon_6790_shader_compile
+
+tworzy shader (vertex/pixel/geometry/compute/hull/domain) z kodu bajtowego ISA GPU, niszczy shader lub kompiluje shader.
+
+```
+radeon_6790_handle_t radeon_6790_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size);
+void radeon_6790_shader_destroy(radeon_6790_handle_t handle);
+void radeon_6790_shader_compile(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_sampler_state_create / radeon_6790_sampler_state_destroy
+
+tworzy lub niszczy stan probki tekstury (filtrowanie min/mag/mip, anisotropia, adresowanie U/V/W, porownanie tekstury, redukcja do zera).
+
+```
+radeon_6790_handle_t radeon_6790_sampler_state_create(uint32_t filter_min, uint32_t filter_mag, uint32_t filter_mip, uint32_t max_anisotropy, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint8_t compare_enable, uint8_t compare_func, uint8_t reduction_zero);
+void radeon_6790_sampler_state_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_blend_state_create / radeon_6790_blend_state_destroy
+
+tworzy lub niszczy stan blendowania (przezroczystosc alpha, operacje blendowania koloru i alfa, staly kolor blendowania, alpha to coverage, dual source blend).
+
+```
+radeon_6790_handle_t radeon_6790_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor, uint8_t alpha_to_coverage, uint8_t dual_source_blend);
+void radeon_6790_blend_state_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_rasterizer_state_create / radeon_6790_rasterizer_state_destroy
+
+tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage, depth bias, rasteryzacja zachowawcza).
+
+```
+radeon_6790_handle_t radeon_6790_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage, uint8_t depth_bias_enable, float depth_bias_constant, float depth_bias_slope, uint8_t conservative_raster);
+void radeon_6790_rasterizer_state_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_depth_stencil_state_create / radeon_6790_depth_stencil_state_destroy
+
+tworzy lub niszczy stan depth-stencil (testy glebi i stencil z przodem i tylem, depth bounds test).
+
+```
+radeon_6790_handle_t radeon_6790_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func, uint8_t depth_bounds_enable);
+void radeon_6790_depth_stencil_state_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_input_layout_create / radeon_6790_input_layout_destroy
+
+tworzy lub niszczy input layout (mapowanie atrybutow vertex do slotow).
+
+```
+radeon_6790_handle_t radeon_6790_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats);
+void radeon_6790_input_layout_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_constant_buffer_create / radeon_6790_constant_buffer_destroy / radeon_6790_constant_buffer_update
+
+tworzy, niszczy lub aktualizuje constant buffer (stale shadera / uniforms).
+
+```
+radeon_6790_handle_t radeon_6790_constant_buffer_create(uint32_t size);
+void radeon_6790_constant_buffer_destroy(radeon_6790_handle_t handle);
+void radeon_6790_constant_buffer_update(radeon_6790_handle_t handle, uint32_t offset, uint32_t size, const void *data)
+```
+
+#### radeon_6790_stream_output_create / radeon_6790_stream_output_destroy / radeon_6790_stream_output_update
+
+tworzy, niszczy lub aktualizuje buffer wyjscia strumieniowego (transform feedback) dla potoku geometrycznego.
+
+```
+radeon_6790_handle_t radeon_6790_stream_output_create(uint32_t buffer_count, const uint64_t *sizes);
+void radeon_6790_stream_output_destroy(radeon_6790_handle_t handle);
+void radeon_6790_stream_output_update(radeon_6790_handle_t handle, uint32_t slot, const void *data, uint32_t size)
+```
+
+#### radeon_6790_tessellation_state_create / radeon_6790_tessellation_state_destroy / radeon_6790_tessellation_state_update
+
+tworzy, niszczy lub aktualizuje stan tessellation (liczba wierzcholkow latek, czynniki tessellation krawedzi i srodka, typ domeny, partycjonowanie).
+
+```
+radeon_6790_handle_t radeon_6790_tessellation_state_create(uint32_t patch_vertices, const float *edge_factors, const float *inside_factors, uint8_t domain_triangles, uint8_t fractional_odd);
+void radeon_6790_tessellation_state_destroy(radeon_6790_handle_t handle);
+void radeon_6790_tessellation_state_update(radeon_6790_handle_t handle, const float *edge_factors, const float *inside_factors)
+```
+
+### bindowanie stanow potoku 3D
+
+#### radeon_6790_bind_vertex_buffer / radeon_6790_bind_index_buffer / radeon_6790_bind_input_layout
+
+binduje vertex buffer, index buffer lub input layout do potoku 3D.
+
+```
+void radeon_6790_bind_vertex_buffer(radeon_6790_handle_t handle);
+void radeon_6790_bind_index_buffer(radeon_6790_handle_t handle);
+void radeon_6790_bind_input_layout(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_bind_vertex_shader / radeon_6790_bind_pixel_shader / radeon_6790_bind_geometry_shader / radeon_6790_bind_compute_shader / radeon_6790_bind_hull_shader / radeon_6790_bind_domain_shader
+
+binduje shader vertex, pixel, geometry, compute, hull lub domain do potoku 3D.
+
+```
+void radeon_6790_bind_vertex_shader(radeon_6790_handle_t handle);
+void radeon_6790_bind_pixel_shader(radeon_6790_handle_t handle);
+void radeon_6790_bind_geometry_shader(radeon_6790_handle_t handle);
+void radeon_6790_bind_compute_shader(radeon_6790_handle_t handle);
+void radeon_6790_bind_hull_shader(radeon_6790_handle_t handle);
+void radeon_6790_bind_domain_shader(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_bind_render_target / radeon_6790_bind_depth_stencil
+
+binduje render target lub depth-stencil do potoku 3D.
+
+```
+void radeon_6790_bind_render_target(radeon_6790_handle_t handle);
+void radeon_6790_bind_depth_stencil(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_bind_blend_state / radeon_6790_bind_rasterizer_state / radeon_6790_bind_depth_stencil_state
+
+binduje stan blendowania, rasterizera lub depth-stencil do potoku 3D.
+
+```
+void radeon_6790_bind_blend_state(radeon_6790_handle_t handle);
+void radeon_6790_bind_rasterizer_state(radeon_6790_handle_t handle);
+void radeon_6790_bind_depth_stencil_state(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_bind_sampler_and_texture / radeon_6790_bind_constant_buffer / radeon_6790_bind_stream_output / radeon_6790_bind_tessellation
+
+binduje probke tekstury i teksture do slotu, constant buffer do slotu, buffer wyjscia strumieniowego do slotu lub stan tessellation do potoku.
+
+```
+void radeon_6790_bind_sampler_and_texture(uint32_t slot, radeon_6790_handle_t sampler, radeon_6790_handle_t texture);
+void radeon_6790_bind_constant_buffer(uint32_t slot, radeon_6790_handle_t handle);
+void radeon_6790_bind_stream_output(uint32_t slot, radeon_6790_handle_t handle);
+void radeon_6790_bind_tessellation(radeon_6790_handle_t handle)
+```
+
+### konfiguracja potoku 3D
+
+#### radeon_6790_set_viewport
+
+ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi.
+
+```
+void radeon_6790_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth)
+```
+
+#### radeon_6790_set_scissor
+
+ustawia prostokat przyciecia renderowania (scissor).
+
+```
+void radeon_6790_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom)
+```
+
+#### radeon_6790_set_primitive_topology
+
+ustawia typ primitivu do rysowania (punkt, linia, trojkat, kwadrat itp.).
+
+```
+void radeon_6790_set_primitive_topology(uint32_t topology)
+```
+
+#### radeon_6790_set_alpha_blend_global
+
+wlacza lub wylacza globalne blendowanie alfa (przezroczystosc) dla calego potoku 3D.
+
+```
+void radeon_6790_set_alpha_blend_global(uint8_t enable)
+```
+
+#### radeon_6790_set_depth_bounds
+
+ustawia dolne i gorne granice testu depth bounds (odrzucanie pikseli poza zakresem glebi).
+
+```
+void radeon_6790_set_depth_bounds(float min_depth, float max_depth)
+```
+
+#### radeon_6790_set_render_target_array_slice
+
+ustawia aktywna warstwe tablicy render targetow (rendered array / layered rendering).
+
+```
+void radeon_6790_set_render_target_array_slice(uint32_t slice)
+```
+
+#### radeon_6790_set_msaa_samples
+
+ustawia liczba probek MSAA (wieloprobekowe wygładzanie krawedzi).
+
+```
+void radeon_6790_set_msaa_samples(uint32_t samples)
+```
+
+### rysowanie 3D
+
+#### radeon_6790_clear_render_target
+
+czyści render target podanym kolorem.
+
+```
+void radeon_6790_clear_render_target(radeon_6790_handle_t rt, uint32_t color)
+```
+
+#### radeon_6790_clear_depth_stencil
+
+czyści depth-stencil podanymi wartosciami glebi i stencil.
+
+```
+void radeon_6790_clear_depth_stencil(radeon_6790_handle_t ds, float depth, uint8_t stencil)
+```
+
+#### radeon_6790_draw
+
+rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. obsluguje tessellation, render target array i MSAA.
+
+```
+void radeon_6790_draw(uint32_t vertex_count, uint32_t start_vertex)
+```
+
+#### radeon_6790_draw_indexed
+
+rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex.
+
+```
+void radeon_6790_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)
+```
+
+#### radeon_6790_draw_indexed_instanced
+
+rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji, start_instance jako pierwsza instancja.
+
+```
+void radeon_6790_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)
+```
+
+#### radeon_6790_draw_indirect
+
+rysuje primitivy na podstawie danych rysunkowych z bufora po podanym adresie - draw_count rysunkow o podanym kroku (stride).
+
+```
+void radeon_6790_draw_indirect(uint32_t buffer_addr, uint32_t draw_count, uint32_t stride)
+```
+
+### compute shaders
+
+#### radeon_6790_compute_dispatch
+
+wysyla zlecenie obliczeniowe (compute shader) na podana liczbe grup watkow (group_x, group_y, group_z).
+
+```
+void radeon_6790_compute_dispatch(uint32_t group_x, uint32_t group_y, uint32_t group_z)
+```
+
+#### radeon_6790_compute_dispatch_indirect
+
+wysyla zlecenie obliczeniowe na podstawie danych z bufora po podanym adresie.
+
+```
+void radeon_6790_compute_dispatch_indirect(uint32_t buffer_addr)
+```
+
+#### radeon_6790_dma_transfer
+
+przenosi blok danych o podanym rozmiarze z adresu src na adres dst uzywajac asynchronicznego silnika DMA (Command Processor oddzielny od grafiki).
+
+```
+void radeon_6790_dma_transfer(uint64_t dst, uint64_t src, uint64_t size)
+```
+
+### zapytania okluzyjne
+
+#### radeon_6790_occlusion_query_create / radeon_6790_occlusion_query_destroy
+
+tworzy lub niszczy zapytanie okluzyjne (test widzialnosci obiektu poprzez liczenie probek przechodzacych test glebi).
+
+```
+radeon_6790_handle_t radeon_6790_occlusion_query_create(void);
+void radeon_6790_occlusion_query_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_occlusion_query_begin / radeon_6790_occlusion_query_end
+
+rozpoczyna lub konczy zbieranie wyniku zapytania okluzyjnego.
+
+```
+void radeon_6790_occlusion_query_begin(radeon_6790_handle_t handle);
+void radeon_6790_occlusion_query_end(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_occlusion_query_get
+
+pobiera liczbe probek widzialnych dla zapytania okluzyjnego. zwraca 1 gdy wynik jest gotowy.
+
+```
+int radeon_6790_occlusion_query_get(radeon_6790_handle_t handle, uint32_t *samples)
+```
+
+### statystyki potoku 3D
+
+#### radeon_6790_pipeline_stats_create / radeon_6790_pipeline_stats_destroy
+
+tworzy lub niszczy liczniki statystyk potoku (wierzcholki, primitivy, wywolania shaderow).
+
+```
+radeon_6790_handle_t radeon_6790_pipeline_stats_create(void);
+void radeon_6790_pipeline_stats_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_pipeline_stats_begin / radeon_6790_pipeline_stats_end
+
+rozpoczyna lub konczy zbieranie statystyk potoku 3D.
+
+```
+void radeon_6790_pipeline_stats_begin(radeon_6790_handle_t handle);
+void radeon_6790_pipeline_stats_end(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_pipeline_stats_get
+
+pobiera zebrane statystyki potoku do struktury radeon_6790_pipeline_stats. zwraca 1 gdy dane sa dostepne.
+
+```
+int radeon_6790_pipeline_stats_get(radeon_6790_handle_t handle, struct radeon_6790_pipeline_stats *out)
+```
+
+### synchronizacja
+
+#### radeon_6790_fence_create / radeon_6790_fence_signal / radeon_6790_fence_wait / radeon_6790_fence_destroy
+
+tworzy, sygnalizuje, oczekuje na sygnal lub niszczy fence (punkt synchronizacji potoku GPU).
+
+```
+void radeon_6790_fence_create(radeon_6790_handle_t *out);
+void radeon_6790_fence_signal(radeon_6790_handle_t handle, uint32_t value);
+int radeon_6790_fence_wait(radeon_6790_handle_t handle, uint32_t value, uint32_t timeout_us);
+void radeon_6790_fence_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_semaphore_create / radeon_6790_semaphore_signal / radeon_6790_semaphore_wait / radeon_6790_semaphore_destroy
+
+tworzy, sygnalizuje, oczekuje na sygnal lub niszczy semafor (synchronizacja miedzy potokami graficznym i obliczeniowym).
+
+```
+void radeon_6790_semaphore_create(radeon_6790_handle_t *out);
+void radeon_6790_semaphore_signal(radeon_6790_handle_t handle, uint32_t value);
+void radeon_6790_semaphore_wait(radeon_6790_handle_t handle, uint32_t value);
+void radeon_6790_semaphore_destroy(radeon_6790_handle_t handle)
+```
+
+#### radeon_6790_wait_idle / radeon_6790_timestamp
+
+czeka az potok GPU stanie sie bezczynny lub pobiera znacznik czasu GPU.
+
+```
+int radeon_6790_wait_idle(uint32_t timeout_us);
+uint64_t radeon_6790_timestamp(void)
+```
+
+### zasilanie, zegary i monitoring
+
+#### radeon_6790_power_set_state / radeon_6790_power_get_state
+
+ustawia lub zwraca stan zasilania GPU (D0-D3).
+
+```
+void radeon_6790_power_set_state(uint8_t state);
+uint8_t radeon_6790_power_get_state(void);
+```
+
+#### radeon_6790_set_clock_gfx / radeon_6790_set_clock_memory / radeon_6790_get_clock_gfx / radeon_6790_get_clock_memory
+
+ustawia lub zwraca czestotliwosc zegara grafiki i pamieci w MHz.
+
+```
+void radeon_6790_set_clock_gfx(uint32_t mhz);
+void radeon_6790_set_clock_memory(uint32_t mhz);
+uint32_t radeon_6790_get_clock_gfx(void);
+uint32_t radeon_6790_get_clock_memory(void);
+```
+
+#### radeon_6790_get_temperature
+
+odczytuje aktualna temperature GPU w stopniach Celsjusza.
+
+```
+uint32_t radeon_6790_get_temperature(void);
+```
+
+#### radeon_6790_set_fan_speed / radeon_6790_get_fan_speed
+
+ustawia lub zwraca predkosc wentylatora w obrotach na minute.
+
+```
+void radeon_6790_set_fan_speed(uint32_t rpm);
+uint32_t radeon_6790_get_fan_speed(void);
+```
+
+#### radeon_6790_rgb_set / radeon_6790_rgb_off
+
+ustawia podswietlenie RGB karty graficznej (kolor i tryb) lub wylacza podswietlenie.
+
+```
+void radeon_6790_rgb_set(uint32_t color, uint8_t mode);
+void radeon_6790_rgb_off(void);
+```
+
+### presentation (swap chain)
+
+#### radeon_6790_swap_chain_create / radeon_6790_swap_chain_destroy / radeon_6790_present
+
+tworzy swap chain (podwojne buforowanie z opcja vsync i premultiplied alpha dla przezroczystosci), niszczy swap chain lub przebija tylny bufor na przedni (present).
+
+```
+radeon_6790_handle_t radeon_6790_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync, uint8_t alpha_premultiplied);
+void radeon_6790_swap_chain_destroy(radeon_6790_handle_t handle);
+void radeon_6790_present(radeon_6790_handle_t chain)
+```
+
+### command buffer (akceleracja 3D w strumieniu)
+
+#### radeon_6790_command_begin / radeon_6790_command_end
+
+rozpoczyna nagrywanie polecen do command buffer lub zakoncza nagrywanie i wykonuje wszystkie polecenia przez Command Processor.
+
+```
+void radeon_6790_command_begin(void);
+void radeon_6790_command_end(void)
+```
+
+### informacje o akceleracji 3D
+
+#### radeon_6790_context_get / radeon_6790_3d_available
+
+pobiera biezacy kontekst 3D lub zwraca 1 gdy akceleracja 3D jest dostepna (potok Northern Islands / Barts).
+
+```
+void radeon_6790_context_get(struct radeon_6790_context *out);
+int radeon_6790_3d_available(void)
+```
+
 ## struktura plikow
 
 ```
@@ -4069,9 +4719,253 @@ rx_9070_xt_init();
 
 Nagłówek `drivers/karty_graficzne/radeon_rx_9070_xt.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_rx_9070_xt.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
+## karta graficzna - drivers/karty_graficzne/radeon_hd_6870.cpp
+
+Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Northern Islands / Cayman, VLIW4) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT), shadery (vertex, pixel, geometry, compute), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync). Sterownik zarządza pamiecia GDDR5 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_hd_6870.h i jest inicjalizowany z kernel/kernel.c przez `radeon_6870_init()`.
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `int radeon_6870_init(void)` | Inicjalizuje sterownik Radeon HD 6870: wyszukuje urzadzenie na PCI (vendor 0x1002, Cayman), mapuje adresy MMIO, czysci przerwania, konfiguruje zasilanie (D0), zegary GPU i pamieci, inicjalizuje silnik wyswietlania DCN (CRTC, plane, surface, 1920x1080), resetuje i inicjalizuje Command Processor (ring buffer), konfiguruje potok 3D (color buffer, depth buffer, blend, rasterizer, shader SQ), inicjalizuje kursor sprzetowy. Zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie. |
+| `int radeon_6870_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy. |
+| `void radeon_6870_shutdown(void)` | Zatrzymuje Command Processor (ME i PFP Halt), przechodzi w stan zasilania D3 i oznacza sterownik jako nieinicjalizowany. |
+
+### Podstawowa grafika 2D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_putpixel(uint32_t x, uint32_t y, uint32_t color)` | Rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem. |
+| `void radeon_6870_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Wypelnia prostokat o podanym rozmiarze i kolorze. Uzywa ring buffer CP gdy sterownik jest zainicjowany, w przeciwnym razie petla CPU. |
+| `void radeon_6870_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)` | Kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) uzywajac ring buffer CP sprzetowego. |
+| `void radeon_6870_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)` | Ustawia kursor sprzetowy na pozycji (x, y) z obrazem 64x64 (kopiowany do pamieci ramki graficznej). |
+| `void radeon_6870_cursor_hide(void)` | Ukrywa kursor sprzetowy. |
+| `void *radeon_6870_get_fb(void)` | Zwraca wskaznik na ramke graficzna (framebuffer). |
+| `uint32_t radeon_6870_get_width(void)` | Zwraca szerokosc ekranu (1920). |
+| `uint32_t radeon_6870_get_height(void)` | Zwraca wysokosc ekranu (1080). |
+| `uint16_t radeon_6870_get_device_id(void)` | Zwraca ID urzadzenia graficznego. |
+| `uint8_t radeon_6870_get_revision(void)` | Zwraca rewizje karty graficznej. |
+| `void radeon_6870_info_get(struct radeon_6870_info *out)` | Pobiera pelne informacje o urzadzeniu (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, architecture, vram_size, vram_used, gfx_clock_mhz, memory_clock_mhz, temperature_c, fan_rpm). |
+
+### Zarządzanie pamięcią VRAM (GDDR5)
+
+| funkcja | opis |
+|---------|------|
+| `uint64_t radeon_6870_vram_alloc(uint64_t size, uint32_t type)` | Alokuje obszar pamieci VRAM o podanym rozmiarze i typie (wyrownanie do strony 4 KB). Zwraca offset w VRAM lub 0xFFFFFFFFFFFFFFFF przy bledzie. |
+| `void radeon_6870_vram_free(uint64_t handle)` | Zwalnia obszar pamieci VRAM o podanym offsecie (oznacza slot jako wolny). |
+| `uint64_t radeon_6870_vram_used(void)` | Zwraca liczbe bajtow VRAM aktualnie uzytych. |
+| `uint64_t radeon_6870_vram_total(void)` | Zwraca calkowita pojemnosc VRAM. |
+
+### Tworzenie i niszczenie zasobow 3D
+
+| funkcja | opis |
+|---------|------|
+| `radeon_6870_handle_t radeon_6870_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data)` | Tworzy vertex buffer (wierzcholki). Zwraca handle lub RADEON_6870_HANDLE_NULL przy bledzie. |
+| `void radeon_6870_vertex_buffer_destroy(radeon_6870_handle_t handle)` | Niszczy vertex buffer o podanym handle i zwalnia jego pamiec VRAM. |
+| `void radeon_6870_vertex_buffer_update(radeon_6870_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane vertex buffera od podanego offsetu. |
+| `radeon_6870_handle_t radeon_6870_index_buffer_create(uint32_t index_count, uint32_t format, const void *data)` | Tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe). Zwraca handle. |
+| `void radeon_6870_index_buffer_destroy(radeon_6870_handle_t handle)` | Niszczy index buffer i zwalnia jego pamiec VRAM. |
+| `void radeon_6870_index_buffer_update(radeon_6870_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane index buffera od podanego offsetu. |
+| `radeon_6870_handle_t radeon_6870_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data)` | Tworzy teksture 2D o podanym rozmiarze, formacie i liczbie poziomow mipmap. Zwraca handle. |
+| `void radeon_6870_texture_destroy(radeon_6870_handle_t handle)` | Niszczy teksture i zwalnia jej pamiec VRAM. |
+| `void radeon_6870_texture_update(radeon_6870_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data)` | Aktualizuje zawartosc tekstury (upload z pamieci systemowej do VRAM). |
+| `void radeon_6870_texture_generate_mipmaps(radeon_6870_handle_t handle)` | Generuje mipmapy dla tekstury (powtarzajace polowowanie wymiarow). |
+| `radeon_6870_handle_t radeon_6870_render_target_create(uint32_t width, uint32_t height, uint32_t format, uint8_t alpha_blend)` | Tworzy render target (bufor koloru do renderowania 3D z obsluga przezroczystosci alpha). Zwraca handle. |
+| `void radeon_6870_render_target_destroy(radeon_6870_handle_t handle)` | Niszczy render target i zwalnia jego pamiec VRAM. |
+| `radeon_6870_handle_t radeon_6870_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format, uint8_t compression)` | Tworzy depth-stencil buffer (bufor glebi i stencil z opcjonalna kompresja). Zwraca handle. |
+| `void radeon_6870_depth_stencil_destroy(radeon_6870_handle_t handle)` | Niszczy depth-stencil i zwalnia jego pamiec VRAM. |
+| `radeon_6870_handle_t radeon_6870_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size)` | Tworzy shader (vertex/pixel/geometry/compute) z kodu bajtowego GPU. Zwraca handle. |
+| `void radeon_6870_shader_destroy(radeon_6870_handle_t handle)` | Niszczy shader. |
+| `void radeon_6870_shader_compile(radeon_6870_handle_t handle)` | Oznacza shader jako skompilowany (gotowy do uzycia w potoku). |
+| `radeon_6870_handle_t radeon_6870_sampler_state_create(uint32_t filter_min, uint32_t filter_mag, uint32_t filter_mip, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint32_t max_anisotropy, uint8_t compare_enable, uint8_t compare_func)` | Tworzy stan probki tekstury (filtrowanie min/mag/mip, adresowanie, anisotropia, porownanie). Zwraca handle. |
+| `void radeon_6870_sampler_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan probki tekstury. |
+| `radeon_6870_handle_t radeon_6870_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor)` | Tworzy stan blendowania (przezroczystosc alpha, operacje blendowania, staly kolor blendowania). Zwraca handle. |
+| `void radeon_6870_blend_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan blendowania. |
+| `radeon_6870_handle_t radeon_6870_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage). Zwraca handle. |
+| `void radeon_6870_rasterizer_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan rasterizera. |
+| `radeon_6870_handle_t radeon_6870_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)` | Tworzy stan depth-stencil (testy glebi i stencil z przodem i tylem). Zwraca handle. |
+| `void radeon_6870_depth_stencil_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan depth-stencil. |
+| `radeon_6870_handle_t radeon_6870_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats)` | Tworzy input layout (mapowanie atrybutow vertex do slotow). Zwraca handle. |
+| `void radeon_6870_input_layout_destroy(radeon_6870_handle_t handle)` | Niszczy input layout. |
+| `radeon_6870_handle_t radeon_6870_constant_buffer_create(uint32_t size)` | Tworzy constant buffer (stale shadera / uniforms) z pamiecia VRAM. Zwraca handle. |
+| `void radeon_6870_constant_buffer_destroy(radeon_6870_handle_t handle)` | Niszczy constant buffer i zwalnia jego pamiec VRAM. |
+| `void radeon_6870_constant_buffer_update(radeon_6870_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane constant buffera od podanego offsetu. |
+
+### Bindowanie stanow potoku 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_bind_vertex_buffer(radeon_6870_handle_t handle)` | Binduje vertex buffer do potoku 3D. |
+| `void radeon_6870_bind_index_buffer(radeon_6870_handle_t handle)` | Binduje index buffer do potoku 3D. |
+| `void radeon_6870_bind_input_layout(radeon_6870_handle_t handle)` | Binduje input layout do potoku 3D. |
+| `void radeon_6870_bind_vertex_shader(radeon_6870_handle_t handle)` | Binduje shader vertex do potoku 3D. |
+| `void radeon_6870_bind_pixel_shader(radeon_6870_handle_t handle)` | Binduje shader pixel do potoku 3D. |
+| `void radeon_6870_bind_geometry_shader(radeon_6870_handle_t handle)` | Binduje shader geometry do potoku 3D. |
+| `void radeon_6870_bind_compute_shader(radeon_6870_handle_t handle)` | Binduje shader compute do potoku 3D. |
+| `void radeon_6870_bind_render_target(radeon_6870_handle_t handle)` | Binduje render target do potoku 3D. |
+| `void radeon_6870_bind_depth_stencil(radeon_6870_handle_t handle)` | Binduje depth-stencil do potoku 3D. |
+| `void radeon_6870_bind_blend_state(radeon_6870_handle_t handle)` | Binduje stan blendowania do potoku 3D. |
+| `void radeon_6870_bind_rasterizer_state(radeon_6870_handle_t handle)` | Binduje stan rasterizera do potoku 3D. |
+| `void radeon_6870_bind_depth_stencil_state(radeon_6870_handle_t handle)` | Binduje stan depth-stencil do potoku 3D. |
+| `void radeon_6870_bind_sampler_and_texture(uint32_t slot, radeon_6870_handle_t sampler, radeon_6870_handle_t texture)` | Binduje probke tekstury i teksture do slotu. |
+| `void radeon_6870_bind_constant_buffer(uint32_t slot, radeon_6870_handle_t handle)` | Binduje constant buffer do slotu. |
+
+### Konfiguracja potoku 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth)` | Ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi. |
+| `void radeon_6870_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom)` | Ustawia prostokat przyciecia renderowania (scissor). |
+| `void radeon_6870_set_primitive_topology(uint32_t topology)` | Ustawia typ primitivu do rysowania (punkt, linia, trojkat, kwadrat itp.). |
+| `void radeon_6870_set_alpha_blend_global(uint8_t enable)` | Wlacza/wylacza globalne blendowanie alfa (przezroczystosc) dla calego potoku 3D. |
+
+### Rysowanie 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_clear_render_target(radeon_6870_handle_t rt, uint32_t color)` | Czyści render target podanym kolorem. |
+| `void radeon_6870_clear_depth_stencil(radeon_6870_handle_t ds, float depth, uint8_t stencil)` | Czyści depth-stencil podanymi wartosciami glebi i stencil. |
+| `void radeon_6870_draw(uint32_t vertex_count, uint32_t start_vertex)` | Rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. |
+| `void radeon_6870_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)` | Rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex. |
+| `void radeon_6870_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)` | Rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji poczynajac od start_instance. |
+| `void radeon_6870_draw_indirect(uint32_t buffer_addr, uint32_t draw_count, uint32_t stride)` | Rysuje z parametrami pobranymi z bufora indirect (draw indirect). |
+
+### Compute
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_compute_dispatch(uint32_t group_x, uint32_t group_y, uint32_t group_z)` | Uruchamia obliczenia compute (dispatch) z podana liczba grup watkow w X, Y, Z. |
+| `void radeon_6870_compute_dispatch_indirect(uint32_t buffer_addr)` | Uruchamia obliczenia compute z parametrami z bufora indirect. |
+
+### Synchronizacja (fences, semaphory)
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_fence_create(radeon_6870_handle_t *out)` | Tworzy fence (synchronizacja GPU) i zwraca jego handle. |
+| `void radeon_6870_fence_signal(radeon_6870_handle_t handle, uint32_t value)` | Sygnalizuje fence z podana wartoscia (oznacza zakonczenie pracy GPU). |
+| `int radeon_6870_fence_wait(radeon_6870_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizację fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
+| `void radeon_6870_fence_destroy(radeon_6870_handle_t handle)` | Niszczy fence o podanym handle. |
+| `void radeon_6870_semaphore_create(radeon_6870_handle_t *out)` | Tworzy semafor (synchronizacja miedzy etapami potoku) i zwraca jego handle. |
+| `void radeon_6870_semaphore_signal(radeon_6870_handle_t handle, uint32_t value)` | Sygnalizuje semafor z podana wartoscia. |
+| `void radeon_6870_semaphore_wait(radeon_6870_handle_t handle, uint32_t value)` | Czeka na sygnalizację semafora do podanej wartosci (blokujace). |
+| `void radeon_6870_semaphore_destroy(radeon_6870_handle_t handle)` | Niszczy semafor o podanym handle. |
+
+### Zarządzanie zasilaniem, zegarami, temperatura, wentylator, RGB
+
+| funkcja | opis |
+|---------|------|
+| `int radeon_6870_wait_idle(uint32_t timeout_us)` | Czeka az GPU bedzie bezczynne (ring buffer pusty) z timeoutem. Zwraca 1 gdy GPU jest idle, 0 przy timeoutcie. |
+| `uint64_t radeon_6870_timestamp(void)` | Pobiera aktualny znacznik czasu z rejestru timestamp GPU. |
+| `void radeon_6870_power_set_state(uint8_t state)` | Ustawia stan zasilania GPU (D0-D3). |
+| `uint8_t radeon_6870_power_get_state(void)` | Zwraca aktualny stan zasilania GPU. |
+| `void radeon_6870_set_clock_gfx(uint32_t mhz)` | Ustawia taktowanie rdzenia grafiki (GFX clock) w MHz. |
+| `void radeon_6870_set_clock_memory(uint32_t mhz)` | Ustawia taktowanie pamieci (memory clock) w MHz. |
+| `uint32_t radeon_6870_get_clock_gfx(void)` | Zwraca aktualne taktowanie rdzenia grafiki w MHz. |
+| `uint32_t radeon_6870_get_clock_memory(void)` | Zwraca aktualne taktowanie pamieci w MHz. |
+| `uint32_t radeon_6870_get_temperature(void)` | Pobiera aktualna temperature GPU z czujnika termicznego (w stopniach Celsjusza). |
+| `void radeon_6870_set_fan_speed(uint32_t rpm)` | Ustawia predkosc wentylatora GPU w obrotach na minute (RPM). |
+| `uint32_t radeon_6870_get_fan_speed(void)` | Zwraca aktualna predkosc wentylatora GPU w RPM. |
+| `void radeon_6870_rgb_set(uint32_t color, uint8_t mode)` | Ustawia sterowanie RGB na karcie (kolor i tryb swiecenia). |
+| `void radeon_6870_rgb_off(void)` | Wylacza sterowanie RGB na karcie. |
+
+### Presentation (swap chain)
+
+| funkcja | opis |
+|---------|------|
+| `radeon_6870_handle_t radeon_6870_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync, uint8_t alpha_premultiplied)` | Tworzy swap chain (podwojne buforowanie z opcja vsync i premultiplied alpha). Zwraca handle. |
+| `void radeon_6870_swap_chain_destroy(radeon_6870_handle_t handle)` | Niszczy swap chain i zwalnia pamiec VRAM bufora tylnego. |
+| `void radeon_6870_present(radeon_6870_handle_t chain)` | Przebija tylny bufor na przedni (present) z oczekiwaniem na vsync (opcjonalnie) przez ring buffer CP. |
+
+### Command buffer
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_command_begin(void)` | Rozpoczyna nagrywanie polecen do command buffer. |
+| `void radeon_6870_command_end(void)` | Zakoncza nagrywanie i wykonuje wszystkie polecenia command buffer przez ring buffer CP. |
+
+### Informacje o akceleracji 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_6870_context_get(struct radeon_6870_context *out)` | Pobiera biezacy kontekst 3D (stan potoku). |
+| `int radeon_6870_3d_available(void)` | Zwraca 1 gdy akceleracja 3D jest dostepna (sterownik zainicjowany). |
+
+### Stale i typy
+
+| nazwa | opis |
+|-------|------|
+| `RADEON_6870_VENDOR_ID` | ID dostawcy AMD (0x1002). |
+| `RADEON_6870_DEVICE_ID_CAYMAN_XT` | ID urzadzenia Cayman XT (0x6738) oraz warianty 0x6739/0x673A/0x673B/0x673C/0x673D. |
+| `RADEON_6870_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (GDDR5). |
+| `RADEON_6870_FB_WIDTH / RADEON_6870_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1920x1080). |
+| `RADEON_6870_FB_PITCH` | Pitch ramki graficznej (7680 bajtow). |
+| `RADEON_6870_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
+| `radeon_6870_handle_t` | Typ handle zasobu (uint32_t). |
+| `RADEON_6870_*` | Stale dla formatow vertex, indeksow, primitivow, tekstur, shaderow, blendowania, operacji blendowania, porownan glebi, wypelnienia, cullowania, operacji stencil (patrz naglowek radeon_hd_6870.h). |
+
+### Integracja z jądrem
+
+Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `rx_9070_xt_init()`:
+
+```
+radeon_6870_init();
+```
+
+Nagłówek `drivers/karty_graficzne/radeon_hd_6870.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_hd_6870.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+
 ## konwencja pisania kodu
 
 - komentarze po polsku
 - commity po polsku
 - kod w C (C++ tylko z pozwolenia, nie w miejscach krytycznych)
 - komentarze tylko tam gdzie kod jest mniej czytelny
+
+## sterownik sieciowy realtek rtl8111e
+
+plik `drivers/internet/rtl8111e.cpp` i naglowek `drivers/internet/rtl8111e.h` implementuja pelny sterownik PCIe Gigabit Ethernet dla kart Realtek RTL8111E (rodzina RTL8168/RTL8111, vendor 0x10EC, urzadzenie 0x8168). Kod jest napisany w C++, eksportuje interfejs C (`extern "C"`), jest wolny od wyjatkow i RTTI i kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/internet/*.cpp)`).
+
+sterownik inicjalizuje sie przez:
+1. skanowanie szyny PCI i wyszukanie urzadzenia Realtek 0x10EC:0x8168
+2. odczyt BAR0 (MMIO), wlaczenie miejsca pamietnego i bus master w rejestrze komend PCI
+3. zapis `REG_CFG9346 = 0` (tryb normalny), soft reset ukazu (`REG_CMDR`)
+4. odczyt adresu MAC z rejestrow `REG_MAC0` / `REG_MAC4`
+5. wyczyszczenie oczekujacych przerwan (`REG_ISR`), maska `REG_IMR = 0` (tryb poling, bez przerwan)
+6. konfiguracja nadawania `REG_TCR = 0`, odbioru `REG_RCR` (wlasny MAC, broadcast, multicast, ramki fizyczne, bufor 16K)
+7. adres bufora odbiorczego `REG_RBSTART`
+4 deskryptory nadawcze `REG_TSAD0..3` z buforami `REG_TSD0..3` i bitem `TSD_OWN`
+8. wlaczenie nadawania i odbioru (`CMD_START | CMD_TX_ENABLE | CMD_RX_ENABLE`)
+
+odbior dziala w buforze liniowym cyklicznym pod `REG_RBSTART`; kazda ramka jest poprzedzona 4-bajtowym naglowkiem (status + dlugosc). Nadawanie czeka az karta zwolni deskryptor (bit `TSD_OWN`), kopiuje ramke, oddaje deskryptor karti i czeka na zakonczenie transmisji.
+
+dostepne funkcje:
+
+| funkcja | opis |
+|---------|------|
+| `rtl8111e_init()` | inicjalizuje kartę: PCI, MMIO, reset, MAC, rejestry, bufor, TX/RX. zwraca 1 przy sukcesie, 0 przy porażce. |
+| `rtl8111e_is_ready()` | zwraca 1 gdy sterownik jest zainicjowany i gotowy. |
+| `rtl8111e_get_mac(mac)` | kopiuje 6-bajtowy adres MAC do tablicy `mac`. zwraca 1/0. |
+| `rtl8111e_send(frame, length)` | wysyla ramke ethernet. zwraca 1 po zakonczeniu, 0 gdy deskryptor zajety, -1 przy bledzie argumentow. |
+| `rtl8111e_receive(frame, capacity)` | odbiera ramke w trybie poling. zwraca dlugosc ramki, 0 gdy brak danych, -1 przy bledzie. |
+| `rtl8111e_link_up()` | odczytuje status lacza z PHY (rejestr BMSR bit 2). zwraca 1 gdy lacze aktywne. |
+| `rtl8111e_speed_mbps()` | zwraca predkosc lacza w Mb/s (1000 przy laczu, 0 bez). |
+| `rtl8111e_duplex_full()` | zwraca 1 gdy lacze pracuje w pelnodupleksie. |
+| `rtl8111e_autonegotiate()` | wymusza autonegocjacje PHY i czeka na zakonczenie oraz lacze. zwraca 1/0. |
+| `rtl8111e_reset_link()` | resetuje PHY i ponawia autonegocjacje. zwraca 1/0. |
+| `rtl8111e_loopback_test(frame, length)` | wlacza wewnetrzny loopback, wysyla ramke, odbiera i porownuje. zwraca 1 przy zgodzie, 0 przy rozbieznosci, -1 przy bledzie. |
+| `rtl8111e_set_multicast(addresses, count)` | programuje filtr adresow multicast w rejestrach MAR. |
+| `rtl8111e_stats_get(out)` | wypelnia strukture `rtl8111e_stats` (tx_packets, tx_bytes, tx_errors, rx_packets, rx_bytes, rx_errors, resets, link_changes). |
+
+PHY jest dostępny przez rejestr `REG_PHYAR` (bit 31 = zajęty, bit 30 = zapis, bity 23-16 = adres rejestru, bity 15-0 = dane). Uzywane rejestry PHY: BMCR (0) i BMSR (1).
+
+integracja z przegladarka:
+
+`drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
+
+przyklad uruchomienia:
+
+```
+make
+cd build
+qemu-system-x86_64 -m 2G -boot c -drive file=tarixenOS.img,format=raw -machine pc -display sdl
+```
+
