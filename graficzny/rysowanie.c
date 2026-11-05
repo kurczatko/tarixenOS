@@ -176,7 +176,7 @@ static const uint8_t ikona_www_pasek[12][12] = {
     {0,0,0,0,0,0,0,0,0,0,0,0}
 };
 
-static void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul)
+void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul)
 {
     rysuj_prostokat(x, y, PASEK_ICON_W, PASEK_ICON_H, 0x003A4B5C);
     int ix = x + (PASEK_ICON_W - 12) / 2;

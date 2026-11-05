@@ -31,7 +31,7 @@ static uint8_t menu_otwarte;
 
 extern struct okno *aktywne_okno;
 
-void menu_start(void)
+void menu_start_rysuj_przycisk(void)
 {
     static const uint8_t ikona_menu_start[16][16] = { //bitmapa ikony na menu start
         {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0},
@@ -51,19 +51,23 @@ void menu_start(void)
         {0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
         {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0}
     };
-    menu_otwarte = 0;
     rysuj_prostokat(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC, KOLOR_PRZYCISKU_START);
     
     for (int iy = 0; iy < 16; iy++) {
         for (int ix = 0; ix < 16; ix++) {
             if (ikona_menu_start[iy][ix]) { 
-                rysuj_piksel(START_X + 6 + ix, START_Y + (START_WYSOKOSC / 2) - 8 + iy, KOLOR_ZOLTY); //rysowanie bitmapowej ikony w lewo od przycisku start
+                rysuj_piksel(START_X + 6 + ix, START_Y + (START_WYSOKOSC / 2) - 8 + iy, KOLOR_ZOLTY);
             }
         }
     }
     
     rysuj_tekst_chicago(START_X + 26, START_Y + (START_WYSOKOSC / 2) - 4, "start", KOLOR_TEKST_BIALY);
+}
 
+void menu_start(void)
+{
+    menu_otwarte = 0;
+    menu_start_rysuj_przycisk();
     odswiez_widok();
 }
 

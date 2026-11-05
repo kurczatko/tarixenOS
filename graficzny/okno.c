@@ -2,6 +2,7 @@
 #include "czcionka.h"
 #include "rysowanie.h"
 #include "pulpit.h"
+#include "menu_start.h"
 
 #define KOLOR_RAMKI 0x00787C82
 #define KOLOR_PASKA 0x00787C82
@@ -10,6 +11,8 @@
 #define KOLOR_X     0x00E74C3C
 #define OKNA_MAKS 8
 #define GENIE_KLATKI 14
+#define GENIE_ICON_W 24
+#define GENIE_ICON_SPACJE 4
 
 struct okno *aktywne_okno;
 static struct okno *okna[OKNA_MAKS];
@@ -386,6 +389,8 @@ static void okno_genie_czekaj(void)
 static void okno_genie_rysuj_klatke(struct okno *okno, int cx, int cy, int cw, int ch)
 {
     odtworz_fragment_tla_bufor(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    narysuj_pasek_zadan();
+    menu_start_rysuj_przycisk();
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         struct okno *o = okna[indeks];
         if (!o || !o->otwarte || o->zminimalizowane || o == okno) continue;
@@ -399,8 +404,25 @@ static void okno_genie_rysuj_klatke(struct okno *okno, int cx, int cy, int cw, i
         }
         rysuj_tekst_chicago(cx + 8, cy + 8, okno->tytul, 0x00FFFFFF);
     }
-    pasek_zadan_rysuj_ikony_minimalizowanych();
     odswiez_widok();
+}
+
+static void okno_genie_animuj(struct okno *okno, int sx, int sy, int sw, int sh,
+                              int ex, int ey, int ew, int eh)
+{
+    for (int k = 0; k <= GENIE_KLATKI; k++) {
+        int e = k * k;
+        int m = GENIE_KLATKI * GENIE_KLATKI;
+        if (m == 0) m = 1;
+        int cx = sx + (ex - sx) * e / m;
+        int cy = sy + (ey - sy) * e / m;
+        int cw = sw + (ew - sw) * e / m;
+        int ch = sh + (eh - sh) * e / m;
+        if (cw < 4) cw = 4;
+        if (ch < 4) ch = 4;
+        okno_genie_rysuj_klatke(okno, cx, cy, cw, ch);
+        okno_genie_czekaj();
+    }
 }
 
 void okno_zminimalizuj(struct okno *okno)
@@ -416,19 +438,7 @@ void okno_zminimalizuj(struct okno *okno)
     int cel_w = 8;
     int cel_h = 8;
 
-    for (int k = 0; k <= GENIE_KLATKI; k++) {
-        int e = k * k;
-        int m = GENIE_KLATKI * GENIE_KLATKI;
-        if (m == 0) m = 1;
-        int cx = start_x + (cel_x - start_x) * e / m;
-        int cy = start_y + (cel_y - start_y) * e / m;
-        int cw = start_w + (cel_w - start_w) * e / m;
-        int ch = start_h + (cel_h - start_h) * e / m;
-        if (cw < 4) cw = 4;
-        if (ch < 4) ch = 4;
-        okno_genie_rysuj_klatke(okno, cx, cy, cw, ch);
-        okno_genie_czekaj();
-    }
+    okno_genie_animuj(okno, start_x, start_y, start_w, start_h, cel_x, cel_y, cel_w, cel_h);
 
     int zamkniety_x = okno->x;
     int zamkniety_y = okno->y;
@@ -453,6 +463,14 @@ void okno_zminimalizuj(struct okno *okno)
 void okno_przywroc(struct okno *okno)
 {
     if (!okno || !okno->otwarte || !okno->zminimalizowane) return;
+
+    int cel_x = okno->x + okno->szerokosc / 2 - 4;
+    int cel_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 4;
+    odtworz_fragment_tla_bufor(cel_x, cel_y, 8, 8);
+    okno_genie_animuj(okno, cel_x, cel_y, 8, 8,
+                      okno->x, okno->y, okno->szerokosc, okno->wysokosc);
+    odtworz_fragment_tla_bufor(cel_x, cel_y, 8, 8);
+
     okno->zminimalizowane = 0;
     okno_przenies_na_wierzch(okno);
     pulp_zglosz_zmiane();

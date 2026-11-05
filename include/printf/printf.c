@@ -1,5 +1,12 @@
+/*
+* okej na pocztku ta funkcja sluzyla do wypisywania tekstu w vga
+* ale teraz sluzy do wypisywania rzeczy na porcie szeregowym
+* bo system jest juz graficzny i nikt nie odczyta
+* tekstu vga.
+*/
+
 #include "printf.h"
-#include "vga.h"
+#include "serial.h"
 #include "types.h"
 #include "stdarg.h"
 
@@ -10,12 +17,12 @@ static void print_int(int value) {
     buf[11] = 0;
 
     if (value == 0) {
-        vga_putc('0');
+        serial_putc('0');
         return;
     }
 
     if (value < 0) {
-        vga_putc('-');
+        serial_putc('-');
         value = -value;
     }
 
@@ -26,11 +33,12 @@ static void print_int(int value) {
 
     i++;
     while (buf[i]) {
-        vga_putc(buf[i++]);
+        serial_putc(buf[i++]);
     }
 }
 
 void printf(const char* format, ...) { // deklaracja funkcji printf
+    /*TODO: zmienic nazwe na printk (nie chce mi sie)*/
     va_list args;
     va_start(args, format);
 
@@ -41,12 +49,12 @@ void printf(const char* format, ...) { // deklaracja funkcji printf
             switch (*format) {
                 case 's': {
                     char* s = va_arg(args, char*);
-                    vga_print(s);
+                    serial_print(s);
                     break;
                 }
                 case 'c': {
                     char c = (char)va_arg(args, int);
-                    vga_putc(c);
+                    serial_putc(c);
                     break;
                 }
                 case 'd': {
@@ -55,12 +63,12 @@ void printf(const char* format, ...) { // deklaracja funkcji printf
                     break;
                 }
                 default:
-                    vga_putc('%');
-                    vga_putc(*format);
+                    serial_putc('%');
+                    serial_putc(*format);
                     break;
             }
         } else {
-            vga_putc(*format);
+            serial_putc(*format);
         }
         format++;
     }
