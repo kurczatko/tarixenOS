@@ -5262,3 +5262,202 @@ PHY jest dostępny przez rejestr `REG_PHYAR` (bit 31 = zajęty, bit 30 = zapis, 
 integracja z przegladarka:
 
 `drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
+
+## karta graficzna - drivers/karty_graficzne/radeon_8500.cpp
+
+Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarządza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_8500.h i jest inicjalizowany z kernel/kernel.c przez `radeon_8500_init()`.
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `int radeon_8500_init(void)` | Inicjalizuje sterownik Radeon 8500: wyszukuje urzadzenie na PCI (vendor 0x1002, R200), mapuje adresy MMIO, czysci przerwania, konfiguruje silnik wyswietlania (CRTC, plane, surface, 1024x768), resetuje i inicjalizuje Command Processor (ring buffer), konfiguruje potok 3D (color buffer, depth buffer, blend, rasterizer, shader SQ), inicjalizuje kursor sprhetowy. Zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie. |
+| `int radeon_8500_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy. |
+| `void radeon_8500_shutdown(void)` | Zatrzymuje Command Processor (ME i PFP Halt), przechodzi w stan zasilania D3 i oznacza sterownik jako nieinicjalizowany. |
+
+### Podstawowa grafika 2D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_putpixel(uint32_t x, uint32_t y, uint32_t color)` | Rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem. |
+| `void radeon_8500_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Wypelnia prostokat o podanym rozmiarze i kolorze. Uzywa ring buffer CP gdy sterownik jest zainicjowany, w przeciwnym razie petla CPU. |
+| `void radeon_8500_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)` | Kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) uzywajac ring buffer CP sprzetowego. |
+| `void radeon_8500_cursor_set(uint32_t x, uint32_t y, const uint32_t *image)` | Ustawia kursor sprhetowy na pozycji (x, y) z obrazem 64x64 (kopiowany do pamieci ramki graficznej). |
+| `void radeon_8500_cursor_hide(void)` | Ukrywa kursor sprhetowy. |
+| `void *radeon_8500_get_fb(void)` | Zwraca wskaznik na ramke graficzna (framebuffer). |
+| `uint32_t radeon_8500_get_width(void)` | Zwraca szerokosc ekranu (1024). |
+| `uint32_t radeon_8500_get_height(void)` | Zwraca wysokosc ekranu (768). |
+| `uint16_t radeon_8500_get_device_id(void)` | Zwraca ID urzadzenia graficznego. |
+| `uint8_t radeon_8500_get_revision(void)` | Zwraca rewizje karty graficznej. |
+| `void radeon_8500_info_get(struct radeon_8500_info *out)` | Pobiera pelne informacje o urzadzeniu (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, architecture, vram_size, vram_used, gfx_clock_mhz, memory_clock_mhz, temperature_c, fan_rpm). |
+
+### Zaawansowane shadery i akceleracja 3D
+
+| funkcja | opis |
+|---------|------|
+| `radeon_8500_handle_t radeon_8500_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size)` | Tworzy shader (vertex/pixel/geometry/compute) z kodu bajtowego GPU R200. Zwraca handle lub RADEON_8500_HANDLE_NULL przy bledzie. |
+| `void radeon_8500_shader_destroy(radeon_8500_handle_t handle)` | Niszczy shader o podanym handle. |
+| `void radeon_8500_shader_compile(radeon_8500_handle_t handle)` | Kompiluje shader i oznacza go jako gotowy do uzycia w potoku graficznym. |
+| `void radeon_8500_bind_vertex_shader(radeon_8500_handle_t handle)` | Binduje shader vertex do potoku 3D (etap przetwarzania wierzcholkow). |
+| `void radeon_8500_bind_pixel_shader(radeon_8500_handle_t handle)` | Binduje shader pixel do potoku 3D (etap cieniowania pikseli). |
+| `void radeon_8500_bind_geometry_shader(radeon_8500_handle_t handle)` | Binduje shader geometry do potoku 3D (etap generowania primitivow geometrycznych). |
+| `void radeon_8500_bind_compute_shader(radeon_8500_handle_t handle)` | Binduje shader compute do potoku (obliczenia ogolnego przeznaczenia na GPU). |
+
+### Tworzenie i niszczenie zasobow 3D
+
+| funkcja | opis |
+|---------|------|
+| `radeon_8500_handle_t radeon_8500_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data)` | Tworzy vertex buffer (wierzcholki) z pamiecia VRAM. Zwraca handle. |
+| `void radeon_8500_vertex_buffer_destroy(radeon_8500_handle_t handle)` | Niszczy vertex buffer i zwalnia jego pamiec VRAM. |
+| `void radeon_8500_vertex_buffer_update(radeon_8500_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane vertex buffera od podanego offsetu. |
+| `radeon_8500_handle_t radeon_8500_index_buffer_create(uint32_t index_count, uint32_t format, const void *data)` | Tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe) w VRAM. Zwraca handle. |
+| `void radeon_8500_index_buffer_destroy(radeon_8500_handle_t handle)` | Niszczy index buffer i zwalnia jego pamiec VRAM. |
+| `void radeon_8500_index_buffer_update(radeon_8500_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane index buffera od podanego offsetu. |
+| `radeon_8500_handle_t radeon_8500_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data)` | Tworzy teksture 2D z obsuga mipmap i kompresji (DXT1/3/5, ATI1N, ATI2N) w VRAM. Zwraca handle. |
+| `void radeon_8500_texture_destroy(radeon_8500_handle_t handle)` | Niszczy teksture i zwalnia jej pamiec VRAM. |
+| `void radeon_8500_texture_update(radeon_8500_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data)` | Aktualizuje zawartosc tekstury (upload z pamieci systemowej do VRAM). |
+| `void radeon_8500_texture_generate_mipmaps(radeon_8500_handle_t handle)` | Generuje lancuch mipmap dla tekstury (kolejne poziomy przez polowowanie wymiarow). |
+| `radeon_8500_handle_t radeon_8500_render_target_create(uint32_t width, uint32_t height, uint32_t format, uint8_t alpha_blend)` | Tworzy render target (bufor koloru do renderowania 3D z opcjonalna przezroczystoscia alpha). Zwraca handle. |
+| `void radeon_8500_render_target_destroy(radeon_8500_handle_t handle)` | Niszczy render target i zwalnia jego pamiec VRAM. |
+| `radeon_8500_handle_t radeon_8500_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format, uint8_t compression)` | Tworzy depth-stencil buffer (bufor glebi i stencil z opcjonalna kompresja). Zwraca handle. |
+| `void radeon_8500_depth_stencil_destroy(radeon_8500_handle_t handle)` | Niszczy depth-stencil i zwalnia jego pamiec VRAM. |
+| `radeon_8500_handle_t radeon_8500_sampler_state_create(uint32_t filter_min, uint32_t filter_mag, uint32_t filter_mip, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint32_t max_anisotropy, uint8_t compare_enable, uint8_t compare_func)` | Tworzy stan probki tekstury (filtrowanie min/mag/mip, adresowanie U/V/W, anisotropia, porownanie). Zwraca handle. |
+| `void radeon_8500_sampler_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan probki tekstury. |
+| `radeon_8500_handle_t radeon_8500_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor)` | Tworzy stan blendowania (przezroczystosc alpha, operacje blendowania RGB i alpha, staly kolor blendowania). Zwraca handle. |
+| `void radeon_8500_blend_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan blendowania. |
+| `radeon_8500_handle_t radeon_8500_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha-to-coverage). Zwraca handle. |
+| `void radeon_8500_rasterizer_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan rasterizera. |
+| `radeon_8500_handle_t radeon_8500_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)` | Tworzy stan depth-stencil (testy glebi i stencil z przodem i tylem). Zwraca handle. |
+| `void radeon_8500_depth_stencil_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan depth-stencil. |
+| `radeon_8500_handle_t radeon_8500_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats)` | Tworzy input layout (mapowanie atrybutow vertex do slotow wejsciowych). Zwraca handle. |
+| `void radeon_8500_input_layout_destroy(radeon_8500_handle_t handle)` | Niszczy input layout. |
+| `radeon_8500_handle_t radeon_8500_constant_buffer_create(uint32_t size)` | Tworzy constant buffer (stale shadera / uniforms) w pamieci VRAM. Zwraca handle. |
+| `void radeon_8500_constant_buffer_destroy(radeon_8500_handle_t handle)` | Niszczy constant buffer i zwalnia jego pamiec VRAM. |
+| `void radeon_8500_constant_buffer_update(radeon_8500_handle_t handle, uint32_t offset, uint32_t size, const void *data)` | Aktualizuje dane constant buffera od podanego offsetu. |
+
+### Bindowanie stanow potoku 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_bind_vertex_buffer(radeon_8500_handle_t handle)` | Binduje vertex buffer do potoku 3D. |
+| `void radeon_8500_bind_index_buffer(radeon_8500_handle_t handle)` | Binduje index buffer do potoku 3D. |
+| `void radeon_8500_bind_input_layout(radeon_8500_handle_t handle)` | Binduje input layout do potoku 3D. |
+| `void radeon_8500_bind_render_target(radeon_8500_handle_t handle)` | Binduje render target do potoku 3D. |
+| `void radeon_8500_bind_depth_stencil(radeon_8500_handle_t handle)` | Binduje depth-stencil do potoku 3D. |
+| `void radeon_8500_bind_blend_state(radeon_8500_handle_t handle)` | Binduje stan blendowania do potoku 3D. |
+| `void radeon_8500_bind_rasterizer_state(radeon_8500_handle_t handle)` | Binduje stan rasterizera do potoku 3D. |
+| `void radeon_8500_bind_depth_stencil_state(radeon_8500_handle_t handle)` | Binduje stan depth-stencil do potoku 3D. |
+| `void radeon_8500_bind_sampler_and_texture(uint32_t slot, radeon_8500_handle_t sampler, radeon_8500_handle_t texture)` | Binduje probke tekstury i teksture do slotu tekstur. |
+| `void radeon_8500_bind_constant_buffer(uint32_t slot, radeon_8500_handle_t handle)` | Binduje constant buffer do slotu stalych shadera. |
+
+### Konfiguracja potoku 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth)` | Ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi. |
+| `void radeon_8500_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom)` | Ustawia prostokat przyciecia renderowania (scissor). |
+| `void radeon_8500_set_primitive_topology(uint32_t topology)` | Ustawia typ primitivu do rysowania (punkt, linia, trojkat, kwadrat itp.). |
+| `void radeon_8500_set_alpha_blend_global(uint8_t enable)` | Wlacza/wylacza globalne blendowanie alfa (przezroczystosc) dla calego potoku 3D. |
+
+### Rysowanie 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_clear_render_target(radeon_8500_handle_t rt, uint32_t color)` | Czyści render target podanym kolorem przez potok CB sprzetowy. |
+| `void radeon_8500_clear_depth_stencil(radeon_8500_handle_t ds, float depth, uint8_t stencil)` | Czyści depth-stencil podanymi wartosciami glebi i stencil. |
+| `void radeon_8500_draw(uint32_t vertex_count, uint32_t start_vertex)` | Rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. |
+| `void radeon_8500_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)` | Rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex. |
+| `void radeon_8500_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)` | Rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji poczynajac od start_instance. |
+| `void radeon_8500_draw_indirect(uint32_t buffer_addr, uint32_t draw_count, uint32_t stride)` | Rysuje z parametrami pobranymi z bufora indirect (draw indirect) sprzed GPU. |
+
+### Compute (obliczenia GPU)
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_compute_dispatch(uint32_t group_x, uint32_t group_y, uint32_t group_z)` | Uruchamia obliczenia compute (dispatch) z podana liczba grup watkow w X, Y, Z. |
+| `void radeon_8500_compute_dispatch_indirect(uint32_t buffer_addr)` | Uruchamia obliczenia compute z parametrami z bufora indirect. |
+
+### Synchronizacja (fences, semaphory)
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_fence_create(radeon_8500_handle_t *out)` | Tworzy fence (synchronizacja GPU) i zwraca jego handle. |
+| `void radeon_8500_fence_signal(radeon_8500_handle_t handle, uint32_t value)` | Sygnalizuje fence z podana wartoscia (oznacza zakonczenie pracy GPU). |
+| `int radeon_8500_fence_wait(radeon_8500_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizację fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
+| `void radeon_8500_fence_destroy(radeon_8500_handle_t handle)` | Niszczy fence o podanym handle. |
+| `void radeon_8500_semaphore_create(radeon_8500_handle_t *out)` | Tworzy semafor (synchronizacja miedzy etapami potoku) i zwraca jego handle. |
+| `void radeon_8500_semaphore_signal(radeon_8500_handle_t handle, uint32_t value)` | Sygnalizuje semafor z podana wartoscia. |
+| `void radeon_8500_semaphore_wait(radeon_8500_handle_t handle, uint32_t value)` | Czeka na sygnalizację semafora do podanej wartosci (blokujace). |
+| `void radeon_8500_semaphore_destroy(radeon_8500_handle_t handle)` | Niszczy semafor o podanym handle. |
+
+### Zarządzanie pamięcią VRAM
+
+| funkcja | opis |
+|---------|------|
+| `uint64_t radeon_8500_vram_alloc(uint64_t size, uint32_t type)` | Alokuje obszar pamieci VRAM o podanym rozmiarze i typie (wyrownanie do strony 4 KB). Zwraca offset w VRAM lub 0xFFFFFFFFFFFFFFFF przy bledzie. |
+| `void radeon_8500_vram_free(uint64_t handle)` | Zwalnia obszar pamieci VRAM o podanym offsecie (oznacza slot jako wolny). |
+| `uint64_t radeon_8500_vram_used(void)` | Zwraca liczbe bajtow VRAM aktualnie uzytych. |
+| `uint64_t radeon_8500_vram_total(void)` | Zwraca calkowita pojemnosc VRAM (64 MB). |
+
+### Zarządzanie zasilaniem, zegarami, temperatura, wentylator, RGB
+
+| funkcja | opis |
+|---------|------|
+| `int radeon_8500_wait_idle(uint32_t timeout_us)` | Czeka az GPU bedzie bezczynne (ring buffer pusty) z timeoutem. Zwraca 1 gdy GPU jest idle, 0 przy timeoutcie. |
+| `uint64_t radeon_8500_timestamp(void)` | Pobiera aktualny znacznik czasu z rejestru timestamp GPU (64-bitowy). |
+| `void radeon_8500_power_set_state(uint8_t state)` | Ustawia stan zasilania GPU (D0-D3). |
+| `uint8_t radeon_8500_power_get_state(void)` | Zwraca aktualny stan zasilania GPU. |
+| `void radeon_8500_set_clock_gfx(uint32_t mhz)` | Ustawia taktowanie rdzenia grafiki (GFX clock) w MHz. |
+| `void radeon_8500_set_clock_memory(uint32_t mhz)` | Ustawia taktowanie pamieci (memory clock) w MHz. |
+| `uint32_t radeon_8500_get_clock_gfx(void)` | Zwraca aktualne taktowanie rdzenia grafiki w MHz. |
+| `uint32_t radeon_8500_get_clock_memory(void)` | Zwraca aktualne taktowanie pamieci w MHz. |
+| `uint32_t radeon_8500_get_temperature(void)` | Pobiera aktualna temperature GPU z czujnika termicznego (w stopniach Celsjusza). |
+| `void radeon_8500_set_fan_speed(uint32_t rpm)` | Ustawia predkosc wentylatora GPU w obrotach na minute (RPM). |
+| `uint32_t radeon_8500_get_fan_speed(void)` | Zwraca aktualna predkosc wentylatora GPU w RPM. |
+| `void radeon_8500_rgb_set(uint32_t color, uint8_t mode)` | Ustawia sterowanie RGB na karcie (kolor i tryb swiecenia). |
+| `void radeon_8500_rgb_off(void)` | Wylacza sterowanie RGB na karcie. |
+
+### Presentation (swap chain)
+
+| funkcja | opis |
+|---------|------|
+| `radeon_8500_handle_t radeon_8500_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync, uint8_t alpha_premultiplied, uint8_t triple_buffer)` | Tworzy swap chain (podwojne lub potrojne buforowanie z opcja vsync i premultiplied alpha). Zwraca handle. |
+| `void radeon_8500_swap_chain_destroy(radeon_8500_handle_t handle)` | Niszczy swap chain i zwalnia pamiec VRAM buforow. |
+| `void radeon_8500_present(radeon_8500_handle_t chain)` | Przebija tylny bufor na przedni (present) z oczekiwaniem na vsync (opcjonalnie) przez ring buffer CP. |
+
+### Command buffer
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_command_begin(void)` | Rozpoczyna nagrywanie polecen do command buffer. |
+| `void radeon_8500_command_end(void)` | Zakoncza nagrywanie i wykonuje wszystkie polecenia command buffer przez ring buffer CP. |
+
+### Informacje o akceleracji 3D
+
+| funkcja | opis |
+|---------|------|
+| `void radeon_8500_context_get(struct radeon_8500_context *out)` | Pobiera biezacy kontekst 3D (stan potoku). |
+| `int radeon_8500_3d_available(void)` | Zwraca 1 gdy akceleracja 3D jest dostepna (sterownik zainicjowany). |
+
+### Stale i typy
+
+| nazwa | opis |
+|-------|------|
+| `RADEON_8500_VENDOR_ID` | ID dostawcy ATI/AMD (0x1002). |
+| `RADEON_8500_DEVICE_ID_8500` | ID urzadzenia Radeon 8500 (0x4C48) oraz warianty LE i inne (0x4C4D/0x4C56/0x4C57/0x514C/0x514E/0x514F). |
+| `RADEON_8500_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (64 MB). |
+| `RADEON_8500_FB_WIDTH / RADEON_8500_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1024x768). |
+| `RADEON_8500_FB_PITCH` | Pitch ramki graficznej (4096 bajtow). |
+| `RADEON_8500_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
+| `radeon_8500_handle_t` | Typ handle zasobu (uint32_t). |
+| `RADEON_8500_*` | Stale dla formatow vertex, indeksow, primitivow, tekstur, shaderow, blendowania, operacji blendowania, porownan glebi, wypelnienia, cullowania, operacji stencil (patrz naglowek radeon_8500.h). |
+
+### Integracja z jądrem
+
+Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
+
+```
+radeon_8500_init();
+```
+
+Nagłówek `drivers/karty_graficzne/radeon_8500.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_8500.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).

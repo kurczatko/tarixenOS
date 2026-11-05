@@ -9,6 +9,7 @@
 #define KOLOR_OKNA  0x00FFFFFF
 #define KOLOR_X     0x00E74C3C
 #define OKNA_MAKS 8
+#define GENIE_KLATKI 14
 
 struct okno *aktywne_okno;
 static struct okno *okna[OKNA_MAKS];
@@ -374,9 +375,61 @@ void okno_zakoncz_przeciaganie(void)
     okno_odrysuj_wszystkie();
 }
 
+static void okno_genie_czekaj(void)
+{
+    volatile int i;
+    for (i = 0; i < 400000; i++) {
+        __asm__ volatile("nop");
+    }
+}
+
+static void okno_genie_rysuj_klatke(struct okno *okno, int cx, int cy, int cw, int ch)
+{
+    odtworz_fragment_tla_bufor(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    for (int indeks = 0; indeks < liczba_okien; indeks++) {
+        struct okno *o = okna[indeks];
+        if (!o || !o->otwarte || o->zminimalizowane || o == okno) continue;
+        narysuj_okno_bez_odswiezania(o);
+    }
+    if (cw >= 4 && ch >= 4) {
+        rysuj_prostokat(cx, cy, cw, ch, KOLOR_RAMKI);
+        rysuj_prostokat(cx + 2, cy + 2, cw - 4, 20, okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
+        if (ch > 24) {
+            rysuj_prostokat(cx + 2, cy + 22, cw - 4, ch - 24, KOLOR_OKNA);
+        }
+        rysuj_tekst_chicago(cx + 8, cy + 8, okno->tytul, 0x00FFFFFF);
+    }
+    pasek_zadan_rysuj_ikony_minimalizowanych();
+    odswiez_widok();
+}
+
 void okno_zminimalizuj(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
+
+    int start_x = okno->x;
+    int start_y = okno->y;
+    int start_w = okno->szerokosc;
+    int start_h = okno->wysokosc;
+    int cel_x = start_x + start_w / 2 - 4;
+    int cel_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 4;
+    int cel_w = 8;
+    int cel_h = 8;
+
+    for (int k = 0; k <= GENIE_KLATKI; k++) {
+        int e = k * k;
+        int m = GENIE_KLATKI * GENIE_KLATKI;
+        if (m == 0) m = 1;
+        int cx = start_x + (cel_x - start_x) * e / m;
+        int cy = start_y + (cel_y - start_y) * e / m;
+        int cw = start_w + (cel_w - start_w) * e / m;
+        int ch = start_h + (cel_h - start_h) * e / m;
+        if (cw < 4) cw = 4;
+        if (ch < 4) ch = 4;
+        okno_genie_rysuj_klatke(okno, cx, cy, cw, ch);
+        okno_genie_czekaj();
+    }
+
     int zamkniety_x = okno->x;
     int zamkniety_y = okno->y;
     int zamkniety_szerokosc = okno->szerokosc;
