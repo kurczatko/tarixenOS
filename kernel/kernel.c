@@ -40,6 +40,7 @@
 #include "idt.h"
 #include "syscall.h"
 #include "../user_land/tapeta.h"
+#include "../graficzny/podzespoly.h"
 #include "proces.h"
 #include "driver_manager.h"
 #include "timer.h"
@@ -173,6 +174,16 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         }
         if (keyboard_windows_pressed()) {
             menu_start_przełącz(); /*jak to mozliwe ze kompiluje sie z polskimi znakami?*/
+        }
+        if (keyboard_dane_dostepne()) {
+            char znak;
+            if (keyboard_try_getchar(&znak)) {
+                uint8_t ctrl = keyboard_ctrl_pressed();
+                uint8_t alt = keyboard_alt_pressed();
+                if (ctrl && alt && (znak == 'i' || znak == 'I')) {
+                    podzespoly_otworz();
+                }
+            }
         }
         keyboard_discard_pending();
         if (!aktywne_okno || !aktywne_okno->otwarte) {

@@ -1,3 +1,9 @@
+/*
+* wlasciwie jedyny powod dlaczego ten plik nie zostal usuniety
+* to to ze gdybym go usunal wywaliloby
+* milion bledow bo duzo plikow bo includuje
+*/
+
 #include "vga.h"
 
 #define VGA_MEMORY (uint16_t*)0xB8000

@@ -32,6 +32,7 @@ void driver_manager_shutdown_by_pid(uint32_t pid);
 int driver_manager_is_driver(uint32_t pid);
 struct driver_desc *driver_manager_find_by_pid(uint32_t pid);
 void driver_manager_shutdown_all(void);
+int driver_manager_get_driver_list(char names[][64], int max_count);
 
 #ifdef __cplusplus
 }

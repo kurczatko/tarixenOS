@@ -137,3 +137,21 @@ void driver_manager_shutdown_all(void)
         }
     }
 }
+
+int driver_manager_get_driver_list(char names[][64], int max_count)
+{
+    int count = 0;
+    for (uint32_t i = 0; i < g_driver_count && count < max_count; i++) {
+        struct driver_desc *d = &g_drivers[i];
+        if (d->active && d->hardware_detected) {
+            uint32_t j = 0;
+            while (d->name[j] && j < 63) {
+                names[count][j] = d->name[j];
+                j++;
+            }
+            names[count][j] = 0;
+            count++;
+        }
+    }
+    return count;
+}
