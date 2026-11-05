@@ -445,6 +445,7 @@ void okno_zminimalizuj(struct okno *okno)
         }
     }
     odtworz_fragment_tla_bufor(zamkniety_x, zamkniety_y, zamkniety_szerokosc, zamkniety_wysokosc);
+    odtworz_fragment_tla_bufor(cel_x, cel_y, cel_w, cel_h);
     pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
