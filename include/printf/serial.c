@@ -15,25 +15,24 @@ static uint8_t inb(uint16_t port) {
 void serial_init(void) {
     uint16_t port = SERIAL_COM1;
 
-    outb(port + 1, 0x00);         // Disable all interrupts
-    outb(port + 3, 0x80);         // Enable DLAB (set baud rate divisor)
-    outb(port + 0, 0x03);         // Divisor 38400 baud (low byte)
-    outb(port + 1, 0x00);         // (high byte)
-    outb(port + 3, 0x03);         // 8 bits, no parity, one stop bit
-    outb(port + 2, 0xC7);         // Enable FIFO, clear them, with 14-byte threshold
-    outb(port + 4, 0x0B);         // IRQs enabled, RTS/DSR set
-    outb(port + 4, 0x1E);         // Set in loopback mode, test the serial chip
-    outb(port + 0, 0xAE);         // Test serial chip (send byte 0xAE and check if serial returns same byte)
+    outb(port + 1, 0x00);         
+    outb(port + 3, 0x80);        
+    outb(port + 0, 0x03);        
+    outb(port + 1, 0x00);         
+    outb(port + 3, 0x03);        
+    outb(port + 2, 0xC7);       
+    outb(port + 4, 0x0B);         
+    outb(port + 4, 0x1E);        
+    outb(port + 0, 0xAE);         
     if (inb(port) != 0xAE) {
-        return;                   // Serial chip not found
+        return;                   
     }
-    outb(port + 4, 0x0F);         // Normal operation
+    outb(port + 4, 0x0F);         
 }
 
 void serial_putc(char c) {
     uint16_t port = SERIAL_COM1;
     while (!(inb(port + 5) & 0x20)) {
-        ; // wait for Transmitter Holding Register Empty
     }
     outb(port, c);
 }
