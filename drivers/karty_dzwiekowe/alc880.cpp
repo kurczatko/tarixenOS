@@ -859,6 +859,15 @@ void ALC880::widget_amp_set(uint8_t nid, uint8_t direction, uint8_t index,
     send_verb_nid(nid, HDA_VERB_SET_AMP_GAIN_MUTE, payload);
 }
 
+/*
+* wylosowalem ten plik aby upamietnic moje świetej pamieci kury rasy silki
+* dzis niestety jakis brutalny smiec (prawdopodobnie jastrząb)
+* zabil kilka moich kur takich jak:
+* 1. kura z satynowymi piorami
+* 2. koguty ktore honorowo walczyly do konca
+* 3. jakies inne kury
+*/
+
 void ALC880::parse_config_default(uint32_t config, struct alc880_pin_config* out)
 {
     out->sequence = (uint8_t)((config >> 0) & 0xF);
