@@ -6,6 +6,12 @@
 #include "internet/rtl8111e.h"
 #include "internet/rtl8111f.h"
 
+extern int intel_82578dc_driver_init(void);
+extern int intel_82578dc_driver_detected(void);
+extern int intel_82578dc_send_packet(const void *, uint16_t);
+extern int intel_82578dc_receive_packet(void *, uint16_t);
+extern void intel_82578dc_set_callbacks(int (*)(const void *, uint16_t), int (*)(void *, uint16_t));
+
 #define FRAME_MAX 1518
 #define IP_OFFSET 14
 #define ETH_ARP 0x0806
@@ -212,7 +218,10 @@ static int __attribute__((unused)) dhcp_configure(void)
 
 int net_init(void)
 {
-    if (rtl8111f_init() && rtl8111f_get_mac(mac_address)) {
+    if (intel_82578dc_driver_init() && intel_82578dc_driver_detected()) {
+        net_send_fn = intel_82578dc_send_packet;
+        net_receive_fn = intel_82578dc_receive_packet;
+    } else if (rtl8111f_init() && rtl8111f_get_mac(mac_address)) {
         net_send_fn = rtl8111f_send;
         net_receive_fn = rtl8111f_receive;
     } else if (rtl8111e_init() && rtl8111e_get_mac(mac_address)) {

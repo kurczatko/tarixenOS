@@ -1359,6 +1359,106 @@ struktura `rtl8188ce_stats` zawiera:
 | rx_errors | bledy odbioru |
 | resets | liczba resetow chipa |
 
+## sterownik intel 82578dc wifi - rust/drivers/wifi/intel_82578dc.rs
+
+sterownik karty sieciowej Intel 82578DC (PCIe Gigabit Ethernet / WiFi) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenie 0x1502), mapowanie MMIO, soft-reset chipa, konfiguracje adresu MAC, deskryptory nadawcze i odbiorcze (TX/RX), przerwania, odbiornik i nadajnik, monitorowanie lacza, wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. napisany w Rust z `#[no_std]` i `#[no_main]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/wifi/*.rs)`) i linkowany do jadra. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed Realtek/E1000, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
+
+### intel_82578dc_driver_init
+
+inicjalizuje sterownik: wykrywa urzadzenie na PCI, mapuje MMIO, wykonuje soft-reset, konfiguruje adres MAC, deskryptory RX/TX, przerwania, wlacza odbiornik i nadajnik, ustawia lacze jako aktywne. zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+```
+bool intel_82578dc_driver_init(void);
+```
+
+### intel_82578dc_driver_detected
+
+sprawdza czy karta Intel 82578DC jest wykryta na PCI (porownuje vendor ID i device ID). zwraca 1 gdy wykryta, 0 gdy nie.
+
+```
+bool intel_82578dc_driver_detected(void);
+```
+
+### intel_82578dc_send_packet
+
+wysyla ramke ethernet przez kartę Intel 82578DC. zapisuje dane do deskryptora nadawczego (TX) i uruchamia nadajnik przez rejestr TDT. zwraca 1 po udanym wyslaniu, 0 gdy lacze nie jest aktywne lub deskryptor TX jest zajety.
+
+```
+bool intel_82578dc_send_packet(const void *data, uint32_t len);
+```
+
+### intel_82578dc_receive_packet
+
+odbiera ramke ethernet z karty Intel 82578DC. czytuje dane z deskryptora odbiorczego (RX) do bufora i przesuwa glowe odbiorcza (RDH). zwraca dlugosc odebranej ramki w bajtach, -1 gdy brak danych lub bledne argumenty.
+
+```
+int intel_82578dc_receive_packet(void *buffer, uint32_t len);
+```
+
+### intel_82578dc_link_up
+
+sprawdza czy lacze sieciowe jest aktywne. zwraca 1 gdy lacze jest w górę, 0 gdy nie.
+
+```
+bool intel_82578dc_link_up(void);
+```
+
+### intel_82578dc_stats_packets_sent
+
+zwraca liczbe wyslanych pakietow.
+
+```
+uint32_t intel_82578dc_stats_packets_sent(void);
+```
+
+### intel_82578dc_stats_packets_received
+
+zwraca liczbe odebranych pakietow.
+
+```
+uint32_t intel_82578dc_stats_packets_received(void);
+```
+
+### intel_82578dc_stats_bytes_sent
+
+zwraca liczbe wyslanych bajtow.
+
+```
+uint32_t intel_82578dc_stats_bytes_sent(void);
+```
+
+### intel_82578dc_stats_bytes_received
+
+zwraca liczbe odebranych bajtow.
+
+```
+uint32_t intel_82578dc_stats_bytes_received(void);
+```
+
+### intel_82578dc_stats_errors
+
+zwraca liczbe bledow.
+
+```
+uint32_t intel_82578dc_stats_errors(void);
+```
+
+### intel_82578dc_set_callbacks
+
+ustawia funkcje zwrotne (send/receive) dla sterownika. uzywane przez integracje ze stosem sieciowym C (`drivers/net.c`).
+
+```
+void intel_82578dc_set_callbacks(int (*send_fn)(const void *, uint16_t), int (*receive_fn)(void *, uint16_t));
+```
+
+### intel_82578dc_mac_address
+
+kopiuje 6-bajtowy adres MAC karty do bufora.
+
+```
+void intel_82578dc_mac_address(uint8_t *buffer);
+```
+
 ## sterownik bluetooth - drivers/bluetooth/bluetooth.h
 
 sterownik bluetooth dla placas glownej MSI MPG Z890 CARBON WIFI napisany w C++. implementuje pelny stos bluetooth zgodny ze specyfikacja bluetooth core: hci (host controller interface) po usb (transport hci:usb), l2cap (logical link control and adaptation protocol), a2dp (advanced audio distribution profile) dla sluchawek bluetooth, avctp (audio video control transport protocol) oraz sdp (service discovery protocol). obsluguje parowanie i bonding urzadzen oraz wyswietlanie ikony na pasku zadan z oknem wyboru urzadzenia do polaczenia.

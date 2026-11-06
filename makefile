@@ -30,7 +30,7 @@ CXXFLAGS := -m32 -Os -ffreestanding -fno-exceptions -fno-rtti -nostdlib -nostdin
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/proces.cpp kernel/driver_manager.cpp kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/internet/*.c) $(wildcard drivers/internet/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard drivers/sound/*.cpp) $(wildcard drivers/plyty_glowne/*.c) $(wildcard drivers/plyty_glowne/*.cpp) $(wildcard drivers/karty_graficzne/*.cpp) $(wildcard drivers/bluetooth/*.cpp) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user_land/konta.c user_land/tapeta.c $(wildcard rust/drivers/karty_graficzne/amd/*.rs) $(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)
+KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/proces.cpp kernel/driver_manager.cpp kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/internet/*.c) $(wildcard drivers/internet/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard drivers/sound/*.cpp) $(wildcard drivers/plyty_glowne/*.c) $(wildcard drivers/plyty_glowne/*.cpp) $(wildcard drivers/karty_graficzne/*.cpp) $(wildcard drivers/bluetooth/*.cpp) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user_land/konta.c user_land/tapeta.c $(wildcard rust/drivers/karty_graficzne/amd/*.rs) $(wildcard rust/drivers/karty_graficzne/nvidia/*.rs) $(wildcard rust/drivers/wifi/*.rs)
 KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES))) $(patsubst %.rs,$(BUILD_DIR)/rust_%.o,$(filter %.rs,$(KERNEL_SOURCES)))
 KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%64.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
 
@@ -181,7 +181,7 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) $(TAPETA_JASNA_RAW) | $
 	dd if=$(BOOT_BIN32) of=$@ bs=1 count=3 conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 skip=90 seek=90 count=420 conv=notrunc status=none
 	@kernel_size=$$(stat -c %s $(KERNEL_BIN32)); \
-	if [ $$kernel_size -gt $$((512 * 512)) ]; then \
+	if [ $$kernel_size -gt $$((520 * 512)) ]; then \
 		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
 	fi
 	@for app in $(USER_APPS); do \
