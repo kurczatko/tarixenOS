@@ -6,6 +6,41 @@ __attribute__((aligned(4096))) static uint32_t page_table_low2[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_low3[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_fb[1024];
 
+#define FRAME_ALLOC_START 0x00200000
+#define FRAME_ALLOC_END   0x01000000
+#define FRAME_ALLOC_COUNT ((FRAME_ALLOC_END - FRAME_ALLOC_START) / PAGE_SIZE)
+static uint32_t frame_alloc_bits[(FRAME_ALLOC_COUNT + 31) / 32];
+
+static inline int frame_alloc_test(uint32_t i) {
+    return (frame_alloc_bits[i >> 5] >> (i & 31)) & 1U;
+}
+static inline void frame_alloc_set(uint32_t i) {
+    frame_alloc_bits[i >> 5] |= (1U << (i & 31));
+}
+static inline void frame_alloc_clear(uint32_t i) {
+    frame_alloc_bits[i >> 5] &= ~(1U << (i & 31));
+}
+
+void *paging_alloc_frame(void) {
+    uint32_t i = 0;
+    while (i < FRAME_ALLOC_COUNT) {
+        if (!frame_alloc_test(i)) {
+            frame_alloc_set(i);
+            return (void *)(FRAME_ALLOC_START + i * PAGE_SIZE);
+        }
+        i++;
+    }
+    return 0;
+}
+
+void paging_free_frame(void *addr) {
+    uint32_t a = (uint32_t)addr;
+    if (a < FRAME_ALLOC_START || a >= FRAME_ALLOC_END) return;
+    if ((a & (PAGE_SIZE - 1)) != 0) return;
+    uint32_t i = (a - FRAME_ALLOC_START) / PAGE_SIZE;
+    frame_alloc_clear(i);
+}
+
 void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags)
 {
     table[(vaddr / PAGE_SIZE) & 0x3FF] = (paddr & ~(PAGE_SIZE - 1)) | flags;

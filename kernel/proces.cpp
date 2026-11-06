@@ -347,6 +347,14 @@ void proces_zakoncz(uint32_t pid) {
             p->state = PROCES_TERMINATED;
             p->pid = 0;
             process_count--;
+            if (p->page_directory && p->page_directory != (uint32_t *)kernel_page_dir_phys) {
+                uint32_t *user_pt = (uint32_t *)(p->page_directory[1] & ~0xFFF);
+                uint32_t *fb_pt = (uint32_t *)(p->page_directory[0xFD000000 >> 22] & ~0xFFF);
+                paging_free_frame(fb_pt);
+                paging_free_frame(user_pt);
+                paging_free_frame(p->page_directory);
+                p->page_directory = 0;
+            }
             if (was_current) {
                 current_cpu[cpu] = 0;
                 current_process = 0;
@@ -546,14 +554,16 @@ int proces_get_stats(uint32_t pid, struct proces *out) {
 }
 
 uint32_t *proces_klonuj_page_directory(void) {
-    uint32_t *new_dir = (uint32_t *)0x00800000;
+    uint32_t *new_dir = (uint32_t *)paging_alloc_frame();
+    if (!new_dir) return 0;
     uint32_t *kernel_dir = (uint32_t *)kernel_page_dir_phys;
 
     for (int i = 0; i < 1024; i++) new_dir[i] = 0;
 
     for (int i = 0; i < 256; i++) new_dir[i] = kernel_dir[i];
 
-    uint32_t *user_pt = (uint32_t *)0x00801000;
+    uint32_t *user_pt = (uint32_t *)paging_alloc_frame();
+    if (!user_pt) { paging_free_frame(new_dir); return 0; }
     for (int i = 0; i < 1024; i++) user_pt[i] = 0;
 
     for (uint32_t addr = USER_MEM_START; addr < USER_MEM_END; addr += PAGE_SIZE) {
@@ -562,7 +572,8 @@ uint32_t *proces_klonuj_page_directory(void) {
 
     new_dir[1] = ((uint32_t)user_pt | PAGE_PRESENT | PAGE_READWRITE | PAGE_USER);
 
-    uint32_t *fb_pt = (uint32_t *)0x00802000;
+    uint32_t *fb_pt = (uint32_t *)paging_alloc_frame();
+    if (!fb_pt) { paging_free_frame(user_pt); paging_free_frame(new_dir); return 0; }
     for (int i = 0; i < 1024; i++) fb_pt[i] = 0;
     for (int i = 0; i < 1024; i++) {
         map_page(fb_pt, 0xFD000000 + i * PAGE_SIZE, 0xFD000000 + i * PAGE_SIZE, PAGE_PRESENT | PAGE_READWRITE);

@@ -13,5 +13,7 @@
 
 void paging_init(void);
 void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags);
+void *paging_alloc_frame(void);
+void paging_free_frame(void *addr);
 
 #endif

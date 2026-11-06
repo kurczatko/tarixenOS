@@ -8,6 +8,7 @@
 
 #define ELF_MAGIC 0x464C457F
 #define PT_LOAD 1
+#define ELF_MAX_SIZE 65536
 
 struct elf32_ehdr {
     unsigned char e_ident[16];
@@ -37,19 +38,47 @@ struct elf32_phdr {
     uint32_t p_align;
 };
 
-static uint8_t elf_buf[65536];
+static uint8_t elf_buf[ELF_MAX_SIZE];
+
+static int elf_segment_overlaps(uint32_t vaddr, uint32_t memsz, uint32_t *loaded, uint32_t loaded_count) {
+    uint32_t end = vaddr + memsz;
+    for (uint32_t i = 0; i < loaded_count; i++) {
+        uint32_t s = loaded[i * 2];
+        uint32_t e = loaded[i * 2 + 1];
+        if (vaddr < e && s < end) return 1;
+    }
+    return 0;
+}
 
 int userspace_load_elf(const char *path, uint32_t *entry_out) {
     int size = read_file(path, (char *)elf_buf, sizeof(elf_buf));
     if (size <= 0) return -1;
+    if (size > ELF_MAX_SIZE) return -5;
     struct elf32_ehdr *eh = (struct elf32_ehdr *)elf_buf;
     if (*(uint32_t *)eh->e_ident != ELF_MAGIC) return -2;
+    if (eh->e_ehsize < sizeof(struct elf32_ehdr)) return -6;
+    if (eh->e_phentsize < sizeof(struct elf32_phdr)) return -7;
     if (eh->e_phnum == 0) return -3;
+    if (eh->e_phoff + (uint32_t)eh->e_phnum * (uint32_t)eh->e_phentsize > (uint32_t)size) return -8;
+    if (eh->e_entry < USER_MEM_START || eh->e_entry >= USER_MEM_END) return -9;
+
+    uint32_t loaded[16 * 2];
+    uint32_t loaded_count = 0;
     uint32_t max_addr = 0;
+
     for (uint16_t i = 0; i < eh->e_phnum; i++) {
         struct elf32_phdr *ph = (struct elf32_phdr *)(elf_buf + eh->e_phoff + i * eh->e_phentsize);
         if (ph->p_type != PT_LOAD) continue;
-        if (ph->p_vaddr < USER_MEM_START || ph->p_vaddr + ph->p_memsz > USER_MEM_END) return -4;
+        if (ph->p_vaddr < USER_MEM_START || ph->p_vaddr >= USER_MEM_END) return -4;
+        if (ph->p_memsz == 0) continue;
+        if (ph->p_vaddr + ph->p_memsz > USER_MEM_END) return -4;
+        if (ph->p_offset + ph->p_filesz > (uint32_t)size) return -10;
+        if (loaded_count < 16 && elf_segment_overlaps(ph->p_vaddr, ph->p_memsz, loaded, loaded_count)) return -11;
+        if (loaded_count < 16) {
+            loaded[loaded_count * 2] = ph->p_vaddr;
+            loaded[loaded_count * 2 + 1] = ph->p_vaddr + ph->p_memsz;
+            loaded_count++;
+        }
         uint8_t *dst = (uint8_t *)(uint32_t)ph->p_vaddr;
         for (uint32_t j = 0; j < ph->p_filesz; j++) dst[j] = elf_buf[ph->p_offset + j];
         for (uint32_t j = ph->p_filesz; j < ph->p_memsz; j++) dst[j] = 0;

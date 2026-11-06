@@ -7,6 +7,7 @@
 #include "../system_plikow/system_plikow.h"
 #include "proces.h"
 #include "../drivers/keyboard.h"
+#include "../drivers/mouse.h"
 #include "loader.h"
 #include "../user_land/tapeta.h"
 
@@ -294,9 +295,8 @@ uint32_t syscall_handler(void)
         }
         case SYSCALL_MYSZ_POZYCJA: {
             int mx, my;
-            mx = 512;
-            my = 384;
-            return (mx & 0xFFFF) | ((my & 0xFFFF) << 16);
+            mouse_pozycja(&mx, &my);
+            return (uint32_t)((mx & 0xFFFF) | ((my & 0xFFFF) << 16));
         }
         case SYSCALL_DRUKUJ:
             if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
@@ -312,7 +312,8 @@ uint32_t syscall_handler(void)
             }
             return (uint32_t)ecx;
         case SYSCALL_EXIT:
-            return 0xFFFFFFFF;
+            proces_zakoncz(proces_pobierz_pid());
+            return 0;
         case SYSCALL_BRK:
             if (ebx == 0) return userspace_break;
             if (ebx < USER_MEM_START || ebx > USER_MEM_END) return 0xFFFFFFFF;
