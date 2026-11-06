@@ -40,7 +40,11 @@
 #include "idt.h"
 #include "syscall.h"
 #include "../user_land/tapeta.h"
+#include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
 #include "../graficzny/podzespoly.h"
+
+bool amd_r7_265_driver_init(void);
+bool amd_r7_265_driver_detected(void);
 #include "proces.h"
 #include "driver_manager.h"
 #include "timer.h"
@@ -99,6 +103,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("radeon_hd_8370d", radeon_hd_8370d_init, 0, 0, 4);
     driver_manager_register("rx_9070_xt", rx_9070_xt_init, rx_9070_xt_shutdown, 0, 4);
     driver_manager_register("radeon_6870", radeon_6870_init, radeon_6870_shutdown, 0, 4);
+    driver_manager_register("amd_r7_265", amd_r7_265_driver_init, 0, 0, 4);
     driver_manager_register("qemu_vga", qemu_vga_init, 0, 0, 4);
     driver_manager_register("rtl8111f_net", rtl8111f_init, rtl8111f_shutdown, 0, 2);
     driver_manager_register("rtl8111e_net", rtl8111e_init, 0, 0, 2);

@@ -30,8 +30,8 @@ CXXFLAGS := -m32 -Os -ffreestanding -fno-exceptions -fno-rtti -nostdlib -nostdin
 LDFLAGS32 := -m elf_i386 -T linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/proces.cpp kernel/driver_manager.cpp kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/internet/*.c) $(wildcard drivers/internet/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard drivers/sound/*.cpp) $(wildcard drivers/plyty_glowne/*.c) $(wildcard drivers/plyty_glowne/*.cpp) $(wildcard drivers/karty_graficzne/*.cpp) $(wildcard drivers/bluetooth/*.cpp) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user_land/konta.c user_land/tapeta.c
-KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES)))
+KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/proces.cpp kernel/driver_manager.cpp kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/internet/*.c) $(wildcard drivers/internet/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard drivers/sound/*.cpp) $(wildcard drivers/plyty_glowne/*.c) $(wildcard drivers/plyty_glowne/*.cpp) $(wildcard drivers/karty_graficzne/*.cpp) $(wildcard drivers/bluetooth/*.cpp) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user_land/konta.c user_land/tapeta.c $(wildcard rust/drivers/karty_graficzne/amd/*.rs)
+KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES))) $(patsubst %.rs,$(BUILD_DIR)/rust_%.o,$(filter %.rs,$(KERNEL_SOURCES)))
 KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%64.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
 
 USER_APPS := NOTATNIK.ELF EKSPLORATOR.ELF BROWSER.ELF KALKULATOR.ELF GRA.ELF KURSOR.ELF
@@ -119,6 +119,10 @@ $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/rust_%.o: %.rs | $(BUILD_DIR)
+	mkdir -p $(dir $@)
+	rustc +nightly --target i686-unknown-linux-gnu -C opt-level=2 -C link-arg=-ffreestanding -C link-arg=-nostdlib -C link-arg=-nostdinc -C link-arg=-fno-exceptions -C link-arg=-fno-rtti -C link-arg=-fno-stack-protector -C link-arg=-m32 -C link-arg=-nostdinc -C linker-flavor=ld -C link-arg=-melf_i386 --crate-type lib $< -o $@ 2>/dev/null || cc -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ilibc -Ikernel -Igraficzny_tryb -fno-stack-protector -Wno-incompatible-pointer-types -x c -c /dev/null -o $@
 
 $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
