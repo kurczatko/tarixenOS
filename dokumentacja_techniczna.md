@@ -5700,3 +5700,107 @@ voodoo2_init();
 ```
 
 Wszystkie funkcje eksportowane sa jako C (`#[no_mangle] pub extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `rust/drivers/karty_graficzne/3dfx/voodoo2.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/3dfx/*.rs)`).
+
+## sterownik plyt optycznych - drivers/plyty.cpp
+
+zaawansowany sterownik napędów płyt optycznych (CD, DVD, Blu-ray, HD DVD, CD-i, Photo CD, MO, WO) napisany w C++. obsluguje interfejs ATAPI (ATA Packet Interface) dla glownej i pomocniczej kanalowe magistrali IDE, wykrycie napedu, identyfikacje urzadzenia, odczyt konfiguracji, pomiar pojemnosci, wykrycie systemu plikow (ISO 9660, UDF, Joliet, Rock Ridge, HFS, CDFS), czytanie sektorow, czytanie plikow, listowanie katalogu glownego, wysiadanie i zamykanie tacki, wykrywanie zmiany plyty. wspiera kazdy rodzaj plyty w tym formaty niszowe. kompilowany przez makefile (wildcard `$(wildcard drivers/*.cpp)`) i linkowany do jadra.
+
+### plyty_init
+
+inicjalizuje sterownik plyt optycznych: wykrywa naped na kanale IDE, wykonuje identyfikacje ATAPI, wykrywa typ plyty (CD/DVD/BD/HD DVD/niszowe), odczytuje pojemnosc i rozmiar sektora, wykrywa system plikow. zwraca 1 po udanej inicjalizacji, 0 gdy naped nie zostanie wykryty.
+
+```
+int plyty_init(void);
+```
+
+### plyty_present
+
+zwraca 1 gdy naped plyty optycznej jest wykryty i obecny, 0 gdy nie.
+
+```
+int plyty_present(void);
+```
+
+### plyty_ready
+
+zwraca 1 gdy naped jest gotowy do odczytu, 0 gdy nie.
+
+```
+int plyty_ready(void);
+```
+
+### plyty_type
+
+zwraca typ wykrytej plyty jako kombinacja flag: PLITY_CDROM, PLITY_DVDROM, PLITY_BDROM, PLITY_HDDVD, PLITY_CDI, PLITY_PHOTOCD, PLITY_CDR, PLITY_CDRW, PLITY_DVDR, PLITY_DVDRW, PLITY_BDR, PLITY_BDRE, PLITY_MO, PLITY_WO.
+
+```
+uint32_t plyty_type(void);
+```
+
+### plyty_sector_count / plyty_sector_size
+
+zwracaja liczbe sektorow na plycie oraz rozmiar sektora w bajtach (zazwyczaj 2048).
+
+```
+uint64_t plyty_sector_count(void);
+uint32_t plyty_sector_size(void);
+```
+
+### plyty_read_sector / plyty_read_sectors
+
+czytuje jeden sektor lub wiele sektorow z plyty do bufora.
+
+```
+int plyty_read_sector(uint64_t sector, char *buffer);
+int plyty_read_sectors(uint64_t sector, uint32_t count, char *buffer);
+```
+
+### plyty_volume_label / plyty_fs_type
+
+zwraca etykietę woluminu plyty oraz typ systemu plikow (PLITY_FS_ISO9660, PLITY_FS_UDF, PLITY_FS_JOLIET, PLITY_FS_ROCKRIDGE, PLITY_FS_HFS, PLITY_FS_CDFS).
+
+```
+const char *plyty_volume_label(void);
+uint32_t plyty_fs_type(void);
+```
+
+### plyty_list_root / plyty_find_file / plyty_read_file
+
+listuje pliki w katalogu glownym plyty, znajduje plik po nazwie, czytuje zawartosc pliku do bufora.
+
+```
+int plyty_list_root(struct plyty_file_entry *entries, int capacity);
+int plyty_find_file(const char *name, struct plyty_file_entry *entry);
+int plyty_read_file(const char *name, char *buffer, uint64_t size);
+```
+
+### plyty_disc_changed / plyty_eject / plyty_close_tray
+
+wykrywa zmiane plyty w napedzie, wysadza tacka, zamykanie tacka.
+
+```
+int plyty_disc_changed(void);
+void plyty_eject(void);
+void plyty_close_tray(void);
+```
+
+### Integracja z menedzerem plikow
+
+Sterownik jest rejestrowany w `kernel/kernel.c` w funkcji `kernel_main`:
+
+```
+driver_manager_register("plyty", plyty_init, 0, 0, 4);
+```
+
+Integracja z systemem plikow (`system_plikow.c`):
+
+```
+void fs_set_device_cdrom(int use_cdrom);
+int fs_is_cdrom(void);
+```
+
+Gdy urzadzenie cdrom jest aktywne, funkcje `read_sector`, `read_file`, `fs_list_current` i `cd` sa przekierowywane do sterownika plyt (ATAPI + ISO 9660), co pozwala przegladac pliki na plycie optycznej przez eksplorator plikow.
+
+Eksplorator plikow (`graficzny/eksplorator_plikow.c`) wyswietla opcje "CD-ROM" / "PLYTA OPTYCZNA" obok "DYSKIETKA" / "DYSK TWARDY" gdy naped plyty jest wykryty. Po wyborze plyty optycznej zostaje ona ustawiona jako aktywne urzadzenie systemu plikow, a zawartosc plyty jest wyswietlana w liscie plikow. Mozna entonces otwierac pliki .TXT, .C, .TSI oraz nawigowac po katalogach.
+
+Nagłówek `drivers/plyty.h` jest dołączany w `kernel/kernel.c`. Plik zrodlowy `drivers/plyty.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/*.cpp)`).

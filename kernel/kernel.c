@@ -25,6 +25,7 @@
 #include "../drivers/alc650.h"
 #include "../drivers/net.h"
 #include "../drivers/floppy.h"
+#include "../drivers/plyty.h"
 #include "../drivers/nvme.h"
 #include "../drivers/intel_uhd.h"
 #include "../drivers/karty_graficzne/gma_x4500.h"
@@ -99,6 +100,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     */
     init_fs();
     driver_manager_register("floppy", floppy_init, 0, 0, 4);
+    driver_manager_register("plyty", plyty_init, 0, 0, 4);
     driver_manager_register("nvme", nvme_init, 0, 0, 4);
     driver_manager_register("intel_uhd", intel_uhd_init, 0, 0, 4);
     driver_manager_register("p4p_motherboard", p4p_init, p4p_shutdown, 0, 4);

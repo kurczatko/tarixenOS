@@ -1,6 +1,7 @@
 #include "system_plikow.h"
 #include "../include/printf/printf.h"
 #include "../drivers/floppy.h"
+#include "../drivers/plyty.h"
 
 #define FAT32_EOC 0x0FFFFFF8
 #define FAT32_FREE 0
@@ -26,6 +27,7 @@ static uint8_t directory_depth;
 static uint32_t first_data_sector;
 static uint32_t fat_start;
 static uint8_t fs_use_floppy = 0;
+static uint8_t fs_use_cdrom = 0;
 
 static int memory_compare(const void *left, const void *right, uint32_t count) {
     const uint8_t *a = left;
@@ -43,6 +45,12 @@ static uint8_t inb(uint16_t port) { uint8_t value; __asm__ volatile ("inb %1, %0
 static void ata_wait(void) { while (inb(ATA_STATUS) & 0x80) { } }
 
 void read_sector(uint32_t sector, char *buffer) {
+    if (fs_use_cdrom) {
+        char temp[2048];
+        if (!plyty_read_sector(sector, temp)) return;
+        for (uint32_t i = 0; i < 512; i++) buffer[i] = temp[i];
+        return;
+    }
     if (fs_use_floppy) {
         floppy_read_sector(sector, buffer);
         return;
@@ -143,6 +151,18 @@ int fs_is_floppy(void) {
     return fs_use_floppy;
 }
 
+void fs_set_device_cdrom(int use_cdrom) {
+    fs_use_cdrom = (uint8_t)(use_cdrom ? 1 : 0);
+    if (use_cdrom) {
+        current_dir = 0;
+        directory_depth = 0;
+    }
+}
+
+int fs_is_cdrom(void) {
+    return fs_use_cdrom;
+}
+
 static struct fat32_entry *new_entry(const char *name, uint8_t attributes, char *sector) {
     struct fat32_entry *entry;
     read_sector(cluster_sector(current_dir), sector);
@@ -160,6 +180,9 @@ int create_file(const char *name, uint32_t size) {
 }
 
 int read_file(const char *name, char *buffer, uint32_t size) {
+    if (fs_use_cdrom) {
+        return plyty_read_file(name, buffer, size);
+    }
     char sector[512]; uint32_t sector_number, done = 0, cluster, file_size; struct fat32_entry *entry = find_entry(name, current_dir, sector, &sector_number);
     if (!entry || (entry->attributes & 0x10)) return -1;
     file_size = entry->size;
@@ -208,6 +231,9 @@ int ls(const char *dir) {
 }
 
 int cd(const char *dir) {
+    if (fs_use_cdrom) {
+        return 0;
+    }
     char sector[512];
     uint32_t sector_number;
     struct fat32_entry *entry;
@@ -255,6 +281,20 @@ static void format_short_name(const char short_name[11], char name[13]) {
 }
 
 int fs_list_current(struct fs_entry_info *entries, int capacity) {
+    if (fs_use_cdrom) {
+        struct plyty_file_entry pentries[24];
+        int count = plyty_list_root(pentries, capacity > 24 ? 24 : capacity);
+        for (int i = 0; i < count; i++) {
+            uint32_t j = 0;
+            while (pentries[i].name[j] && j < 12) {
+                entries[i].name[j] = pentries[i].name[j];
+                j++;
+            }
+            entries[i].name[j] = 0;
+            entries[i].is_directory = pentries[i].is_directory;
+        }
+        return count;
+    }
     char sector[512];
     uint32_t cluster = current_dir;
     int count = 0;
