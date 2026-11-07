@@ -57,6 +57,9 @@ static uint32_t page_colors[BROWSER_PAGE_MAX];
 static uint32_t page_backgrounds[BROWSER_PAGE_MAX];
 static uint8_t page_bold[BROWSER_PAGE_MAX];
 static uint8_t page_rozmiar[BROWSER_PAGE_MAX];
+static uint32_t page_line_y[BROWSER_PAGE_MAX];
+static uint32_t page_line_height[BROWSER_PAGE_MAX];
+static uint8_t page_align[BROWSER_PAGE_MAX];
 static struct browser_link links[BROWSER_LINKS_MAX];
 static uint8_t link_count;
 static struct browser_css_rule css_rules[BROWSER_CSS_RULES];
@@ -68,7 +71,7 @@ static uint32_t page_background = 0x00FFFFFF;
 static char status[64] = "Wpisz adres i nacisnij IDZ";
 static uint8_t address_focused = 1;
 static uint8_t browser_opened;
-static int page_scroll_line;
+static int page_scroll_y;
 static uint8_t browser_use_https;
 static char current_form_action[256];
 static uint8_t current_form_method_get;
@@ -323,7 +326,7 @@ static void parse_css_stylesheet(const char *text, int start, int end)
 }
 
 static int append_page_character(char c, int *output, uint32_t color, uint32_t background,
-                                 uint8_t bold, uint8_t rozmiar)
+                                 uint8_t bold, uint8_t rozmiar, uint8_t align, uint32_t line_y, uint32_t line_height)
 {
     if (*output >= BROWSER_PAGE_MAX - 1) return 0;
     page[*output] = c;
@@ -331,6 +334,9 @@ static int append_page_character(char c, int *output, uint32_t color, uint32_t b
     page_backgrounds[*output] = background;
     page_bold[*output] = bold;
     page_rozmiar[*output] = rozmiar;
+    page_align[*output] = align;
+    page_line_y[*output] = line_y;
+    page_line_height[*output] = line_height;
     (*output)++;
     return 1;
 }
@@ -338,6 +344,12 @@ static int append_page_character(char c, int *output, uint32_t color, uint32_t b
 static int slice_match_nocase(const char *text, int start, int length, const char *word)
 {
     return slice_equal_nocase(text, start, length, word);
+}
+
+static uint32_t wysokosc_linii_dla_rozmiaru(uint8_t rozmiar)
+{
+    if (rozmiar == 0) return 8;
+    return 16;
 }
 
 static void create_field(uint8_t type, const char *value, int width, const char *action, uint8_t method_get, int page_start, uint32_t page_width)
@@ -377,9 +389,11 @@ static void page_from_response(int response_length)
     field_count = 0;
     focused_field = -1;
     page_background = 0x00FFFFFF;
-    page_scroll_line = 0;
+    page_scroll_y = 0;
     current_form_action[0] = 0;
     current_form_method_get = 1;
+    uint32_t current_line_y = 0;
+    uint32_t current_line_height = 8;
     while (body + 3 < response_length) {
         if (response[body] == '\r' && response[body + 1] == '\n' &&
             response[body + 2] == '\r' && response[body + 3] == '\n') {
@@ -395,6 +409,8 @@ static void page_from_response(int response_length)
             page_backgrounds[i] = current_style.background;
             page_bold[i] = current_style.bold;
             page_rozmiar[i] = current_style.rozmiar;
+            page_line_y[i] = current_line_y;
+            page_line_height[i] = wysokosc_linii_dla_rozmiaru(current_style.rozmiar);
         }
         return;
     }
@@ -480,13 +496,17 @@ static void page_from_response(int response_length)
                                 text_equal_nocase(tag, "tr") || text_equal_nocase(tag, "blockquote") ||
                                 text_equal_nocase(tag, "pre") || text_equal_nocase(tag, "center");
                 if (block_tag && output > 0 && page[output - 1] != '\n')
-                    append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+                    append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
                 if (text_equal_nocase(tag, "li"))
-                    append_page_character(BULLET_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+                    append_page_character(BULLET_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
                 if (text_equal_nocase(tag, "hr")) {
-                    append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
-                    append_page_character('\x01', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
-                    append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+                    append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
+                    current_line_y += current_line_height;
+                    current_line_height = 8;
+                    append_page_character('\x01', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
+                    append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
+                    current_line_y += current_line_height;
+                    current_line_height = 8;
                 }
                 int skip_style = text_equal_nocase(tag, "br") || text_equal_nocase(tag, "hr") ||
                                  text_equal_nocase(tag, "img") || text_equal_nocase(tag, "meta") ||
@@ -612,16 +632,16 @@ static void page_from_response(int response_length)
                         int btn_width = val_length > 0 ? val_length + 4 : 10;
                         if (btn_width > 30) btn_width = 30;
                         create_field(1, val_value, btn_width, action_value, current_form_method_get, output, (uint32_t)btn_width);
-                        append_page_character(FIELD_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+                        append_page_character(FIELD_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
                         for (int w = 1; w < btn_width; w++) {
-                            if (output + 1 < BROWSER_PAGE_MAX) { page[output] = ' '; page_colors[output] = current_style.color; page_backgrounds[output] = current_style.background; page_bold[output] = current_style.bold; page_rozmiar[output] = current_style.rozmiar; output++; }
+                            if (output + 1 < BROWSER_PAGE_MAX) { page[output] = ' '; page_colors[output] = current_style.color; page_backgrounds[output] = current_style.background; page_bold[output] = current_style.bold; page_rozmiar[output] = current_style.rozmiar; page_line_y[output] = current_line_y; page_line_height[output] = current_line_height; output++; }
                         }
                     } else {
                         int txt_width = 20;
                         create_field(0, val_value, txt_width, action_value, current_form_method_get, output, (uint32_t)txt_width);
-                        append_page_character(FIELD_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+                        append_page_character(FIELD_MARKER, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
                         for (int w = 1; w < txt_width; w++) {
-                            if (output + 1 < BROWSER_PAGE_MAX) { page[output] = ' '; page_colors[output] = current_style.color; page_backgrounds[output] = current_style.background; page_bold[output] = current_style.bold; page_rozmiar[output] = current_style.rozmiar; output++; }
+                            if (output + 1 < BROWSER_PAGE_MAX) { page[output] = ' '; page_colors[output] = current_style.color; page_backgrounds[output] = current_style.background; page_bold[output] = current_style.bold; page_rozmiar[output] = current_style.rozmiar; page_line_y[output] = current_line_y; page_line_height[output] = current_line_height; output++; }
                         }
                     }
                 }
@@ -669,16 +689,19 @@ static void page_from_response(int response_length)
         if (in_script || in_style) continue;
         if (c == '\r') continue;
         if (c == '&') {
-            if (starts_with(&response[i], "&nbsp;")) { append_page_character(' ', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar); i += 5; continue; }
-            if (starts_with(&response[i], "&amp;")) { append_page_character('&', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar); i += 4; continue; }
-            if (starts_with(&response[i], "&lt;")) { append_page_character('<', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar); i += 3; continue; }
-            if (starts_with(&response[i], "&gt;")) { append_page_character('>', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar); i += 3; continue; }
-            if (starts_with(&response[i], "&quot;")) { append_page_character('"', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar); i += 5; continue; }
+            if (starts_with(&response[i], "&nbsp;")) { append_page_character(' ', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height); current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar); i += 5; continue; }
+            if (starts_with(&response[i], "&amp;")) { append_page_character('&', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height); current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar); i += 4; continue; }
+            if (starts_with(&response[i], "&lt;")) { append_page_character('<', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height); current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar); i += 3; continue; }
+            if (starts_with(&response[i], "&gt;")) { append_page_character('>', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height); current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar); i += 3; continue; }
+            if (starts_with(&response[i], "&quot;")) { append_page_character('"', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height); current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar); i += 5; continue; }
         }
         if (c == '\n') {
-            if (output > 0 && page[output - 1] != '\n') append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+            if (output > 0 && page[output - 1] != '\n') append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
+            current_line_y += current_line_height;
+            current_line_height = 8;
         } else if ((unsigned char)c >= 32) {
-            append_page_character(c, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar);
+            append_page_character(c, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
+            current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar);
         }
     }
     while (output > 0 && page[output - 1] == '\n') output--;
@@ -876,8 +899,7 @@ static void browser_submit_form(struct browser_field *f)
 
 static void browser_draw(int x, int y, int width, int height)
 {
-    int line = 0;
-    int char_x = 0;
+    uint32_t scroll_y = page_scroll_y;
     (void)width;
     rysuj_prostokat(x, y, 610, 24, address_focused ? 0x00FFF4CC : 0x00FFFFFF);
     rysuj_tekst_chicago(x + 5, y + 8, address, 0x00000000);
@@ -885,22 +907,94 @@ static void browser_draw(int x, int y, int width, int height)
     rysuj_tekst_chicago(x + 636, y + 8, "IDZ", 0x00FFFFFF);
     rysuj_tekst_chicago(x, y + 30, status, 0x00000000);
     rysuj_prostokat(x, y + 48, width, height - 48, page_background);
+
+#define MAX_DRAW_LINES 512
+    int line_x_offset[MAX_DRAW_LINES];
+    int line_count = 0;
+
+    int idx = 0;
+    while (page[idx]) {
+        int line_start = idx;
+        int char_x = 0;
+        uint8_t align = 0;
+        int line_w = 0;
+        while (page[idx]) {
+            char c = page[idx];
+            if (c == '\n') { idx++; break; }
+            if (char_x >= 84 * 8) break;
+            if (idx == line_start) align = page_align[idx];
+            int cw;
+            if (c == FIELD_MARKER) {
+                int fw = 20;
+                for (uint32_t fi = 0; fi < field_count; fi++) {
+                    if (fields[fi].page_start == (uint32_t)idx) {
+                        fw = fields[fi].page_width > 0 ? (int)fields[fi].page_width : 20;
+                        if (fw > 40) fw = 40;
+                        break;
+                    }
+                }
+                cw = fw * 8;
+            } else if (c == BULLET_MARKER) {
+                cw = 8;
+            } else if (c == '\x01') {
+                cw = 84 * 8 - char_x;
+                if (cw < 0) cw = 0;
+            } else {
+                cw = znak_szerokosc(page_rozmiar[idx]);
+            }
+            line_w += cw;
+            char_x += cw;
+            idx++;
+        }
+        int offset = 0;
+        if (align == 1) offset = (84 * 8 - line_w) / 2;
+        else if (align == 2) offset = 84 * 8 - line_w;
+        if (line_count < MAX_DRAW_LINES) {
+            line_x_offset[line_count] = offset;
+            line_count++;
+        }
+    }
+
+    int char_x = 0;
+    int current_line = 0;
     for (int i = 0; page[i]; i++) {
         char c = page[i];
-        if (c == '\n' || char_x >= 84 * 8) {
-            line++;
+        if (c == '\n') {
             char_x = 0;
-            if (c == '\n') continue;
-        }
-        if (line < page_scroll_line) {
-            if (c == FIELD_MARKER) char_x += 160;
-            else if (c == BULLET_MARKER) char_x += 8;
-            else char_x += znak_szerokosc(page_rozmiar[i]);
+            current_line++;
             continue;
         }
-        if (y + 62 + (line - page_scroll_line) * 8 >= y + height - 8) break;
-        int character_x = x + 4 + char_x;
-        int character_y = y + 56 + (line - page_scroll_line) * 8;
+        if (char_x >= 84 * 8) {
+            char_x = 0;
+            current_line++;
+            i--;
+            continue;
+        }
+        if (page_line_y[i] + page_line_height[i] <= scroll_y) {
+            if (c == FIELD_MARKER) {
+                int fw = 20;
+                for (uint32_t fi = 0; fi < field_count; fi++) {
+                    if (fields[fi].page_start == (uint32_t)i) {
+                        fw = fields[fi].page_width > 0 ? (int)fields[fi].page_width : 20;
+                        if (fw > 40) fw = 40;
+                        break;
+                    }
+                }
+                char_x += fw * 8;
+            } else if (c == BULLET_MARKER) {
+                char_x += 8;
+            } else if (c == '\x01') {
+                char_x = 84 * 8;
+            } else {
+                char_x += znak_szerokosc(page_rozmiar[i]);
+            }
+            continue;
+        }
+        int line_offset = 0;
+        if (current_line < line_count) line_offset = line_x_offset[current_line];
+        int character_x = x + 4 + char_x + line_offset;
+        int character_y = y + 56 + (int)(page_line_y[i] - scroll_y);
+        if (character_y + (int)page_line_height[i] > y + height - 8) break;
         if (c == FIELD_MARKER) {
             struct browser_field *f = (struct browser_field *)0;
             for (uint32_t fi = 0; fi < field_count; fi++) {
@@ -935,15 +1029,16 @@ static void browser_draw(int x, int y, int width, int height)
             continue;
         }
         if (page[i] == '\x01') {
-            rysuj_prostokat(x + 4, y + 59 + (line - page_scroll_line) * 8, 84 * 8, 1, page_colors[i]);
+            rysuj_prostokat(x + 4 + line_offset, character_y + 3, 84 * 8, 1, page_colors[i]);
             char_x = 84 * 8;
             continue;
         }
         if (page_backgrounds[i] != page_background)
-            rysuj_prostokat(character_x, character_y, znak_szerokosc(page_rozmiar[i]), 8, page_backgrounds[i]);
+            rysuj_prostokat(character_x, character_y, znak_szerokosc(page_rozmiar[i]), page_line_height[i], page_backgrounds[i]);
         rysuj_znak_styl(character_x, character_y, c, page_colors[i], page_rozmiar[i], page_bold[i] ? 1 : 0);
         char_x += znak_szerokosc(page_rozmiar[i]);
     }
+#undef MAX_DRAW_LINES
 }
 
 static int browser_field_at(int x, int y)
@@ -957,30 +1052,45 @@ static int browser_field_at(int x, int y)
 
 static int browser_link_at(int x, int y)
 {
-    int line = 0;
     int char_x = 0;
-    int target_line = page_scroll_line + (y - 86) / 8;
+    uint32_t target_y = (uint32_t)(page_scroll_y + (y - 86));
     int target_px = x - 12;
     int page_index = -1;
 
-    if (x < 12 || y < 86 || target_line < 0 || target_px < 0) return -1;
+    if (x < 12 || y < 86 || target_px < 0) return -1;
     for (int i = 0; page[i]; i++) {
-        if (page[i] == '\n' || char_x >= 84 * 8) {
-            line++;
+        if (page[i] == '\n') {
             char_x = 0;
-            if (page[i] == '\n') continue;
+            continue;
         }
-        if (line == target_line && page[i] != FIELD_MARKER && page[i] != '\x01') {
-            int w = znak_szerokosc(page_rozmiar[i]);
-            if (target_px < char_x + w) {
-                page_index = i;
-                break;
+        if (char_x >= 84 * 8) {
+            char_x = 0;
+            continue;
+        }
+        if (page_line_y[i] <= target_y && target_y < page_line_y[i] + page_line_height[i]) {
+            if (page[i] != FIELD_MARKER && page[i] != '\x01') {
+                int w = znak_szerokosc(page_rozmiar[i]);
+                if (target_px < char_x + w) {
+                    page_index = i;
+                    break;
+                }
             }
         }
-        if (page[i] == '\x01') { char_x = 84 * 8; continue; }
-        if (page[i] == FIELD_MARKER) char_x += 160;
-        else if (page[i] == BULLET_MARKER) char_x += 8;
-        else char_x += znak_szerokosc(page_rozmiar[i]);
+        if (page[i] == FIELD_MARKER) {
+                int fw = 20;
+                for (uint32_t fi = 0; fi < field_count; fi++) {
+                    if (fields[fi].page_start == (uint32_t)i) {
+                        fw = fields[fi].page_width > 0 ? (int)fields[fi].page_width : 20;
+                        if (fw > 40) fw = 40;
+                        break;
+                    }
+                }
+                char_x += fw * 8;
+            } else if (page[i] == BULLET_MARKER) {
+                char_x += 8;
+            } else {
+                char_x += znak_szerokosc(page_rozmiar[i]);
+            }
     }
     if (page_index < 0) return -1;
     for (uint32_t link = 0; link < link_count; link++)
@@ -990,26 +1100,17 @@ static int browser_link_at(int x, int y)
 
 void browser_scroll_wheel(int delta)
 {
-    int total_lines = 0;
-    int char_x = 0;
-    int visible_lines = (BROWSER_HEIGHT - 64) / 8;
+    int total_height = 0;
     if (!browser_opened || !browser_window.otwarte || !okno_czy_aktywne(&browser_window) || !delta) return;
     for (int i = 0; page[i]; i++) {
-        if (page[i] == '\n' || char_x >= 84 * 8) {
-            total_lines++;
-            char_x = 0;
-            if (page[i] == '\n') continue;
-        }
-        if (page[i] == '\x01') { char_x = 84 * 8; continue; }
-        if (page[i] == FIELD_MARKER) char_x += 160;
-        else if (page[i] == BULLET_MARKER) char_x += 8;
-        else char_x += znak_szerokosc(page_rozmiar[i]);
+        int bottom = page_line_y[i] + page_line_height[i];
+        if (bottom > total_height) total_height = bottom;
     }
-    if (char_x) total_lines++;
-    page_scroll_line -= delta * 3;
-    if (page_scroll_line < 0) page_scroll_line = 0;
-    if (page_scroll_line > total_lines - visible_lines)
-        page_scroll_line = total_lines > visible_lines ? total_lines - visible_lines : 0;
+    int visible_height = BROWSER_HEIGHT - 64;
+    page_scroll_y -= delta * 24;
+    if (page_scroll_y < 0) page_scroll_y = 0;
+    if (page_scroll_y > total_height - visible_height)
+        page_scroll_y = total_height > visible_height ? total_height - visible_height : 0;
     okno_narysuj(&browser_window);
 }
 
