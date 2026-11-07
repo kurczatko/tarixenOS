@@ -80,7 +80,6 @@ static uint32_t g_temperature = 52U;
 static uint32_t g_fan_rpm = 1500U;
 static uint8_t g_power_state = POWER_STATE_D0;
 static uint8_t g_alpha_blend_global = 1U;
-static uint32_t g_msaa_samples = 1U;
 
 static struct radeon_6790_vram_alloc g_vram_allocs[RADEON_6790_VRAM_MAX_ALLOCS];
 static uint32_t g_vram_alloc_count = 0U;
@@ -1027,6 +1026,7 @@ void radeon_6790_stream_output_destroy(radeon_6790_handle_t handle)
 
 void radeon_6790_stream_output_update(radeon_6790_handle_t handle, uint32_t slot, const void *data, uint32_t size)
 {
+    (void)data;
     if (!handle_valid(handle, g_so_used, RADEON_6790_MAX_STREAM_OUTPUT)) return;
     struct radeon_6790_stream_output *so = &g_so[handle];
     if (slot >= so->buffer_count) return;

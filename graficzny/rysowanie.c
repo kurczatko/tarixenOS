@@ -8,6 +8,14 @@
 #define CURSOR_H 18
 #define KOLOR_TLA 0x0098C74C
 #define KOLOR_PASKA_ZADAN 0x002D3E50
+
+static inline uint8_t vbe_read8(volatile uint8_t *base, uint32_t off) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
+    volatile char *p = (volatile char *)base;
+    return *(volatile uint8_t *)(p + off);
+#pragma GCC diagnostic pop
+}
 #define KOLOR_TEKST_BIALY 0x00FFFFFF
 
 #define NAPIS_SZEROKOSC (27 * 8)
@@ -632,36 +640,42 @@ void kursor_graficzny_pozycja(int *x, int *y)
 void rysowanie_init(void)
 {
     volatile uint8_t *mode_info = (volatile uint8_t *)0x0500;
-    uint32_t lfb_address = *(volatile uint32_t *)(mode_info + 0x28);
+    uint32_t lfb_address = (uint32_t)vbe_read8(mode_info, 0x28)
+                         | ((uint32_t)vbe_read8(mode_info, 0x29) << 8)
+                         | ((uint32_t)vbe_read8(mode_info, 0x2A) << 16)
+                         | ((uint32_t)vbe_read8(mode_info, 0x2B) << 24);
 
     if (lfb_address != 0) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
         uint8_t wersja_vbe = *(volatile uint8_t *)0x05FF;
         uint16_t liniowy_pitch = 0;
         pamiec_graficzna = (volatile uint8_t *)lfb_address;
-        framebuffer_pitch = *(volatile uint16_t *)(mode_info + 0x10);
-        framebuffer_bytes_per_pixel = (mode_info[0x19] + 7) / 8;
-        red_mask_size = mode_info[0x1F];
-        red_field_position = mode_info[0x20];
-        green_mask_size = mode_info[0x21];
-        green_field_position = mode_info[0x22];
-        blue_mask_size = mode_info[0x23];
-        blue_field_position = mode_info[0x24];
+        framebuffer_pitch = (uint16_t)(vbe_read8(mode_info, 0x10) | (vbe_read8(mode_info, 0x11) << 8));
+        framebuffer_bytes_per_pixel = (vbe_read8(mode_info, 0x19) + 7) / 8;
+        red_mask_size = vbe_read8(mode_info, 0x1F);
+        red_field_position = vbe_read8(mode_info, 0x20);
+        green_mask_size = vbe_read8(mode_info, 0x21);
+        green_field_position = vbe_read8(mode_info, 0x22);
+        blue_mask_size = vbe_read8(mode_info, 0x23);
+        blue_field_position = vbe_read8(mode_info, 0x24);
         if (wersja_vbe >= 3) {
-            liniowy_pitch = *(volatile uint16_t *)(mode_info + 0x32);
+            liniowy_pitch = (uint16_t)(vbe_read8(mode_info, 0x32) | (vbe_read8(mode_info, 0x33) << 8));
             if (liniowy_pitch) framebuffer_pitch = liniowy_pitch;
-            if (mode_info[0x36]) {
-                red_mask_size = mode_info[0x36];
-                red_field_position = mode_info[0x37];
+            if (vbe_read8(mode_info, 0x36)) {
+                red_mask_size = vbe_read8(mode_info, 0x36);
+                red_field_position = vbe_read8(mode_info, 0x37);
             }
-            if (mode_info[0x38]) {
-                green_mask_size = mode_info[0x38];
-                green_field_position = mode_info[0x39];
+            if (vbe_read8(mode_info, 0x38)) {
+                green_mask_size = vbe_read8(mode_info, 0x38);
+                green_field_position = vbe_read8(mode_info, 0x39);
             }
-            if (mode_info[0x3A]) {
-                blue_mask_size = mode_info[0x3A];
-                blue_field_position = mode_info[0x3B];
+            if (vbe_read8(mode_info, 0x3A)) {
+                blue_mask_size = vbe_read8(mode_info, 0x3A);
+                blue_field_position = vbe_read8(mode_info, 0x3B);
             }
         }
+#pragma GCC diagnostic pop
     }
 
     tapeta_gradientowa = 1;

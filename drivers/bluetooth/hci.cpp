@@ -32,7 +32,7 @@ static inline void outl(uint16_t port, uint32_t value)
 
 /*kontekst bluetooth*/
 
-static struct bt_context g_bt_ctx = {0};
+static struct bt_context g_bt_ctx = {};
 
 /*urządzenie usb kontrolera bluetooth*/
 
@@ -43,7 +43,7 @@ static uint8_t g_bt_ep_int = 0;
 
 /*bufor zdarzen hci*/
 
-static uint8_t g_hci_evt_buf[256];
+static uint8_t g_hci_evt_buf[255];
 static uint32_t g_hci_evt_len = 0;
 static uint8_t g_hci_evt_ready = 0;
 
@@ -83,7 +83,7 @@ static void bt_zero(uint8_t *dst, uint32_t n)
 
 static int bt_addr_equal(const struct bt_addr *a, const struct bt_addr *b)
 {
-    for (int i = 0; i < BT_ADDR_LEN; i++) {
+    for (uint32_t i = 0; i < BT_ADDR_LEN; i++) {
         if (a->b[i] != b->b[i]) return 0;
     }
     return 1;
@@ -93,14 +93,14 @@ static int bt_addr_equal(const struct bt_addr *a, const struct bt_addr *b)
 
 static void bt_addr_copy(struct bt_addr *dst, const struct bt_addr *src)
 {
-    for (int i = 0; i < BT_ADDR_LEN; i++) dst->b[i] = src->b[i];
+    for (uint32_t i = 0; i < BT_ADDR_LEN; i++) dst->b[i] = src->b[i];
 }
 
 /*zapisanie adresu bluetooth z tablicy bajtow*/
 
 static void bt_addr_set(struct bt_addr *dst, const uint8_t *bytes)
 {
-    for (int i = 0; i < BT_ADDR_LEN; i++) dst->b[i] = bytes[i];
+    for (uint32_t i = 0; i < BT_ADDR_LEN; i++) dst->b[i] = bytes[i];
 }
 
 /*warstwa usb - transport hci:usb*/
@@ -204,7 +204,7 @@ static int bt_hci_recv_event(void)
 
 /*odbierz dane acl z endpointu bulk in*/
 
-static int bt_hci_recv_acl(uint8_t *buf, uint32_t capacity)
+static int __attribute__((unused)) bt_hci_recv_acl(uint8_t *buf, uint32_t capacity)
 {
     if (!g_bt_usb_dev || !g_bt_ep_in) return 0;
     return usb_bulk_transfer(g_bt_usb_dev, g_bt_ep_in, buf, capacity, USB_DIR_IN);
@@ -307,7 +307,7 @@ static int bt_hci_pin_code_reply(const struct bt_addr *addr, uint8_t pin_len, co
     return bt_hci_send_cmd((HCI_OGF_LINK_CTL | (HCI_OCF_PIN_CODE_REPLY << 8)), params, 23);
 }
 
-static int bt_hci_link_key_reply(const struct bt_addr *addr, const struct bt_link_key *key)
+static int __attribute__((unused)) bt_hci_link_key_reply(const struct bt_addr *addr, const struct bt_link_key *key)
 {
     uint8_t params[22];
     bt_addr_copy((struct bt_addr *)params, addr);
@@ -472,7 +472,7 @@ int bluetooth_init(void)
 
     bt_hci_write_local_name("tarixenos");
 
-    for (int i = 0; i < BT_ADDR_LEN; i++) g_bt_ctx.local_addr.b[i] = (uint8_t)(0x00 + i * 0x11);
+    for (uint32_t i = 0; i < BT_ADDR_LEN; i++) g_bt_ctx.local_addr.b[i] = (uint8_t)(0x00 + i * 0x11);
     g_bt_ctx.local_addr.b[0] = 0xaa;
     g_bt_ctx.local_addr.b[1] = 0xbb;
     g_bt_ctx.local_addr.b[2] = 0xcc;

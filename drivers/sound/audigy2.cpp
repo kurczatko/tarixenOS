@@ -14,6 +14,8 @@
 #define DSP_CAPTURE_LIST_ADDR 0x01
 #define DSP_EFX_RAM_ADDR 0x02
 
+static inline uint32_t f2u(float v) { union { float f; uint32_t u; } u = {v}; return u.u; }
+
 static Audigy2* g_audigy2 = 0;
 
 Audigy2::Audigy2()
@@ -195,6 +197,7 @@ void Audigy2::dma_start_playback(PcmBuffer* buf)
 
 void Audigy2::dma_stop_playback(PcmBuffer* buf)
 {
+    (void)buf;
     write_reg(0x88, 0x00000000);
 }
 
@@ -343,15 +346,15 @@ int Audigy2::eax_set_listener(float x, float y, float z,
                               float fx, float fy, float fz,
                               float ux, float uy, float uz)
 {
-    write_dsp(0x340, *(uint32_t*)&x);
-    write_dsp(0x344, *(uint32_t*)&y);
-    write_dsp(0x348, *(uint32_t*)&z);
-    write_dsp(0x34C, *(uint32_t*)&fx);
-    write_dsp(0x350, *(uint32_t*)&fy);
-    write_dsp(0x354, *(uint32_t*)&fz);
-    write_dsp(0x358, *(uint32_t*)&ux);
-    write_dsp(0x35C, *(uint32_t*)&uy);
-    write_dsp(0x360, *(uint32_t*)&uz);
+    write_dsp(0x340, f2u(x));
+    write_dsp(0x344, f2u(y));
+    write_dsp(0x348, f2u(z));
+    write_dsp(0x34C, f2u(fx));
+    write_dsp(0x350, f2u(fy));
+    write_dsp(0x354, f2u(fz));
+    write_dsp(0x358, f2u(ux));
+    write_dsp(0x35C, f2u(uy));
+    write_dsp(0x360, f2u(uz));
     return 0;
 }
 

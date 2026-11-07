@@ -76,8 +76,14 @@ static uint32_t g_temperature_8500 = 45U;
 static uint32_t g_fan_rpm_8500 = 2000U;
 static uint8_t g_alpha_blend_global_8500 = 1U;
 
-static uint64_t g_vram_bitmap_8500[(RADEON_8500_VRAM_MAX_ALLOCS + 63U) / 64U] = {0};
 static struct radeon_8500_vram_alloc g_vram_allocs_8500[RADEON_8500_VRAM_MAX_ALLOCS];
+
+static uint8_t g_fence_used_8500[RADEON_8500_MAX_FENCES] = {0};
+static struct radeon_8500_fence g_fence_8500[RADEON_8500_MAX_FENCES];
+static uint8_t g_sem_used_8500[RADEON_8500_MAX_SEMAPHORES] = {0};
+static struct radeon_8500_semaphore g_sem_8500[RADEON_8500_MAX_SEMAPHORES];
+static uint8_t g_swap_used_8500[RADEON_8500_MAX_SWAP_CHAINS] = {0};
+static struct radeon_8500_swap_chain g_swap_8500[RADEON_8500_MAX_SWAP_CHAINS];
 
 static inline uint32_t mmio_read32_8500(uint32_t offset)
 {
@@ -454,7 +460,6 @@ static uint64_t vram_allocate_8500(uint64_t size, uint32_t type)
 {
     uint64_t aligned = (size + RADEON_8500_VRAM_PAGE_SIZE - 1U) & ~(RADEON_8500_VRAM_PAGE_SIZE - 1U);
     if (aligned == 0) return 0xFFFFFFFFFFFFFFFFULL;
-    uint64_t pages = aligned / RADEON_8500_VRAM_PAGE_SIZE;
     for (uint64_t i = 0; i < RADEON_8500_VRAM_MAX_ALLOCS; i++) {
         if (g_vram_allocs_8500[i].used) continue;
         uint64_t offset = i * RADEON_8500_VRAM_PAGE_SIZE;
@@ -674,6 +679,7 @@ void radeon_8500_texture_destroy(radeon_8500_handle_t handle)
 
 void radeon_8500_texture_update(radeon_8500_handle_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data)
 {
+    (void)level;
     if (!handle_valid_8500(handle, g_tex_used_8500, RADEON_8500_MAX_TEXTURES)) return;
     struct radeon_8500_texture *t = &g_tex_8500[handle];
     if (!t->system_mem) return;
@@ -1169,8 +1175,6 @@ void radeon_8500_fence_create(radeon_8500_handle_t *out)
 {
     if (!out) return;
     for (uint32_t i = 0; i < RADEON_8500_MAX_FENCES; i++) {
-        static uint8_t g_fence_used_8500[RADEON_8500_MAX_FENCES] = {0};
-        static struct radeon_8500_fence g_fence_8500[RADEON_8500_MAX_FENCES];
         if (!g_fence_used_8500[i]) {
             g_fence_used_8500[i] = 1;
             g_fence_8500[i].value = 0;
@@ -1184,8 +1188,6 @@ void radeon_8500_fence_create(radeon_8500_handle_t *out)
 
 void radeon_8500_fence_signal(radeon_8500_handle_t handle, uint32_t value)
 {
-    static uint8_t g_fence_used_8500[RADEON_8500_MAX_FENCES] = {0};
-    static struct radeon_8500_fence g_fence_8500[RADEON_8500_MAX_FENCES];
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_FENCES || !g_fence_used_8500[handle]) return;
     g_fence_8500[handle].value = value;
     g_fence_8500[handle].signaled = 1;
@@ -1193,8 +1195,6 @@ void radeon_8500_fence_signal(radeon_8500_handle_t handle, uint32_t value)
 
 int radeon_8500_fence_wait(radeon_8500_handle_t handle, uint32_t value, uint32_t timeout_us)
 {
-    static uint8_t g_fence_used_8500[RADEON_8500_MAX_FENCES] = {0};
-    static struct radeon_8500_fence g_fence_8500[RADEON_8500_MAX_FENCES];
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_FENCES || !g_fence_used_8500[handle]) return 0;
     for (volatile uint32_t wait = 0; wait < timeout_us * 10U; wait++) {
         if (g_fence_8500[handle].signaled && g_fence_8500[handle].value >= value) return 1;
@@ -1204,7 +1204,6 @@ int radeon_8500_fence_wait(radeon_8500_handle_t handle, uint32_t value, uint32_t
 
 void radeon_8500_fence_destroy(radeon_8500_handle_t handle)
 {
-    static uint8_t g_fence_used_8500[RADEON_8500_MAX_FENCES] = {0};
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_FENCES || !g_fence_used_8500[handle]) return;
     g_fence_used_8500[handle] = 0;
 }
@@ -1212,8 +1211,6 @@ void radeon_8500_fence_destroy(radeon_8500_handle_t handle)
 void radeon_8500_semaphore_create(radeon_8500_handle_t *out)
 {
     if (!out) return;
-    static uint8_t g_sem_used_8500[RADEON_8500_MAX_SEMAPHORES] = {0};
-    static struct radeon_8500_semaphore g_sem_8500[RADEON_8500_MAX_SEMAPHORES];
     for (uint32_t i = 0; i < RADEON_8500_MAX_SEMAPHORES; i++) {
         if (!g_sem_used_8500[i]) {
             g_sem_used_8500[i] = 1;
@@ -1227,16 +1224,12 @@ void radeon_8500_semaphore_create(radeon_8500_handle_t *out)
 
 void radeon_8500_semaphore_signal(radeon_8500_handle_t handle, uint32_t value)
 {
-    static uint8_t g_sem_used_8500[RADEON_8500_MAX_SEMAPHORES] = {0};
-    static struct radeon_8500_semaphore g_sem_8500[RADEON_8500_MAX_SEMAPHORES];
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_SEMAPHORES || !g_sem_used_8500[handle]) return;
     g_sem_8500[handle].value = value;
 }
 
 void radeon_8500_semaphore_wait(radeon_8500_handle_t handle, uint32_t value)
 {
-    static uint8_t g_sem_used_8500[RADEON_8500_MAX_SEMAPHORES] = {0};
-    static struct radeon_8500_semaphore g_sem_8500[RADEON_8500_MAX_SEMAPHORES];
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_SEMAPHORES || !g_sem_used_8500[handle]) return;
     for (volatile uint32_t wait = 0; wait < 10000000U; wait++) {
         if (g_sem_8500[handle].value >= value) break;
@@ -1245,7 +1238,6 @@ void radeon_8500_semaphore_wait(radeon_8500_handle_t handle, uint32_t value)
 
 void radeon_8500_semaphore_destroy(radeon_8500_handle_t handle)
 {
-    static uint8_t g_sem_used_8500[RADEON_8500_MAX_SEMAPHORES] = {0};
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_SEMAPHORES || !g_sem_used_8500[handle]) return;
     g_sem_used_8500[handle] = 0;
 }
@@ -1336,8 +1328,6 @@ void radeon_8500_rgb_off(void)
 
 radeon_8500_handle_t radeon_8500_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync, uint8_t alpha_premultiplied, uint8_t triple_buffer)
 {
-    static uint8_t g_swap_used_8500[RADEON_8500_MAX_SWAP_CHAINS] = {0};
-    static struct radeon_8500_swap_chain g_swap_8500[RADEON_8500_MAX_SWAP_CHAINS];
     for (uint32_t i = 0; i < RADEON_8500_MAX_SWAP_CHAINS; i++) {
         if (g_swap_used_8500[i]) continue;
         g_swap_used_8500[i] = 1;

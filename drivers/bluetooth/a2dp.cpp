@@ -70,7 +70,7 @@ struct avdtp_endpoint {
     uint32_t timestamp;
 };
 
-static struct avdtp_endpoint g_avdtp_ep = {0};
+static struct avdtp_endpoint g_avdtp_ep = {};
 
 /*inicjalizacja warstwy a2dp i avdtp*/
 
@@ -113,10 +113,11 @@ static uint16_t sbc_build_header(uint8_t *out, uint8_t channels, uint32_t sample
 }
 
 /*zakoduj proba audio do ramki sbc (uproszczony enkodier)*/
-static uint32_t sbc_encode_frame(uint8_t *out, const int16_t *samples, uint32_t num_samples,
+static uint32_t __attribute__((unused)) sbc_encode_frame(uint8_t *out, const int16_t *samples, uint32_t num_samples,
                                   uint8_t channels, uint32_t sample_rate)
 {
     (void)samples;
+    (void)num_samples;
     uint8_t header[4];
     uint16_t hlen = sbc_build_header(header, channels, sample_rate, 16, 8, 1);
     for (uint16_t i = 0; i < hlen; i++) out[i] = header[i];

@@ -51,7 +51,7 @@ typedef struct {
 } pilka_t;
 
 static pilka_t pilki[MAX_PILKI];
-static int spawn_timer = 0;
+static uint32_t spawn_timer = 0;
 static int gra_koniec = 0;
 static uint32_t rand_seed = 123456789;
 

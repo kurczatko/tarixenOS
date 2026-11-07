@@ -339,7 +339,6 @@ void fs_get_current_dir_name(char *buf) {
         if (count > 0) {
             int len = 0;
             while (name[len]) len++;
-            int name_pos = pos;
             for (int i = len - 1; i >= 0; i--) {
                 if (pos < 127) buf[pos++] = name[i];
             }

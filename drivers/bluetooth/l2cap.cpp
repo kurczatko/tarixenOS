@@ -48,7 +48,7 @@ struct l2cap_signal {
 
 /*polaczenia l2cap z pelnym stanem*/
 
-static struct bt_l2cap_connection g_l2cap_conns[BT_MAX_CONNECTIONS] = {0};
+static struct bt_l2cap_connection g_l2cap_conns[BT_MAX_CONNECTIONS] = {};
 
 /*identyfikator sygnalizacji (rosnie z kazdym zapytaniem)*/
 static uint8_t g_l2cap_signal_id = 0;
@@ -60,7 +60,7 @@ static uint8_t g_l2cap_tx_buf[1024];
 
 int bt_l2cap_init(void)
 {
-    for (int i = 0; i < BT_MAX_CONNECTIONS; i++) {
+    for (uint32_t i = 0; i < BT_MAX_CONNECTIONS; i++) {
         g_l2cap_conns[i].used = 0;
         g_l2cap_conns[i].configured = 0;
         g_l2cap_conns[i].state = L2CAP_STATE_CLOSED;
@@ -78,7 +78,7 @@ int bt_l2cap_init(void)
 
 static struct bt_l2cap_connection *l2cap_find_free(void)
 {
-    for (int i = 0; i < BT_MAX_CONNECTIONS; i++) {
+    for (uint32_t i = 0; i < BT_MAX_CONNECTIONS; i++) {
         if (!g_l2cap_conns[i].used) return &g_l2cap_conns[i];
     }
     return 0;
@@ -168,7 +168,7 @@ int bt_l2cap_connect(uint16_t handle, uint16_t psm, const struct bt_addr *addr)
 
 void bt_l2cap_disconnect(uint16_t handle)
 {
-    for (int i = 0; i < BT_MAX_CONNECTIONS; i++) {
+    for (uint32_t i = 0; i < BT_MAX_CONNECTIONS; i++) {
         if (g_l2cap_conns[i].used && g_l2cap_conns[i].handle == handle) {
             if (g_l2cap_conns[i].state == L2CAP_STATE_OPEN ||
                 g_l2cap_conns[i].state == L2CAP_STATE_WAIT_CONFIG) {
@@ -192,7 +192,7 @@ void bt_l2cap_disconnect(uint16_t handle)
 
 struct bt_l2cap_connection *bt_l2cap_find_by_handle(uint16_t handle)
 {
-    for (int i = 0; i < BT_MAX_CONNECTIONS; i++) {
+    for (uint32_t i = 0; i < BT_MAX_CONNECTIONS; i++) {
         if (g_l2cap_conns[i].used && g_l2cap_conns[i].handle == handle)
             return &g_l2cap_conns[i];
     }
@@ -203,7 +203,7 @@ struct bt_l2cap_connection *bt_l2cap_find_by_handle(uint16_t handle)
 
 struct bt_l2cap_connection *bt_l2cap_find_by_cid(uint16_t cid)
 {
-    for (int i = 0; i < BT_MAX_CONNECTIONS; i++) {
+    for (uint32_t i = 0; i < BT_MAX_CONNECTIONS; i++) {
         if (g_l2cap_conns[i].used && g_l2cap_conns[i].cid == cid)
             return &g_l2cap_conns[i];
     }
@@ -271,7 +271,6 @@ void bt_l2cap_handle_rx(uint16_t handle, uint16_t cid, const uint8_t *data, uint
         case L2CAP_SIG_CONFIGURE_REQUEST: {
             if (sig_len < 6) break;
             uint16_t remote_cid_sig = (uint16_t)(sig_data[0] | (sig_data[1] << 8));
-            uint16_t flags = (uint16_t)(sig_data[2] | (sig_data[3] << 8));
             struct bt_l2cap_connection *conn = bt_l2cap_find_by_cid(remote_cid_sig);
             if (conn) {
                 conn->configured = 1;
@@ -291,7 +290,6 @@ void bt_l2cap_handle_rx(uint16_t handle, uint16_t cid, const uint8_t *data, uint
         case L2CAP_SIG_DISCONNECTION_REQUEST: {
             if (sig_len < 4) break;
             uint16_t local_cid_sig = (uint16_t)(sig_data[0] | (sig_data[1] << 8));
-            uint16_t remote_cid_sig = (uint16_t)(sig_data[2] | (sig_data[3] << 8));
             struct bt_l2cap_connection *conn = bt_l2cap_find_by_cid(local_cid_sig);
             if (conn) {
                 uint8_t resp[4];
@@ -355,7 +353,7 @@ void bt_l2cap_handle_rx(uint16_t handle, uint16_t cid, const uint8_t *data, uint
 int bt_l2cap_connection_count(void)
 {
     int count = 0;
-    for (int i = 0; i < BT_MAX_CONNECTIONS; i++) {
+    for (uint32_t i = 0; i < BT_MAX_CONNECTIONS; i++) {
         if (g_l2cap_conns[i].used) count++;
     }
     return count;
