@@ -394,6 +394,7 @@ static void page_from_response(int response_length)
     current_form_method_get = 1;
     uint32_t current_line_y = 0;
     uint32_t current_line_height = 8;
+    int char_x = 0;
     while (body + 3 < response_length) {
         if (response[body] == '\r' && response[body + 1] == '\n' &&
             response[body + 2] == '\r' && response[body + 3] == '\n') {
@@ -699,9 +700,18 @@ static void page_from_response(int response_length)
             if (output > 0 && page[output - 1] != '\n') append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
             current_line_y += current_line_height;
             current_line_height = 8;
+            char_x = 0;
         } else if ((unsigned char)c >= 32) {
+            int cw = znak_szerokosc(current_style.rozmiar);
+            if (char_x + cw > 84 * 8) {
+                if (output > 0 && page[output - 1] != '\n') append_page_character('\n', &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
+                current_line_y += current_line_height;
+                current_line_height = 8;
+                char_x = 0;
+            }
             append_page_character(c, &output, current_style.color, current_style.background, current_style.bold, current_style.rozmiar, current_style.text_align, current_line_y, current_line_height);
             current_line_height = current_line_height > wysokosc_linii_dla_rozmiaru(current_style.rozmiar) ? current_line_height : wysokosc_linii_dla_rozmiaru(current_style.rozmiar);
+            char_x += cw;
         }
     }
     while (output > 0 && page[output - 1] == '\n') output--;
@@ -1141,6 +1151,9 @@ static void browser_click(int x, int y)
         {
             const char *jid = js_find_id_by_page(fields[field].page_start);
             if (jid) js_dispatch_click(jid);
+        }
+        if (fields[field].type == 1) {
+            browser_submit_form(&fields[field]);
         }
         return;
     }
