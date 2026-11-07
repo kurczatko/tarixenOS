@@ -3,13 +3,13 @@
 
 KERNEL_LOAD_SEGMENT equ 0x1000
 KERNEL_LOAD_OFFSET  equ 0x1000
-KERNEL_SECTORS      equ 512
+KERNEL_SECTORS      equ 768
 KERNEL_START_LBA    equ 126000
 CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
 VBE_INFO_BUFFER     equ 0x7E00
 VBE_CONTROLLER_BUFFER equ 0x8000
-VBE_HANDOFF_BUFFER  equ 0x50000
+VBE_HANDOFF_BUFFER  equ 0x0500
 
     jmp short boot_start
     nop
@@ -107,7 +107,7 @@ video_mode_depth_ok:
     cmp ax, 0x004F
     jne video_mode_next
     mov si, VBE_INFO_BUFFER
-    mov ax, 0x5000
+    mov ax, 0x0050
     mov es, ax
     xor di, di
     mov cx, 64
@@ -115,7 +115,7 @@ video_mode_depth_ok:
     rep movsd
     mov al, [VBE_CONTROLLER_BUFFER + 5]
     mov [es:0x00FF], al
-    je video_mode_ready
+    jmp video_mode_ready
 video_mode_next:
     add si, 2
     jmp video_mode_loop
@@ -194,7 +194,7 @@ protected_mode:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    mov esp, 0x280000
+    mov esp, 0x02000000
 
     mov esi, reloc_code
     mov edi, 0x90000

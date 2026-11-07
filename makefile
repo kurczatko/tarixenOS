@@ -7,7 +7,7 @@ KERNEL_BIN32 := $(BUILD_DIR)/kernel32.bin
 OS_IMAGE := $(BUILD_DIR)/tarixenOS.img
 TAPETA_RAW := $(BUILD_DIR)/tapeta.raw
 TAPETA_JASNA_RAW := $(BUILD_DIR)/tapeta_jasna.raw
-KERNEL_MAX_SECTORS := 512
+KERNEL_MAX_SECTORS := 768
 FLOPPY_SIZE := 67108864
 FAT32_SECTORS := 125952
 KERNEL_START_LBA := 126000
@@ -181,7 +181,7 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) $(TAPETA_JASNA_RAW) | $
 	dd if=$(BOOT_BIN32) of=$@ bs=1 count=3 conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 skip=90 seek=90 count=420 conv=notrunc status=none
 	@kernel_size=$$(stat -c %s $(KERNEL_BIN32)); \
-	if [ $$kernel_size -gt $$((520 * 512)) ]; then \
+	if [ $$kernel_size -gt $$((768 * 512)) ]; then \
 		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
 	fi
 	@for app in $(USER_APPS); do \

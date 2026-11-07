@@ -631,11 +631,11 @@ void kursor_graficzny_pozycja(int *x, int *y)
 
 void rysowanie_init(void)
 {
-    volatile uint8_t *mode_info = (volatile uint8_t *)0x50000;
+    volatile uint8_t *mode_info = (volatile uint8_t *)0x0500;
     uint32_t lfb_address = *(volatile uint32_t *)(mode_info + 0x28);
 
     if (lfb_address != 0) {
-        uint8_t wersja_vbe = *(volatile uint8_t *)0x500FF;
+        uint8_t wersja_vbe = *(volatile uint8_t *)0x05FF;
         uint16_t liniowy_pitch = 0;
         pamiec_graficzna = (volatile uint8_t *)lfb_address;
         framebuffer_pitch = *(volatile uint16_t *)(mode_info + 0x10);

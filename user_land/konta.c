@@ -171,9 +171,6 @@ void konta_obsluz(void)
     if (!zalogowano && !okno_konta.otwarte) {
         konta_start();
     }
-    if (!zalogowano) {
-        okno_narysuj(&okno_konta);
-    }
     char znak;
     while (keyboard_try_getchar(&znak)) {
         uint8_t ctrl = keyboard_ctrl_pressed();

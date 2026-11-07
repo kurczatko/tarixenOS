@@ -29,9 +29,8 @@ SECTIONS
         *(.data.*)
     } :data
 
-    .bss ALIGN(4) :
+    .bss 0x01000000 : AT(0x01000000)
     {
-        . = MAX(., 0x100000);
         __bss_start = .;
         *(COMMON)
         *(.bss)

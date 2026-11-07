@@ -46,7 +46,7 @@ static void browser_narysuj(int x, int y, int szerokosc, int wysokosc) {
             i--;
             continue;
         }
-        rysuj_znak_user(cx, cy, c, 0x00000000);
+        rysuj_znak(cx, cy, c, 0x00000000);
         char_x += 8;
     }
 }
