@@ -186,6 +186,28 @@ static void menu_start_narysuj(void)
     rysuj_prostokat(MENU_X + 6, MENU_Y + 192, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 202, "GRA", KOLOR_TEKST_BIALY);
 
+    static const uint8_t ikona_pada[12][12] = {
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,1,1,0,0,0,0,1,1,0,0},
+        {0,1,1,1,1,1,1,1,1,1,1,0},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,0,1,1,1,1,1,1,0,1,1},
+        {1,0,0,0,1,0,0,1,0,1,0,1},
+        {1,1,0,1,1,1,1,1,1,0,1,1},
+        {1,1,1,1,1,1,1,1,1,1,1,1},
+        {1,1,1,0,0,0,0,0,0,1,1,1},
+        {0,1,1,0,0,0,0,0,0,1,1,0},
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0,0,0,0,0}
+    };
+    for (int iy = 0; iy < 12; iy++) {
+        for (int ix = 0; ix < 12; ix++) {
+            if (ikona_pada[iy][ix]) {
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 200 + iy, KOLOR_SZARY);
+            }
+        }
+    }
+
     rysuj_prostokat(MENU_X + 6, MENU_Y + 228, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 238, "MALOWANIE", KOLOR_TEKST_BIALY);
 
