@@ -5561,3 +5561,142 @@ radeon_8500_init();
 ```
 
 Nagłówek `drivers/karty_graficzne/radeon_8500.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_8500.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+
+## sterownik 3dfx Voodoo2 - rust/drivers/karty_graficzne/3dfx/voodoo2.rs
+
+zaawansowany sterownik karty graficznej 3dfx Voodoo2 (chip SST2, architektura Voodoo2) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (vendor 0x121A, urzadzenie 0x0005), mapowanie MMIO (baza 0xF0000000) i ramki graficznej (baza 0xE0000000), soft-reset chipa, inicjalizacje pelnego potoku graficzny (FBZ mode, tryb alpha, mgla, chroma key, stipple, format koloru, dithering, bufor koloru, bufor pomocniczy, rejestry FBI, kolor mgly, referencja alpha, tryb tekstury, baza tekstury, jednostki tekstury, setup trojkata, blendowanie, test glebi, stencil, mgla, filtrowanie trilinearne, viewport, scissor), wlaczenie zaawansowanej akceleracji 3D oraz pelny zestaw funkcji rysowania 3D (trojekaty, linie, czyszczenie ekranu, viewport, macierze rzutowania/swiata/widoku, test glebi, blendowanie, funkcje blendowania, tryb cienia, ramka druciana, multisampling, antyaliasing, granice glebi, stencil, operacje stencil, rownanie blendowania, kolor blendowania, operacja logiczna, dithering, offset wielokata, probka probkowania, tablice wierzcholkow/indeksow, rysowanie tablic/elementow/instancji, programy shadera, uniformy, tekstury, renderbuffery, framebuffery, blit, odczyt pikseli, finish, flush, status). napisany w Rust z `#[no_std]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/3dfx/*.rs)`) i linkowany do jadra.
+
+### voodoo2_init
+
+inicjalizuje sterownik Voodoo2: wykrywa urzadzenie na PCI, wykonuje soft-reset, czeka na bezczynnosc, konfiguruje wszystkie rejestry potoku graficznego i wlacza akceleracje 3D. zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+```
+bool voodoo2_init(void);
+```
+
+### voodoo2_detected
+
+sprawdza czy karta 3dfx Voodoo2 jest wykryta na PCI (porownuje vendor ID i device ID). zwraca 1 gdy wykryta, 0 gdy nie.
+
+```
+bool voodoo2_detected(void);
+```
+
+### voodoo2_draw_triangle_3d
+
+rysuje trojkat 3D o wierzcholkach (x1,y1,z1), (x2,y2,z2), (x3,y3,z3) i podanym kolorze.
+
+```
+void voodoo2_draw_triangle_3d(int x1, int y1, int z1, int x2, int y2, int z2, int x3, int y3, int z3, uint32_t color);
+```
+
+### voodoo2_clear_screen_3d
+
+czysci ekran podanym kolorem w trybie 3D.
+
+```
+void voodoo2_clear_screen_3d(uint32_t color);
+```
+
+### voodoo2_set_viewport
+
+ustawia viewport (prostokat wyswietlania) na pozycji (x, y) o rozmiarze (width, height).
+
+```
+void voodoo2_set_viewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+```
+
+### voodoo2_set_projection_matrix / voodoo2_set_world_matrix / voodoo2_set_view_matrix
+
+ustawia macierz rzutowania, swiata lub widoku (4x4, podana jako wskaznik na `Matrix4x4`).
+
+```
+void voodoo2_set_projection_matrix(const Matrix4x4 *matrix);
+void voodoo2_set_world_matrix(const Matrix4x4 *matrix);
+void voodoo2_set_view_matrix(const Matrix4x4 *matrix);
+```
+
+### voodoo2_enable_depth_test / voodoo2_enable_blending
+
+wlacza lub wylacza test glebi lub blendowanie.
+
+```
+void voodoo2_enable_depth_test(bool enabled);
+void voodoo2_enable_blending(bool enabled);
+```
+
+### voodoo2_set_blend_func
+
+ustawia funkcje blendowania zrodlo (src) i cel (dst).
+
+```
+void voodoo2_set_blend_func(uint32_t src, uint32_t dst);
+```
+
+### voodoo2_set_depth_func
+
+ustawia funkcje porownania glebi.
+
+```
+void voodoo2_set_depth_func(uint32_t func);
+```
+
+### voodoo2_set_cull_mode
+
+ustawia tryb cienia (culling) trojkatow.
+
+```
+void voodoo2_set_cull_mode(uint32_t mode);
+```
+
+### voodoo2_set_wireframe
+
+wlacza lub wylacza tryb ramki drucianej (wireframe).
+
+```
+void voodoo2_set_wireframe(bool enabled);
+```
+
+### voodoo2_set_multisample_count / voodoo2_enable_multisampling
+
+ustawia liczbe probek multisampling lub wlacza/wylacza multisampling.
+
+```
+void voodoo2_set_multisample_count(uint32_t count);
+void voodoo2_enable_multisampling(bool enabled);
+```
+
+### voodoo2_enable_antialiasing
+
+wlacza lub wylacza wygładzanie krawedzi (antialiasing).
+
+```
+void voodoo2_enable_antialiasing(bool enabled);
+```
+
+### voodoo2_finish / voodoo2_flush
+
+czeka az GPU zakonczy wszystkie operacje (finish) lub wymusza wykonanie oczekujacych polecen (flush).
+
+```
+void voodoo2_finish(void);
+void voodoo2_flush(void);
+```
+
+### voodoo2_get_status
+
+zwraca aktualny status rejestru karty graficznej.
+
+```
+uint32_t voodoo2_get_status(void);
+```
+
+### Integracja z jądrem
+
+Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
+
+```
+voodoo2_init();
+```
+
+Wszystkie funkcje eksportowane sa jako C (`#[no_mangle] pub extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `rust/drivers/karty_graficzne/3dfx/voodoo2.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/3dfx/*.rs)`).
