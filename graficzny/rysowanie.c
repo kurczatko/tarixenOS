@@ -63,7 +63,7 @@ static int kursor_y;
 static void narysuj_kursor_bitmapa(int x, int y);
 
 uint32_t *obraz = (uint32_t *)0x00400000;
-#define TAPETA_BITMAPA_ADRES (0x00400000u + EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4u)
+#define TAPETA_BITMAPA_ADRES 0x02000000u
 #define TAPETA_BITMAPA_BAJTY (EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4u)
 #define PLIK_TAPETA_CIEMNA "TAPETA.RAW"
 #define PLIK_TAPETA_JASNA "TAPETAJ.RAW"

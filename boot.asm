@@ -57,7 +57,7 @@ boot_start:
     pop es
     int 0x10
 
-    mov si, video_modes
+    mov si, VBE_CONTROLLER_BUFFER + 0x0E
 video_mode_loop:
     mov cx, [si]
     cmp cx, 0xFFFF
@@ -73,9 +73,9 @@ video_mode_loop:
     and ax, 0x0091
     cmp ax, 0x0091
     jne video_mode_next
-    cmp word [VBE_INFO_BUFFER + 0x12], 1280
+    cmp word [VBE_INFO_BUFFER + 0x12], 1920
     jne video_mode_next
-    cmp word [VBE_INFO_BUFFER + 0x14], 1024
+    cmp word [VBE_INFO_BUFFER + 0x14], 1080
     jne video_mode_next
     cmp byte [VBE_INFO_BUFFER + 0x19], 24
     je video_mode_depth_ok
@@ -127,8 +127,6 @@ video_mode_error:
     hlt
     jmp video_mode_error
 
-video_modes:
-    dw 0x011B, 0x0144, 0x0118, 0xFFFF
 selected_vbe_mode:
     dw 0
 video_mode_ready:
