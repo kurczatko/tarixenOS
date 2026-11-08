@@ -5969,3 +5969,18 @@ bool nvidia_gtx_1060_driver_detected(void);
 ```
 
 Plik zrodlowy `rust/drivers/karty_graficzne/nvidia/gtx_1060.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra. Gdy `rustc` jest dostepny, silne symbole z obiektu Rust nadpisuja weak definicje C w `kernel/kernel.c`.
+
+## pasek zadan - zaawansowane rozmycie gaussowskie (aero) - graficzny/rysowanie.c
+
+Pasek zadan (`narysuj_pasek_zadan`) wykorzystuje zaawansowane rozmycie gaussowskie w stylu systemu Windows Aero. Tapeta wyswietlana pod paskiem jest rozmyta i nakladana na kolor paska z zadania, tworzac efekt przezroczystego, rozmytego szkola.
+
+Algorytm rozmycia gaussowskiego:
+1. Funkcja `tapeta_piksel(x, y)` pobiera piksel tapety z podanej pozycji z obsluga krawedzi (clamping) i obsluga trzech trybow tapety: wczytany bitmapa RAW, gradientowy i kolor stalowy.
+2. Funkcja `rozmyj_pasek_zadan()` wykonuje dwukierunkowe separowalne rozmycie gaussowskie z 9-elementowym jadrem gaussa: {1, 4, 9, 14, 16, 14, 9, 4, 1} o sumie 72.
+3. Najpierw wykonuje sie rozmycie w kierunku poziomym (prawo-lewo) dla kazdego wiersza paska z zadan, zapisujac wyniki do bufora tymczasowego `blur_temp`.
+4. Nastepnie wykonuje sie rozmycie w kierunku pionowym (gora-dol) na buforze tymczasowym, lacznie z obsluga krawedzi paska (clamping do range 0..PASEK_ZADAN_WYSOKOSC-1).
+5. Rozmyty obraz tapety jest laczony z kolorem paska (`KOLOR_PASKA_ZADAN`) za pomoca blendowania alfa.
+6. Wartosc alpha jest zmienna wzdosupie osi pionowej paska (gradient alpha): na krawedziach paska alpha jest mniejsza (wiecej przezroczystosci), w srodku wieksza (mniej przezroczystosci), co daje naturalny efekt szkla aero.
+7. Wszystkie operacje wykonuje sie na kanale RGB rozdzielczo, z dzieleniem przez 255 na koncu.
+
+Wynikiem jest pasek z zadan ktory rozmywa tapete pod soba i ma przezroczysty, szklany wygląd w stylu aero, z ikonami minimalizowanych okien, zegarem, ikona internetu i ikona bluetooth rysowanymi na wierzchu rozmytego tla.

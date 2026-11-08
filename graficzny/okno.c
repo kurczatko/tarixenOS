@@ -118,6 +118,7 @@ void okno_odrysuj_wszystkie(void)
         if (okna[indeks] && okna[indeks]->otwarte && !okna[indeks]->zminimalizowane)
             narysuj_okno_bez_odswiezania(okna[indeks]);
     pasek_zadan_rysuj_ikony_minimalizowanych();
+    narysuj_pasek_zadan();
     odswiez_widok();
 }
 

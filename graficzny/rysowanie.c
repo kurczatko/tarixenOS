@@ -3,6 +3,7 @@
 #include "okno.h"
 #include "../system_plikow/system_plikow.h"
 #include "../../drivers/bluetooth/bluetooth.h"
+#include "menu_start.h"
 
 #define CURSOR_W 12
 #define CURSOR_H 18
@@ -100,8 +101,6 @@ static void narysuj_czas_paska(void)
 {
     int x = EKRAN_SZEROKOSC - 108;
     int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 11;
-    rysuj_prostokat(x - 4, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
-                    84, PASEK_ZADAN_WYSOKOSC, KOLOR_PASKA_ZADAN);
     rysuj_tekst_chicago(x, y, czas_paska, KOLOR_BIALY);
 }
 
@@ -225,12 +224,6 @@ void pasek_zadan_rysuj_ikony_minimalizowanych(void)
 {
     int x = PASEK_ICON_START_X;
     int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 3;
-    int koniec_x = EKRAN_SZEROKOSC - 120;
-    for (int cx = x; cx < koniec_x; cx++) {
-        for (int cy = y; cy < y + PASEK_ICON_H; cy++) {
-            rysuj_piksel(cx, cy, KOLOR_PASKA_ZADAN);
-        }
-    }
     x = PASEK_ICON_START_X;
     for (int i = 0; i < okno_liczba_okien(); i++) {
         struct okno *okno = okno_pobierz_okno(i);
@@ -335,6 +328,8 @@ void odswiez_widok(void)
     narysuj_kursor_bitmapa(kursor_x, kursor_y);
 }
 
+static void rozmyj_pasek_zadan(void);
+
 void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
 {
     if (x < 0) {
@@ -353,7 +348,7 @@ void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
         uint32_t offset = (uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)x;
         for (int px = 0; px < szerokosc; px++) {
             if (py >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) {
-                obraz[offset + px] = KOLOR_PASKA_ZADAN;
+                continue;
             } else if (tapeta_bitmapa_wczytana) {
                 obraz[offset + px] = tapeta_bitmapa[offset + px];
             } else {
@@ -419,13 +414,79 @@ static void narysuj_kursor_bitmapa(int x, int y)
     }
 }
 
+#define BLUR_RADIUS 4
+static const int gauss_kernel[9] = {1, 4, 9, 14, 16, 14, 9, 4, 1};
+#define GAUSS_SUM 72
+static uint32_t blur_temp[EKRAN_SZEROKOSC * PASEK_ZADAN_WYSOKOSC];
+
+static uint32_t tapeta_piksel(int x, int y)
+{
+    if (x < 0) x = 0;
+    if (x >= EKRAN_SZEROKOSC) x = EKRAN_SZEROKOSC - 1;
+    if (y < 0) y = 0;
+    if (y >= EKRAN_WYSOKOSC) y = EKRAN_WYSOKOSC - 1;
+    if (tapeta_bitmapa_wczytana) {
+        return tapeta_bitmapa[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x];
+    }
+    if (tapeta_gradientowa) {
+        return kolor_tla_dla_x(x);
+    }
+    return kolor_tapety;
+}
+
+static void rozmyj_pasek_zadan(void)
+{
+    int paske_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+
+    for (int py = 0; py < PASEK_ZADAN_WYSOKOSC; py++) {
+        int y = paske_y + py;
+        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+            uint32_t r = 0, g = 0, b = 0;
+            for (int k = 0; k < 9; k++) {
+                int sx = x + (k - 4);
+                uint32_t px = tapeta_piksel(sx, y);
+                int w = gauss_kernel[k];
+                r += ((px >> 16) & 0xFF) * w;
+                g += ((px >> 8) & 0xFF) * w;
+                b += (px & 0xFF) * w;
+            }
+            blur_temp[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)x] =
+                (r / GAUSS_SUM << 16) | (g / GAUSS_SUM << 8) | (b / GAUSS_SUM);
+        }
+    }
+
+    for (int py = 0; py < PASEK_ZADAN_WYSOKOSC; py++) {
+        int y = paske_y + py;
+        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+            uint32_t r = 0, g = 0, b = 0;
+            for (int k = 0; k < 9; k++) {
+                int sy = py + (k - 4);
+                if (sy < 0) sy = 0;
+                if (sy >= PASEK_ZADAN_WYSOKOSC) sy = PASEK_ZADAN_WYSOKOSC - 1;
+                uint32_t px = blur_temp[(uint32_t)sy * EKRAN_SZEROKOSC + (uint32_t)x];
+                int w = gauss_kernel[k];
+                r += ((px >> 16) & 0xFF) * w;
+                g += ((px >> 8) & 0xFF) * w;
+                b += (px & 0xFF) * w;
+            }
+            uint32_t blurred = (r / GAUSS_SUM << 16) | (g / GAUSS_SUM << 8) | (b / GAUSS_SUM);
+
+            uint32_t taskbar = KOLOR_PASKA_ZADAN;
+            int krawedz = py < 2 ? py : (py > PASEK_ZADAN_WYSOKOSC - 3 ? PASEK_ZADAN_WYSOKOSC - 1 - py : 2);
+            uint32_t alpha = 60 + krawedz * 15;
+            r = ((blurred >> 16) & 0xFF) * (255 - alpha) + ((taskbar >> 16) & 0xFF) * alpha;
+            g = ((blurred >> 8) & 0xFF) * (255 - alpha) + ((taskbar >> 8) & 0xFF) * alpha;
+            b = (blurred & 0xFF) * (255 - alpha) + (taskbar & 0xFF) * alpha;
+
+            obraz[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x] = (r / 255 << 16) | (g / 255 << 8) | (b / 255);
+        }
+    }
+}
+
 void narysuj_pasek_zadan(void)
 {
-    uint32_t start = (uint32_t)(EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) * EKRAN_SZEROKOSC;
-    uint32_t size = (uint32_t)PASEK_ZADAN_WYSOKOSC * EKRAN_SZEROKOSC;
-    for (uint32_t i = 0; i < size; i++) {
-        obraz[start + i] = KOLOR_PASKA_ZADAN;
-    }
+    rozmyj_pasek_zadan();
+    menu_start_rysuj_przycisk();
     pasek_zadan_rysuj_ikony_minimalizowanych();
     narysuj_czas_paska();
     narysuj_ikone_internetu();
