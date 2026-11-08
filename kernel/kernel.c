@@ -50,6 +50,8 @@ bool gtx_1080_ti_driver_init(void);
 bool gtx_1080_ti_driver_detected(void);
 bool intel_82578dc_driver_init(void);
 bool intel_82578dc_driver_detected(void);
+bool __attribute__((weak)) amd_hd_4730_driver_init(void) { return false; }
+bool __attribute__((weak)) amd_hd_4730_driver_detected(void) { return false; }
 #include "proces.h"
 #include "driver_manager.h"
 #include "timer.h"
@@ -110,6 +112,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("rx_9070_xt", rx_9070_xt_init, rx_9070_xt_shutdown, 0, 4);
     driver_manager_register("radeon_6870", radeon_6870_init, radeon_6870_shutdown, 0, 4);
     driver_manager_register("amd_r7_265", amd_r7_265_driver_init, 0, 0, 4);
+    driver_manager_register("hd_4730", amd_hd_4730_driver_init, 0, 0, 4);
     driver_manager_register("gtx_1080_ti", gtx_1080_ti_driver_init, 0, 0, 4);
     driver_manager_register("intel_82578dc_wifi", intel_82578dc_driver_init, 0, 0, 4);
     driver_manager_register("qemu_vga", qemu_vga_init, 0, 0, 4);
