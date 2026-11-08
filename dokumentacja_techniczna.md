@@ -1994,7 +1994,7 @@ void *gma_x4500_get_fb(void)
 
 ### gma_x4500_get_width / gma_x4500_get_height
 
-zwracaja szerokosc i wysokosc ekranu (1024x768).
+zwracaja szerokosc i wysokosc ekranu (1280x1024).
 
 ```
 uint32_t gma_x4500_get_width(void);
@@ -2378,7 +2378,7 @@ void *radeon_hd_8370d_get_fb(void)
 
 ### radeon_hd_8370d_get_width / radeon_hd_8370d_get_height
 
-zwracaja szerokosc i wysokosc ekranu (1024x768).
+zwracaja szerokosc i wysokosc ekranu (1280x1024).
 
 ```
 uint32_t radeon_hd_8370d_get_width(void);
@@ -2773,7 +2773,7 @@ void *radeon_6790_get_fb(void)
 
 ### radeon_6790_get_width / radeon_6790_get_height
 
-zwracaja szerokosc i wysokosc ekranu (1920x1080).
+zwracaja szerokosc i wysokosc ekranu (1280x1024).
 
 ```
 uint32_t radeon_6790_get_width(void);
@@ -5371,7 +5371,7 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 
 | funkcja | opis |
 |---------|------|
-| `int radeon_8500_init(void)` | Inicjalizuje sterownik Radeon 8500: wyszukuje urzadzenie na PCI (vendor 0x1002, R200), mapuje adresy MMIO, czysci przerwania, konfiguruje silnik wyswietlania (CRTC, plane, surface, 1024x768), resetuje i inicjalizuje Command Processor (ring buffer), konfiguruje potok 3D (color buffer, depth buffer, blend, rasterizer, shader SQ), inicjalizuje kursor sprhetowy. Zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie. |
+| `int radeon_8500_init(void)` | Inicjalizuje sterownik Radeon 8500: wyszukuje urzadzenie na PCI (vendor 0x1002, R200), mapuje adresy MMIO, czysci przerwania, konfiguruje silnik wyswietlania (CRTC, plane, surface, 1280x1024), resetuje i inicjalizuje Command Processor (ring buffer), konfiguruje potok 3D (color buffer, depth buffer, blend, rasterizer, shader SQ), inicjalizuje kursor sprhetowy. Zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie. |
 | `int radeon_8500_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy. |
 | `void radeon_8500_shutdown(void)` | Zatrzymuje Command Processor (ME i PFP Halt), przechodzi w stan zasilania D3 i oznacza sterownik jako nieinicjalizowany. |
 
@@ -5546,7 +5546,7 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 | `RADEON_8500_VENDOR_ID` | ID dostawcy ATI/AMD (0x1002). |
 | `RADEON_8500_DEVICE_ID_8500` | ID urzadzenia Radeon 8500 (0x4C48) oraz warianty LE i inne (0x4C4D/0x4C56/0x4C57/0x514C/0x514E/0x514F). |
 | `RADEON_8500_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (64 MB). |
-| `RADEON_8500_FB_WIDTH / RADEON_8500_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1024x768). |
+| `RADEON_8500_FB_WIDTH / RADEON_8500_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1280x1024). |
 | `RADEON_8500_FB_PITCH` | Pitch ramki graficznej (4096 bajtow). |
 | `RADEON_8500_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
 | `radeon_8500_handle_t` | Typ handle zasobu (uint32_t). |
@@ -5993,3 +5993,7 @@ Biale tlo wnetrza okien (plikow, przegladarki, menedzera zadan itp.) rowniez kor
 2. `rysuj_prostokat_polprzezroczysty()` naklada biale tlo (`KOLOR_OKNA`) z alpha=70 na rozmyte tlo, co daje efekt szkla aero na wnetrzu okna.
 
 Dzieki temu przesuwanie okna powoduje dynamiczna zmiane rozmycia w zaleznosci od tego co znajduje sie pod nim, a caly system zachowuje sprawnosc thanks to ograniczeniu blur do tylko obszaru wnetrza okna (nie calego ekranu) oraz uzyciu malego 5-elementowego jadra gaussa.
+
+## przycisk menu start - graficzny/menu_start.c
+
+Przycisk otwierajacy menu start rowniez korzysta z tego samego rozmycia gaussa co pasek zadan i ramki okien. Funkcja `menu_start_rysuj_przycisk` wywoluje `rozmyj_prostokat()` na obszarze przycisku przed narysowaniem jego tla (`KOLOR_PRZYCISKU_START`) z alpha=70, co daje spójny efekt szkla aero w calym interfejsie systemu.

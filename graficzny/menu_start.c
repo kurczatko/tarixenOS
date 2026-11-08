@@ -51,7 +51,8 @@ void menu_start_rysuj_przycisk(void)
         {0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
         {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0}
     };
-    rysuj_prostokat(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC, KOLOR_PRZYCISKU_START);
+    rozmyj_prostokat(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC);
+    rysuj_prostokat_polprzezroczysty(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC, KOLOR_PRZYCISKU_START, 70);
     
     for (int iy = 0; iy < 16; iy++) {
         for (int ix = 0; ix < 16; ix++) {

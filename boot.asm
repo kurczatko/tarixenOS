@@ -73,9 +73,9 @@ video_mode_loop:
     and ax, 0x0091
     cmp ax, 0x0091
     jne video_mode_next
-    cmp word [VBE_INFO_BUFFER + 0x12], 1024
+    cmp word [VBE_INFO_BUFFER + 0x12], 1280
     jne video_mode_next
-    cmp word [VBE_INFO_BUFFER + 0x14], 768
+    cmp word [VBE_INFO_BUFFER + 0x14], 1024
     jne video_mode_next
     cmp byte [VBE_INFO_BUFFER + 0x19], 24
     je video_mode_depth_ok
