@@ -328,8 +328,6 @@ void odswiez_widok(void)
     narysuj_kursor_bitmapa(kursor_x, kursor_y);
 }
 
-static void rozmyj_pasek_zadan(void);
-
 void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
 {
     if (x < 0) {
@@ -492,6 +490,84 @@ void narysuj_pasek_zadan(void)
     narysuj_ikone_internetu();
     bluetooth_ui_rysuj_pasek();
     odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
+}
+
+static const int gauss_kernel_5[5] = {1, 4, 6, 4, 1};
+#define GAUSS_SUM_5 16
+static uint32_t blur_row_temp[EKRAN_SZEROKOSC];
+
+void rozmyj_prostokat(int x, int y, int szerokosc, int wysokosc)
+{
+    if (x < 0) { szerokosc += x; x = 0; }
+    if (y < 0) { wysokosc += y; y = 0; }
+    if (x + szerokosc > EKRAN_SZEROKOSC) szerokosc = EKRAN_SZEROKOSC - x;
+    if (y + wysokosc > EKRAN_WYSOKOSC) wysokosc = EKRAN_WYSOKOSC - y;
+    if (szerokosc <= 0 || wysokosc <= 0) return;
+
+    for (int py = y; py < y + wysokosc; py++) {
+        for (int px = x; px < x + szerokosc; px++) {
+            uint32_t r = 0, g = 0, b = 0;
+            for (int k = 0; k < 5; k++) {
+                int sx = px + (k - 2);
+                if (sx < 0) sx = 0;
+                if (sx >= EKRAN_SZEROKOSC) sx = EKRAN_SZEROKOSC - 1;
+                uint32_t p = obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)sx];
+                int w = gauss_kernel_5[k];
+                r += ((p >> 16) & 0xFF) * w;
+                g += ((p >> 8) & 0xFF) * w;
+                b += (p & 0xFF) * w;
+            }
+            blur_row_temp[px] = (r / GAUSS_SUM_5 << 16) | (g / GAUSS_SUM_5 << 8) | (b / GAUSS_SUM_5);
+        }
+        for (int px = x; px < x + szerokosc; px++) {
+            obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)px] = blur_row_temp[px];
+        }
+    }
+
+    for (int px = x; px < x + szerokosc; px++) {
+        for (int py = y; py < y + wysokosc; py++) {
+            uint32_t r = 0, g = 0, b = 0;
+            for (int k = 0; k < 5; k++) {
+                int sy = py + (k - 2);
+                if (sy < 0) sy = 0;
+                if (sy >= EKRAN_WYSOKOSC) sy = EKRAN_WYSOKOSC - 1;
+                uint32_t p = obraz[(uint32_t)sy * EKRAN_SZEROKOSC + (uint32_t)px];
+                int w = gauss_kernel_5[k];
+                r += ((p >> 16) & 0xFF) * w;
+                g += ((p >> 8) & 0xFF) * w;
+                b += (p & 0xFF) * w;
+            }
+            uint32_t blurred = (r / GAUSS_SUM_5 << 16) | (g / GAUSS_SUM_5 << 8) | (b / GAUSS_SUM_5);
+
+            uint32_t taskbar = KOLOR_PASKA_ZADAN;
+            uint32_t alpha = 70;
+            r = ((blurred >> 16) & 0xFF) * (255 - alpha) + ((taskbar >> 16) & 0xFF) * alpha;
+            g = ((blurred >> 8) & 0xFF) * (255 - alpha) + ((taskbar >> 8) & 0xFF) * alpha;
+            b = (blurred & 0xFF) * (255 - alpha) + (taskbar & 0xFF) * alpha;
+
+            obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)px] = (r / 255 << 16) | (g / 255 << 8) | (b / 255);
+        }
+    }
+}
+
+void rysuj_prostokat_polprzezroczysty(int x, int y, int szerokosc, int wysokosc, uint32_t kolor, uint32_t alpha)
+{
+    if (x < 0) { szerokosc += x; x = 0; }
+    if (y < 0) { wysokosc += y; y = 0; }
+    if (x + szerokosc > EKRAN_SZEROKOSC) szerokosc = EKRAN_SZEROKOSC - x;
+    if (y + wysokosc > EKRAN_WYSOKOSC) wysokosc = EKRAN_WYSOKOSC - y;
+    if (szerokosc <= 0 || wysokosc <= 0) return;
+
+    for (int py = y; py < y + wysokosc; py++) {
+        uint32_t offset = (uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)x;
+        for (int px = 0; px < szerokosc; px++) {
+            uint32_t dest = obraz[offset + px];
+            uint32_t r = ((dest >> 16) & 0xFF) * (255 - alpha) + ((kolor >> 16) & 0xFF) * alpha;
+            uint32_t g = ((dest >> 8) & 0xFF) * (255 - alpha) + ((kolor >> 8) & 0xFF) * alpha;
+            uint32_t b = (dest & 0xFF) * (255 - alpha) + (kolor & 0xFF) * alpha;
+            obraz[offset + px] = (r / 255 << 16) | (g / 255 << 8) | (b / 255);
+        }
+    }
 }
 
 void wypelnij_ekran(uint32_t kolor)

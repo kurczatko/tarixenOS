@@ -22,6 +22,8 @@ struct okno;
 
 void rysowanie_init(void);
 void narysuj_pasek_zadan(void);
+void rozmyj_prostokat(int x, int y, int szerokosc, int wysokosc);
+void rysuj_prostokat_polprzezroczysty(int x, int y, int szerokosc, int wysokosc, uint32_t kolor, uint32_t alpha);
 void wypelnij_ekran(uint32_t kolor);
 void rysuj_piksel(int x, int y, uint32_t kolor);
 void rysuj_prostokat(int x, int y, int szerokosc, int wysokosc, uint32_t kolor);

@@ -28,9 +28,10 @@ static int schowek_dlugosc;
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
-    rysuj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI);
-    rysuj_prostokat(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
-                    okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
+    rozmyj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
+    rysuj_prostokat_polprzezroczysty(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI, 60);
+    rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
+                    okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 85);
     rysuj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA);
     rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
     rysuj_prostokat(okno->x + okno->szerokosc - 64, okno->y + 4, 16, 16, 0x004A5D6E);
