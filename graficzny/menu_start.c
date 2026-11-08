@@ -118,10 +118,11 @@ static void menu_start_narysuj(void)
         {1,1,1,1,1,1,1,1,1,1,1,1}
     };
 
-    rysuj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, KOLOR_RAMKA_MENU);
-    rysuj_prostokat(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, KOLOR_TLO_MENU);
+    rozmyj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
+    rysuj_prostokat_polprzezroczysty(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, KOLOR_RAMKA_MENU, 80);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, KOLOR_TLO_MENU, 75);
     
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 12, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 12, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 22, "NOTATNIK", KOLOR_TEKST_BIALY);
 
     for (int iy = 0; iy < 12; iy++) {
@@ -132,7 +133,7 @@ static void menu_start_narysuj(void)
         }
     }
     
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 48, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 48, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 58, "WYLACZ", KOLOR_TEKST_BIALY);
     
     for (int iy = 0; iy < 12; iy++) {
@@ -143,7 +144,7 @@ static void menu_start_narysuj(void)
         }
     }
     
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 84, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 84, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 94, "PLIKI", KOLOR_TEKST_BIALY);
 
     for (int iy = 0; iy < 12; iy++) {
@@ -169,7 +170,7 @@ static void menu_start_narysuj(void)
         {0,0,0,0,0,0,0,0,0,0,0,0}
     };
 
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 120, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 120, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 130, "WWW", KOLOR_TEKST_BIALY);
     for (int iy = 0; iy < 12; iy++) {
         for (int ix = 0; ix < 12; ix++) {
@@ -180,10 +181,10 @@ static void menu_start_narysuj(void)
         }
     }
 
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 156, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 156, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 166, "KALKULATOR", KOLOR_TEKST_BIALY);
 
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 192, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 192, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 202, "GRA", KOLOR_TEKST_BIALY);
 
     static const uint8_t ikona_pada[12][12] = {
@@ -208,10 +209,10 @@ static void menu_start_narysuj(void)
         }
     }
 
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 228, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 228, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 238, "MALOWANIE", KOLOR_TEKST_BIALY);
 
-    rysuj_prostokat(MENU_X + 6, MENU_Y + 264, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU);
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 264, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
     rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 274, "ZADANIA", KOLOR_TEKST_BIALY);
 
     static const uint8_t ikona_zadan[12][12] = {
