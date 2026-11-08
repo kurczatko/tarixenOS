@@ -5804,3 +5804,168 @@ Gdy urzadzenie cdrom jest aktywne, funkcje `read_sector`, `read_file`, `fs_list_
 Eksplorator plikow (`graficzny/eksplorator_plikow.c`) wyswietla opcje "CD-ROM" / "PLYTA OPTYCZNA" obok "DYSKIETKA" / "DYSK TWARDY" gdy naped plyty jest wykryty. Po wyborze plyty optycznej zostaje ona ustawiona jako aktywne urzadzenie systemu plikow, a zawartosc plyty jest wyswietlana w liscie plikow. Mozna entonces otwierac pliki .TXT, .C, .TSI oraz nawigowac po katalogach.
 
 Nagłówek `drivers/plyty.h` jest dołączany w `kernel/kernel.c`. Plik zrodlowy `drivers/plyty.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/*.cpp)`).
+
+## karta graficzna - rust/drivers/karty_graficzne/nvidia/gtx_1060.rs
+
+sterownik karty graficznej NVIDIA GeForce GTX 1060 (GP106, arquitectura Pascal) napisany w Rust. obsluguje pelny potok graficzny 2D i 3D, zaawansowana akceleracja 3D przez Command Processor (CP), przezroczystosc (alpha blending, alpha to coverage, blend equation, blend color, logic op), tekstury z mipmapami i filtrowaniem, shadery (vertex, fragment, geometry, compute, tessellation), uniformy (1f, 2f, 3f, 4f, matrix4fv), render targety, depth-stencil z depth bounds test, tessellation, stream output, zapytania okluzyjne, statystyki potoku, MSAA (multisampling), antialiasing, command buffer z ring bufferami (gfx, compute, dma) i doorbellami, presentation oraz depth test, stencil test, cull mode, wireframe, polygon offset, sample coverage, dither. sterownik opiera sie na architekturze Pascal (GP106, device id 0x1C60, vendor 0x10DE). napisany w Rust z `#[no_std]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra.
+
+inicjalizuje sterownik GTX 1060: wykrywa urzadzenie na PCI (vendor 0x10DE, urzadzenie 0x1C60), mapuje adresy MMIO (0xF0000000), VRAM (0xE0000000), GART (0xD0000000) i doorbelle (0xC0000000), wykonuje soft-reset Command Processor, inicjalizuje PMC, PGRAPH, FECS (context switch), GPCCS (zarzadzanie zasilaniem i zegarami), GPC, TPC, SM (shader multiprocessor), ROP, tekstury, shadery, compute, rasterizer, depth buffer, stencil, blend, color buffer (4 render targety), framebuffery, depth-stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index buffer, primitive buffer, uniform buffer, shader storage buffer, atomic counters, query objects, PCIe, power play (DPM, zegary, wentylator, temperatura), SMU (zarzadzanie zasilaniem GFX/UVD/VCE), ring buffery (gfx, compute, dma) oraz wlacza pelna akceleracje 3D. zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+zwraca 1 gdy karta GTX 1060 zostanie wykryta (poprawne vendor id, device id i revisja), 0 w przeciwnym razie.
+
+rysuje pojedynczy trojkat 3D na karcie graficznej. parametry x1,y1,z1, x2,y2,z2, x3,y3,z3 definiuja wierzcholki trojkata w przestrzeni 3D, color to kolor w formacie ARGB. komenda jest wysylana przez ring buffer Command Processor.
+
+rysuje pojedyncza linie 3D na karcie graficznej. parametry x1,y1,z1, x2,y2,z2 definiuja początek i koniec linii, color to kolor w formacie ARGB.
+
+czysci caly ekran 3D podanym kolorem. komenda jest wysylana przez Command Processor i oczekuje na zakonczenie operacji.
+
+ustawia viewport dla renderowania 3D. parametry x, y definiuja lewy gorny rog, width i height definiuja rozmiar obszaru renderowania.
+
+ustawia macierz rzutowania (projection matrix) dla potoku 3D. matrix to 16-elementowa tablica float (4x4) zapisana w formacie kolumnowym.
+
+ustawia macierz swiata (world matrix) dla potoku 3D. matrix to 16-elementowa tablica float (4x4) zapisana w formacie kolumnowym.
+
+ustawia macierz widoku (view matrix) dla potoku 3D. matrix to 16-elementowa tablica float (4x4) zapisana w formacie kolumnowym.
+
+wlacza lub wylacza test bufora glebokosci (depth test). enabled = 1 wlacza test, enabled = 0 wylacza.
+
+wlacza lub wylacza mieszanie kolorow (alpha blending). enabled = 1 wlacza blending, enabled = 0 wylacza.
+
+ustawia funkcje mieszania kolorow. src to funkcja zrodla (source blend factor), dst to funkcja celu (destination blend factor).
+
+ustawia funkcje testu bufora glebokosci. func to porownanie depths (np. mniej, rowne, wieksze).
+
+ustawia tryb usuwania tylich scian (culling). mode definiuje ktore sciany sa odrzucane (brak, przod, tyl, oba).
+
+wlacza lub wylacza tryb siatki (wireframe). enabled = 1 rysuje tylko krawedzie wielokatow, enabled = 0 rysuje pelne wielokaty.
+
+ustawia liczbe probek dla multisamplingu (MSAA). count to liczba probek na piksel (np. 4 dla 4x MSAA).
+
+wlacza lub wylacza multisampling (MSAA). enabled = 1 wlacza wygładzanie krawedzi, enabled = 0 wylacza.
+
+wlacza lub wylacza antialiasing. enabled = 1 wlacza wygładzanie, enabled = 0 wylacza.
+
+wlacza lub wylacza test depth bounds. enabled = 1 wlacza test zakresu glebokosci, min i max definiuja dolny i gorny zakres glebokosci.
+
+wlacza lub wylacza test stencila. enabled = 1 wlacza test, func to porownanie, ref_value to wartosc referencyjna, mask to maska bitowa.
+
+ustawia operacje stencila. fail to operacja gdy test stencila nie powiedzie sie, zfail gdy test stencila przejdzie ale test depth nie, zpass gdy oba testy przejda.
+
+ustawia rownanie mieszania (blend equation). rgb to rownanie dla kanalow RGB, alpha to rownanie dla kanalu alpha.
+
+ustawia stalowy kolor mieszania (blend color). color to kolor uzywany w rownaniach mieszania.
+
+ustawia operacje logiczna (logic op) dla bufora koloru. op to operacja logiczna (np. AND, OR, XOR, COPY), enabled wlacza lub wylacza operacje logiczna.
+
+wlacza lub wylacza dithering. enabled = 1 wlacza dithering dla gradacji kolorow, enabled = 0 wylacza.
+
+ustawia polygon offset. enabled = 1 wlacza offset, factor to mnoznik nachylenia, units to stalowy offset w jednostkach depth.
+
+ustawia probkowanie probek (sample coverage). value to wartosc pokrycia probek (0.0-1.0), invert odwraca mazke pokrycia.
+
+ustawia tablice wierzcholkow (vertex array). buffer to adres bufora w VRAM, stride to odstep miedzy wierzcholkami, offset to poczatkowe przesuniecie.
+
+ustawia tablice indeksow (index array). buffer to adres bufora indeksow, format to typ indeksow (16-bit lub 32-bit), offset to przesuniecie.
+
+rysuje wielokaty z tablicy wierzcholkow (draw arrays). mode to typ primitive (trojkaty, linie, punkty), first to indeks pierwszego wierzcholka, count to liczba wierzcholkow.
+
+rysuje wielokaty z tablicy indeksow (draw elements). mode to typ primitive, count to liczba indeksow, type_ to typ indeksow, offset to przesuniecie w buforze indeksow.
+
+rysuje wielokaty z tablicy wierzcholkow z instancjami (draw instanced). mode to typ primitive, first, count, instance_count to liczba instancji.
+
+rysuje wielokaty z tablicy indeksow z instancjami (draw elements instanced). mode, count, type_, offset, instance_count.
+
+ustawia aktywny program shaderow. program_id to identyfikator programu shaderow wbudowanego w GPU.
+
+ustawia uniform typu float (1f). location to lokalizacja uniform, value to wartosc float.
+
+ustawia uniform typu vec2 (2f). location to lokalizacja, x i y to wartosci.
+
+ustawia uniform typu vec3 (3f). location to lokalizacja, x, y, z to wartosci.
+
+ustawia uniform typu vec4 (4f). location to lokalizacja, x, y, z, w to wartosci.
+
+ustawia uniform typu macierz 4x4 (matrix4fv). location to lokalizacja uniform, matrix to 16-elementowa tablica float.
+
+binduje teksture do jednostki teksturyjnej. unit to indeks jednostki (0-N), texture_id to id tekstury.
+
+binduje framebuffer do renderowania. framebuffer_id to id framebuffera.
+
+binduje renderbuffer. renderbuffer_id to id renderbuffera.
+
+tworzy teksture na karcie graficznej. width i height to wymiary, format to format pikseli. zwraca id nowej tekstury.
+
+usuwa teksture o podanym id.
+
+przesyla dane tekstury do GPU. texture_id to id tekstury, data to wskaznik na dane w pamieci, size to rozmiar w bajtach.
+
+generuje mipmapy dla tekstury. texture_id to id tekstury.
+
+ustawia filtry tekstury. texture_id to id tekstury, min_filter to filtr minimalizacji, mag_filter to filtr powiekienia.
+
+ustawia owijanie tekstury (wrap). texture_id to id tekstury, wrap_s i wrap_t to tryby owijania osi S i T.
+
+tworzy renderbuffer. width i height to wymiary, format to format. zwraca id renderbuffera.
+
+usuwa renderbuffer o podanym id.
+
+tworzy framebuffer. zwraca id nowego framebuffera.
+
+usuwa framebuffer o podanym id.
+
+przypisuje teksture do framebuffera jako attachment. framebuffer_id to id framebuffera, attachment to punkt przyczepienia (np. COLOR_ATTACHMENT0), texture_id to id tekstury, mip_level to poziom mipmapy.
+
+przypisuje renderbuffer do framebuffera. framebuffer_id, attachment, renderbuffer_id.
+
+ustawia bufora rysowania (draw buffers). count to liczba attachmenetów, attachments to tablica id attachmenetów.
+
+ustawia bufor odczytu (read buffer). attachment to punkt przyczepienia od ktorego bedzie odczyt.
+
+kopiowanie obszaru miedzy framebufferami (blit). src_x0, src_y0, src_x1, src_y1 definuja zrodlo, dst_x0, dst_y0, dst_x1, dst_y1 definuja cel, mask to maska buforow (color, depth, stencil), filter to filtr skalowania.
+
+odczytuje piksele z framebuffera do pamieci. x, y, width, height definuja obszar, format i type definuja format wyjsciowy, pixels to wskaznik na bufor docelowy w pamieci.
+
+czeka na zakonczenie wszystkich operacji GPU (finish). wlacza barrier i czeka az Command Processor zakonczy wszystkie zadania.
+
+wyswietla wyrenderowana klatke (flush). wysyla komende flush do Command Processor.
+
+zwraca status rejestru karty graficznej. zwraca 32-bitowy rejestr statusu z MMIO.
+
+zwraca taktowanie rdzenia GPU (engine clock) w Hz.
+
+zwraca taktowanie pamieci VRAM (memory clock) w Hz.
+
+zwraca rozmiar pamieci VRAM w bajtach.
+
+zwraca liczbe rdzeni CUDA (GP106 ma 1280 rdzeni CUDA).
+
+zwraca liczba multiprocesorow strumieniowych (SM) (GP106 ma 10 SM).
+
+zwraca liczbe jednostek raster operacji (ROP) (GP106 ma 48 ROP).
+
+zwraca liczbe jednostek tekstur (GP106 ma 80 jednostek tekstur).
+
+zwraca szerokość magistrali pamieci w bitach (GP106 ma 192-bit).
+
+zwraca rozmiar cache wierzcholkow w bajtach.
+
+zwraca rozmiar bufora primitivow w bajtach.
+
+zwraca rozmiar bufora komend w bajtach.
+
+zwraca liczbe bledow sterownika (licznik bledow inicjalizacji i operacji MMIO).
+
+sterownik jest rejestrowany w `kernel/kernel.c` w funkcji `kernel_main`:
+
+```
+driver_manager_register("gtx_1060", nvidia_gtx_1060_driver_init, 0, 0, 4);
+```
+
+Deklaracje funkcji C (z atrybutem `__attribute__((weak))` jako fallback gdy Rust jest niedostepny):
+
+```
+bool nvidia_gtx_1060_driver_init(void);
+bool nvidia_gtx_1060_driver_detected(void);
+```
+
+Plik zrodlowy `rust/drivers/karty_graficzne/nvidia/gtx_1060.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra. Gdy `rustc` jest dostepny, silne symbole z obiektu Rust nadpisuja weak definicje C w `kernel/kernel.c`.
