@@ -5984,3 +5984,12 @@ Algorytm rozmycia gaussowskiego:
 7. Wszystkie operacje wykonuje sie na kanale RGB rozdzielczo, z dzieleniem przez 255 na koncu.
 
 Wynikiem jest pasek z zadan ktory rozmywa tapete pod soba i ma przezroczysty, szklany wygląd w stylu aero, z ikonami minimalizowanych okien, zegarem, ikona internetu i ikona bluetooth rysowanymi na wierzchu rozmytego tla.
+
+## rozmycie wnetrza okien - graficzny/okno.c
+
+Biale tlo wnetrza okien (plikow, przegladarki, menedzera zadan itp.) rowniez korzysta z tego samego rozmycia gaussa co ramki okien i pasek zadan. Funkcja `narysuj_okno_bez_odswiezania` wykonuje nastepujace kroki:
+
+1. `rozmyj_prostokat()` rozmywa obszar wnetrza okna z jadrem gaussa 5-elementowym {1, 4, 6, 4, 1}, co dynamicznie dostosowuje sie do tego co znajduje sie za oknem (tapeta, inne okna, pasek zadan).
+2. `rysuj_prostokat_polprzezroczysty()` naklada biale tlo (`KOLOR_OKNA`) z alpha=70 na rozmyte tlo, co daje efekt szkla aero na wnetrzu okna.
+
+Dzieki temu przesuwanie okna powoduje dynamiczna zmiane rozmycia w zaleznosci od tego co znajduje sie pod nim, a caly system zachowuje sprawnosc thanks to ograniczeniu blur do tylko obszaru wnetrza okna (nie calego ekranu) oraz uzyciu malego 5-elementowego jadra gaussa.
