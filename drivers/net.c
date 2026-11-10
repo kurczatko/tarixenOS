@@ -274,8 +274,34 @@ static uint16_t build_dns_query(uint8_t *query, const char *host, uint16_t ident
     return p;
 }
 
+static int parse_ip_address(const char *host, uint8_t address[4])
+{
+    uint8_t parts[4];
+    uint32_t part_count = 0;
+    uint32_t value = 0;
+    uint32_t i = 0;
+    while (host[i]) {
+        if (host[i] >= '0' && host[i] <= '9') {
+            value = value * 10 + (uint32_t)(host[i] - '0');
+            if (value > 255) return 0;
+        } else if (host[i] == '.') {
+            if (part_count >= 4) return 0;
+            parts[part_count++] = (uint8_t)value;
+            value = 0;
+        } else {
+            return 0;
+        }
+        i++;
+    }
+    if (part_count != 3) return 0;
+    parts[3] = (uint8_t)value;
+    copy_bytes(address, parts, 4);
+    return 1;
+}
+
 static int dns_resolve(const char *host, uint8_t address[4])
 {
+    if (parse_ip_address(host, address)) return 1;
     uint8_t query[512];
     uint8_t dns_mac[6];
     uint16_t identifier = 0x4A31;
@@ -435,7 +461,7 @@ void net_tcp_close(struct net_tcp_connection *connection)
     connection->connected = 0;
 }
 
-int net_http_get(const char *host, const char *path, char *response, uint32_t capacity)
+int net_http_get(const char *host, uint16_t port, const char *path, char *response, uint32_t capacity)
 {
     uint8_t remote_ip[4];
     uint8_t remote_mac[6];
@@ -443,15 +469,16 @@ int net_http_get(const char *host, const char *path, char *response, uint32_t ca
     uint8_t *tcp;
     uint16_t payload_length;
     if (!configured || !host || !path || !response || capacity < 2) return -1;
+    if (!port) return -1;
     if (!dns_resolve(host, remote_ip)) return -2;
     if (!resolve_next_hop(remote_ip, remote_mac)) return -3;
 
     tcp_sequence = 0x13572468;
-    make_tcp_packet(frame, remote_mac, remote_ip, local_port, 80, tcp_sequence, 0, 0x02, 0, 0);
-    if (!tcp_wait(frame, &tcp, &payload_length, remote_ip, 80, local_port, NET_WAIT_POLLS) || !(tcp[13] & 0x12)) return -4;
+    make_tcp_packet(frame, remote_mac, remote_ip, local_port, port, tcp_sequence, 0, 0x02, 0, 0);
+    if (!tcp_wait(frame, &tcp, &payload_length, remote_ip, port, local_port, NET_WAIT_POLLS) || !(tcp[13] & 0x12)) return -4;
     uint32_t remote_sequence = read32(tcp + 4) + 1;
     tcp_sequence++;
-    make_tcp_packet(frame, remote_mac, remote_ip, local_port, 80, tcp_sequence, remote_sequence, 0x10, 0, 0);
+    make_tcp_packet(frame, remote_mac, remote_ip, local_port, port, tcp_sequence, remote_sequence, 0x10, 0, 0);
 
     char request[384];
     uint32_t request_length = 0;
@@ -463,14 +490,14 @@ int net_http_get(const char *host, const char *path, char *response, uint32_t ca
     while (*suffix && request_length < sizeof(request)) request[request_length++] = *suffix++;
     if (request_length >= sizeof(request)) return -5;
 
-    make_tcp_packet(frame, remote_mac, remote_ip, local_port, 80, tcp_sequence, remote_sequence,
+    make_tcp_packet(frame, remote_mac, remote_ip, local_port, port, tcp_sequence, remote_sequence,
                     0x18, (const uint8_t *)request, (uint16_t)request_length);
     tcp_sequence += request_length;
     uint32_t used = 0;
     uint8_t finished = 0;
     uint32_t idle_tries = 0;
     for (uint32_t tries = 0; tries < NET_WAIT_POLLS && !finished && used + 1 < capacity; tries++) {
-        int length = tcp_wait(frame, &tcp, &payload_length, remote_ip, 80, local_port, 1);
+        int length = tcp_wait(frame, &tcp, &payload_length, remote_ip, port, local_port, 1);
         if (!length) {
             if (++idle_tries > 5000000) break;
             continue;
@@ -489,7 +516,7 @@ int net_http_get(const char *host, const char *path, char *response, uint32_t ca
         }
         if (flags & 0x01) { remote_sequence++; finished = 1; }
         if (payload_length || (flags & 0x01))
-            make_tcp_packet(frame, remote_mac, remote_ip, local_port, 80, tcp_sequence,
+            make_tcp_packet(frame, remote_mac, remote_ip, local_port, port, tcp_sequence,
                             remote_sequence, 0x10, 0, 0);
         if ((flags & 0x04) || acknowledgement > tcp_sequence + 4096) break;
     }

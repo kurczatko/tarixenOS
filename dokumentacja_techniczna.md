@@ -1032,7 +1032,7 @@ int net_ready(void)
 wysyla zapytanie HTTP GET do hosta i sciezki, zapisuje odpowiedz do bufora.
 
 ```
-int net_http_get(const char *host, const char *path, char *response, uint32_t capacity)
+int net_http_get(const char *host, uint16_t port, const char *path, char *response, uint32_t capacity)
 ```
 
 ### net_tcp_connect

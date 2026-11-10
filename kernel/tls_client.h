@@ -3,6 +3,6 @@
 
 #include "../include/printf/types.h"
 
-int tls13_https_get(const char *host, const char *path, char *response, uint32_t capacity);
+int tls13_https_get(const char *host, uint16_t port, const char *path, char *response, uint32_t capacity);
 
 #endif

@@ -5,7 +5,7 @@
 
 int net_init(void);
 int net_ready(void);
-int net_http_get(const char *host, const char *path, char *response, uint32_t capacity);
+int net_http_get(const char *host, uint16_t port, const char *path, char *response, uint32_t capacity);
 
 struct net_tcp_connection {
     uint8_t remote_ip[4];

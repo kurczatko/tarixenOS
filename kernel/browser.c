@@ -723,6 +723,7 @@ static int copy_resolved_link(const char *link_url)
     const char *base;
     uint32_t output = 0;
     uint32_t host_length = 0;
+    uint16_t port = 0;
 
     if (starts_with(link_url, "https://")) {
         copy_text(address, sizeof(address), link_url);
@@ -740,9 +741,31 @@ static int copy_resolved_link(const char *link_url)
     while (base[host_length] && base[host_length] != '/' && base[host_length] != ':' && host_length < 96)
         host_length++;
     if (!host_length || host_length + 10 >= sizeof(address)) return 0;
+
+    const char *after_host = base + host_length;
+    port = browser_use_https ? 443 : 80;
+    if (*after_host == ':') {
+        after_host++;
+        uint32_t port_value = 0;
+        while (*after_host >= '0' && *after_host <= '9') {
+            port_value = port_value * 10 + (uint32_t)(*after_host - '0');
+            after_host++;
+        }
+        if (port_value > 0 && port_value <= 65535) port = (uint16_t)port_value;
+    }
+
     copy_text(address, sizeof(address), browser_use_https ? "https://" : "http://");
     output = browser_use_https ? 8 : 7;
     for (uint32_t i = 0; i < host_length; i++) address[output++] = base[i];
+    if (port != (browser_use_https ? 443 : 80)) {
+        address[output++] = ':';
+        char port_buf[6];
+        int pn = 0;
+        uint32_t pv = port;
+        if (pv == 0) port_buf[pn++] = '0';
+        while (pv) { port_buf[pn++] = (char)('0' + pv % 10); pv /= 10; }
+        for (int k = pn - 1; k >= 0; k--) address[output++] = port_buf[k];
+    }
     if (link_url[0] == '/') {
         while (*link_url && output + 1 < sizeof(address)) address[output++] = *link_url++;
     } else {
@@ -751,14 +774,16 @@ static int copy_resolved_link(const char *link_url)
         while (base_length && base[base_length - 1] != '/') base_length--;
         for (uint32_t i = host_length; i < base_length && output + 1 < sizeof(address); i++)
             address[output++] = base[i];
-        if (output == (browser_use_https ? 8 : 7) + host_length) address[output++] = '/';
+        if (output == (browser_use_https ? 8 : 7) + host_length ||
+            (output > (browser_use_https ? 8 : 7) + host_length && address[output - 1] != '/'))
+            address[output++] = '/';
         while (*link_url && output + 1 < sizeof(address)) address[output++] = *link_url++;
     }
     address[output] = 0;
     return 1;
 }
 
-static int extract_host_path(char *host, uint32_t host_capacity, char *path, uint32_t path_capacity)
+static int extract_host_path(char *host, uint32_t host_capacity, char *path, uint32_t path_capacity, uint16_t *port)
 {
     const char *cursor = address;
     uint32_t host_length = 0;
@@ -774,9 +799,24 @@ static int extract_host_path(char *host, uint32_t host_capacity, char *path, uin
         host_length++;
     }
     host[host_length] = 0;
-    if (cursor[host_length] == ':') return -3;
+
+    *port = browser_use_https ? 443 : 80;
+
+    const char *after_host = cursor + host_length;
+    if (*after_host == ':') {
+        after_host++;
+        uint32_t port_value = 0;
+        while (*after_host >= '0' && *after_host <= '9') {
+            port_value = port_value * 10 + (uint32_t)(*after_host - '0');
+            after_host++;
+        }
+        if (port_value > 0 && port_value <= 65535) {
+            *port = (uint16_t)port_value;
+        }
+    }
+
     if (!host_length) return 0;
-    cursor += host_length;
+    cursor = after_host;
     if (!*cursor) cursor = "/";
     while (cursor[path_length] && path_length + 1 < path_capacity) {
         path[path_length] = cursor[path_length];
@@ -799,9 +839,9 @@ static void browser_fetch(void)
 {
     char host[96];
     char path[256];
-    int parsed = extract_host_path(host, sizeof(host), path, sizeof(path));
+    uint16_t port = 0;
+    int parsed = extract_host_path(host, sizeof(host), path, sizeof(path), &port);
     int length;
-    if (parsed == -3) { set_status("Adres z portem nieobslugiwany"); page[0] = 0; okno_narysuj(&browser_window); return; }
     if (parsed == 0) { set_status("Nieprawidlowy adres"); okno_narysuj(&browser_window); return; }
     if (!net_ready()) { set_status("Brak sieci: sterownik/DHCP niedostepne"); okno_narysuj(&browser_window); return; }
 
@@ -809,9 +849,9 @@ static void browser_fetch(void)
     okno_narysuj(&browser_window);
 
     if (browser_use_https) {
-        length = tls13_https_get(host, path, response, sizeof(response));
+        length = tls13_https_get(host, port, path, response, sizeof(response));
     } else {
-        length = net_http_get(host, path, response, sizeof(response));
+        length = net_http_get(host, port, path, response, sizeof(response));
     }
     if (length < 0) {
         if (browser_use_https) {
@@ -861,13 +901,34 @@ static void browser_submit_form(struct browser_field *f)
     } else if (action[0] == '/') {
         const char *base = address;
         uint32_t host_length = 0;
+        uint16_t port = 0;
         browser_use_https = starts_with(base, "https://");
         if (browser_use_https) base += 8;
         else if (starts_with(base, "http://")) base += 7;
         while (base[host_length] && base[host_length] != '/' && base[host_length] != ':' && host_length < 96) host_length++;
+        const char *after_host = base + host_length;
+        port = browser_use_https ? 443 : 80;
+        if (*after_host == ':') {
+            after_host++;
+            uint32_t port_value = 0;
+            while (*after_host >= '0' && *after_host <= '9') {
+                port_value = port_value * 10 + (uint32_t)(*after_host - '0');
+                after_host++;
+            }
+            if (port_value > 0 && port_value <= 65535) port = (uint16_t)port_value;
+        }
         copy_text(resolved, sizeof(resolved), browser_use_https ? "https://" : "http://");
         u = browser_use_https ? 8 : 7;
         for (uint32_t i = 0; i < host_length; i++) resolved[u++] = base[i];
+        if (port != (browser_use_https ? 443 : 80)) {
+            resolved[u++] = ':';
+            char port_buf[6];
+            int pn = 0;
+            uint32_t pv = port;
+            if (pv == 0) port_buf[pn++] = '0';
+            while (pv) { port_buf[pn++] = (char)('0' + pv % 10); pv /= 10; }
+            for (int k = pn - 1; k >= 0; k--) resolved[u++] = port_buf[k];
+        }
         resolved[u] = 0;
         copy_text(resolved + u, sizeof(resolved) - u, action);
     } else {

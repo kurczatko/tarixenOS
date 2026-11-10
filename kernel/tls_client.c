@@ -391,7 +391,7 @@ static int tls_read_app_record(struct tls13_connection *connection, uint8_t *dat
     return 1;
 }
 
-int tls13_https_get(const char *host, const char *path, char *response, uint32_t capacity)
+int tls13_https_get(const char *host, uint16_t port, const char *path, char *response, uint32_t capacity)
 {
     struct tls13_connection connection;
     static uint8_t record[TLS_BUFFER_SIZE];
@@ -404,11 +404,12 @@ int tls13_https_get(const char *host, const char *path, char *response, uint32_t
     uint8_t transcript_digest[32];
 
     if (!host || !path || !response || capacity < 2) return -1;
+    if (!port) return -1;
     for (uint32_t i = 0; i < sizeof(connection); i++) ((uint8_t *)&connection)[i] = 0;
     hs_message_start = 0;
     hs_message_end = 0;
 
-    if (net_tcp_connect(&connection.tcp, host, 443) < 0) return -1;
+    if (net_tcp_connect(&connection.tcp, host, port) < 0) return -1;
     if (!tls_build_client_hello(&connection, host, record, &record_length) || !tls_send(&connection, record, record_length)) { net_tcp_close(&connection.tcp); return -2; }
     {
         uint8_t *server_hello_message;
