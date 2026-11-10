@@ -22,6 +22,7 @@ struct okno {
     uint8_t otwarte;
     uint8_t zminimalizowane;
     uint8_t zmaksymalizowane;
+    uint8_t pelnoekranowy;
     uint8_t w_polu_tekstowym;
     int kursor_pozycja;
     int zaznacz_poczatek;
@@ -40,6 +41,7 @@ struct okno {
 
 void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
                  const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc);
+void okno_stworz_pelnoekranowy(struct okno *okno, const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc);
 void okno_narysuj(struct okno *okno);
 void okno_odrysuj_wszystkie(void);
 void okno_zamknij(struct okno *okno);

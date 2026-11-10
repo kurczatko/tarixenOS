@@ -194,7 +194,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             malowanie_obsluz_klawiature();
         }
         if (keyboard_windows_pressed()) {
-            menu_start_przełącz(); /*jak to mozliwe ze kompiluje sie z polskimi znakami?*/
+            menu_start_przelacz(); /*jak to mozliwe ze kompiluje sie z polskimi znakami?*/
         }
         if (keyboard_dane_dostepne()) {
             char znak;

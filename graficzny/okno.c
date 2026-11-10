@@ -28,6 +28,10 @@ static int schowek_dlugosc;
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
+    if (okno->pelnoekranowy) {
+        okno->rysuj_zawartosc(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
+        return;
+    }
     rozmyj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
     rysuj_prostokat_polprzezroczysty(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI, 60);
     rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
@@ -156,6 +160,40 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
     okno->otwarte = 1;
     okno->zminimalizowane = 0;
     okno->zmaksymalizowane = 0;
+    okno->pelnoekranowy = 0;
+    okno->w_polu_tekstowym = 0;
+    okno->kursor_pozycja = 0;
+    okno->zaznacz_poczatek = -1;
+    okno->zaznacz_koniec = -1;
+    okno->tekst_bufor = 0;
+    okno->tekst_dlugosc = 0;
+    okno->tekst_maks = 0;
+    okno_przenies_na_wierzch(okno);
+    pulp_zglosz_zmiane();
+    okno_odrysuj_wszystkie();
+}
+
+void okno_stworz_pelnoekranowy(struct okno *okno, const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc)
+{
+    okno->x = 0;
+    okno->y = 0;
+    okno->szerokosc = EKRAN_SZEROKOSC;
+    okno->wysokosc = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    okno->x_poprzednie = 0;
+    okno->y_poprzednie = 0;
+    okno->szerokosc_poprzednia = EKRAN_SZEROKOSC;
+    okno->wysokosc_poprzednia = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    okno->tytul = tytul;
+    okno->rysuj_zawartosc = rysuj_zawartosc;
+    okno->obsluz_klik = 0;
+    okno->obsluz_ruch = 0;
+    okno->pole_tekstowe_enter = 0;
+    okno->pole_tekstowe_wyjdz = 0;
+    okno->pole_tekstowe_znak = 0;
+    okno->otwarte = 1;
+    okno->zminimalizowane = 0;
+    okno->zmaksymalizowane = 0;
+    okno->pelnoekranowy = 1;
     okno->w_polu_tekstowym = 0;
     okno->kursor_pozycja = 0;
     okno->zaznacz_poczatek = -1;
@@ -242,6 +280,11 @@ int okno_obsluz_klikniecie(int x, int y)
     if (trafione != aktywne_okno) {
         okno_przenies_na_wierzch(trafione);
         okno_odrysuj_wszystkie();
+    }
+
+    if (trafione->pelnoekranowy) {
+        if (trafione->obsluz_klik) trafione->obsluz_klik(x - trafione->x, y - trafione->y);
+        return 1;
     }
 
     if (x >= trafione->x + trafione->szerokosc - 22 &&
@@ -431,6 +474,7 @@ static void okno_genie_animuj(struct okno *okno, int sx, int sy, int sw, int sh,
 void okno_zminimalizuj(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
+    if (okno->pelnoekranowy) return;
 
     int start_x = okno->x;
     int start_y = okno->y;
@@ -483,6 +527,7 @@ void okno_przywroc(struct okno *okno)
 void okno_maksymalizuj(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane || okno->zmaksymalizowane) return;
+    if (okno->pelnoekranowy) return;
     okno->x_poprzednie = okno->x;
     okno->y_poprzednie = okno->y;
     okno->szerokosc_poprzednia = okno->szerokosc;
