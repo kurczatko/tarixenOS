@@ -6784,11 +6784,122 @@ Sterownik definiuje stale dla:
 
 ### informacje o sprzecie
 
-- `engine_clock()` / `memory_clock()` / `vram_size()` / `cuda_cores()` / `sm_count()` / `rop_count()` / `texture_units()` / `memory_bus_width()` / `vertex_cache_size()` / `primitive_buffer_size()` / `command_buffer_size()` / `error_count()` / `tensor_cores()` / `rt_cores()` / `dlss_units()` / `variable_rate_shading()` / `meshlet_compression()` / `displacement_micro_map()` / `opacity_micro_map()` / `serialized_write()` / `shader_execution_reorder()` / `path_tracing()` - parametry karty i flagi dostepnych funkcji.
+- `engine_clock()` / `memory_clock()` / `vram_size()` / `cuda_cores()` / `sm_count()` / `rop_count()` / `texture_units()` / `memory_bus_width()` / `vertex_cache_size()` / `primitive_buffer_size()` / `command_buffer_size()` / `error_count()` - podstawowe parametry karty.
 
 ### globalna instancja
 
 - `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+
+## sterownik nvidia gtx 1000 - rust/drivers/karty_graficzne/nvidia/gtx_1000.rs
+
+Zaawansowany sterownik kart graficznych NVIDIA GeForce GTX 1000 (architektura Pascal, chipy GP104/GP106/GP107/GP108) z obsluga zaawansowanej akceleracji 3D i shaderow. Obsluguje modele: GTX 1080, GTX 1070, GTX 1060, GTX 1050 Ti, GTX 1050, GTX 1030. Sterownik napisany w Rust, kompilowany dla trybu freestanding (#[no_std]), wykorzystujacy bezpieczne operacje MMIO (volatile read/write) oraz atomowe struktury ring bufferow do przesylania komend do GPU.
+
+### stale i adresy rejestrow
+
+Sterownik definiuje stale dla:
+- Identyfikatorow dostawcy i urzadzen: `NVIDIA_VENDOR_ID` (0x10DE), `GTX_1080_DEVICE_ID` (0x1B80), `GTX_1070_DEVICE_ID` (0x1B81), `GTX_1060_DEVICE_ID` (0x1C60), `GTX_1050_TI_DEVICE_ID` (0x1C8C), `GTX_1050_DEVICE_ID` (0x1C8D), `GTX_1030_DEVICE_ID` (0x1D01), `CHIP_GP104` (0x1B80), `CHIP_GP106` (0x1C60), `CHIP_GP107` (0x1C8C), `CHIP_GP108` (0x1D01), `PASCAL_ARCH_VERSION` (1).
+- Baz MMIO, VRAM, GART i doorbell: `REG_MMIO_BASE` (0xF0000000), `REG_VRAM_BASE` (0xE0000000), `REG_GART_BASE` (0xD0000000), `REG_DOORBELL_BASE` (0xC0000000).
+- Rejestrow PMC (zarzadzanie zasilaniem), PGRAPH (potok graficzny, konteksty, przerwania, FECS), GPCCS, GPC, TPC, SM (procesory strumieniowe), ROP, TEX, SHADER (vertex, fragment, geometry, compute, tessellation, uniform, attribute), COMPUTE, RASTER, DEPTH, STENCIL, BLEND, COLOR_BUFFER, FRAMEBUFFER, RENDER_TARGET, DEPTH_STENCIL_BUFFER, MULTISAMPLE, ANTIALIAS, VIEWPORT, SCISSOR, VERTEX_CACHE, INDEX_BUFFER, PRIMITIVE_BUFFER, UNIFORM_BUFFER, SHADER_STORAGE, ATOMIC_COUNTER, QUERY_OBJECT, PCIE, POWER_PLAY, SMU, SDMA, CP, VGT, PA_SC, DB, CB.
+- Rejestrow shaderow i potoku graficznego: `NV_SHADER_MODULE_*`, `NV_DESCRIPTOR_SET_*`, `NV_COMMAND_BUFFER_*`, `NV_QUERY_POOL_*`, `NV_SWAP_CHAIN_*`, `NV_GRAPHICS_PIPELINE_*`.
+
+### struktury danych
+
+- `Matrix4x4` - macierz 4x4 (16 floatow) dla transformacji kamery, swiata i rzutowania.
+- `Vector4`, `Vector3`, `Vector2` - wektory dla pozycji, koloru, tekstur, normalnych, tangentow i bitangentow.
+- `Vertex` - struktura wierzcholka z pozycja, kolorem, tekstura, normalna, tangentem i bitangentem.
+- `Color` - kolor RGBA w formacie float.
+- `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
+- `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
+- `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute oraz offsetami uniformow.
+- `RingBuffer` - kolejki cykliczne dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
+- `GraphicsPipeline` - potok graficzny z adresami etapow shaderow, wejscia wierzcholkow, zestawiania, rasteryzacji, mieszania kolorow, depth-stencil, viewporta, multisamplingu i stanu dynamicznego.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, rozmiarem cache wierzcholkow i bufora primitivow, tablicami shaderow, deskryptorow, buforow komend, pul zapytan, lancuchow wymiany i potokow graficznych.
+
+### inicjalizacja
+
+- `gtx_1000_init()` -> bool (wewnetrzna, wywolywana przez `gtx_1000_driver_init`) - inicjalizuje sterownik: wykrywa karte na podstawie device ID, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_1000_detected()` -> bool - sprawdza czy karta z rodziny GTX 1000 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
+- `gtx_1000_driver_init()` -> bool - eksportowana funkcja C (`#[no_mangle]`, `extern "C"`), wywolywana przez `driver_manager_register` w jadrze. Inicjalizuje instancję GPU i wywoluje `init()`.
+- `gtx_1000_driver_detected()` -> bool - eksportowana funkcja C, sprawdza wykrycie karty.
+- `gtx_1000_is_ready()` -> bool - zwraca 1 gdy sterownik jest zainicjowany i gotowy.
+- `driver_manager_register("gtx_1000", gtx_1000_driver_init, 0, 0, 4)` - rejestracja sterownika w `kernel/kernel.c:124`, uruchamiana automatycznie przy starcie systemu.
+
+### operacje MMIO
+
+- `read_mmio(offset: u32) -> u32` - odczyt 32-bitowy z rejestru MMIO pod podanym offsetem.
+- `write_mmio(offset: u32, value: u32)` - zapis 32-bitowy do rejestru MMIO.
+- `read_mmio_64(offset: u32) -> u64` - odczyt 64-bitowy (dwa rejestry 32-bitowe).
+- `write_mmio_64(offset: u32, value: u64)` - zapis 64-bitowy (dwa rejestry 32-bitowe).
+
+### ring buffer i doorbell
+
+- `init_ring_buffers()` - konfiguruje bazy i rejestry procesora komend oraz SDMA dla tresci ring bufferow GFX, compute i DMA.
+- `submit_doorbell(ring_index: u32, value: u32)` - wysyla sygnal doorbell do wybranego ring bufferu (0=GFX, 1=compute, 2=DMA).
+- `ring_write(ring_index: u32, dword: u32)` - zapisuje slowo do ring bufferu z atomowa aktualizacja wptr.
+- `ring_submit(ring_index: u32)` - zatwierdza ring bufferu przez zapis RPTR i doorbell.
+
+### akceleracja 3D i potok graficzny
+
+- `enable_3d_acceleration()` - wlacza akceleracje 3D w rejestrach sterujacych (shader, raster, ROP, depth, blend, tex, compute, PGRAPH, GPC, SM).
+- `gtx_1000_enable_3d_acceleration()` - eksportowana funkcja C.
+- `compile_shader(stage, spirv_addr, spirv_size, entry_point, entry_point_size) -> u32` - kompiluje moduł shaderu (SPIR-V) dla podanego etapu, zwraca ID modułu.
+- `destroy_shader_module(id)` - niszczy moduł shaderu o podanym ID.
+- `create_shader_program(...) -> u32` - tworzy program cieniujacy z adresami shaderow vertex/fragment/geometry/tessellation/compute, offsetami uniformow, zestawami deskryptorow i push constantami. Zwraca ID programu.
+- `bind_shader_program(program_id)` - wiaże program cieniujacy do potoku.
+- `set_uniform(program_id, index, values)` - ustawia wartosci uniform dla danego programu i indeksu.
+- `set_viewport(viewport)` - ustawia viewport renderowania (x, y, szerokosc, wysokosc, min/max depth).
+- `gtx_1000_set_viewport(x, y, width, height, min_depth, max_depth)` - eksportowana funkcja C.
+- `set_scissor(scissor)` - ustawia obszar odciecia (scissor).
+- `set_blend_state(enable, src_rgb, dst_rgb, src_alpha, dst_alpha, equation_rgb, equation_alpha)` - konfiguracja mieszania kolorow.
+- `set_depth_state(enable, func, write_mask)` - konfiguracja testu bufora glebokosci.
+- `set_stencil_state(enable, func, ref_val, mask, op_fail, op_zfail, op_zpass)` - konfiguracja testu stencila.
+- `set_rasterizer_state(cull, clip, msaa, aa)` - konfiguracja rasteryzatora (wycinanie, przycinanie, MSAA, antialiasing).
+- `create_texture(desc) -> u32` - tworzy teksture na podstawie deskryptora.
+- `bind_texture(unit, address)` - wiąże teksturę pod adresem do jednostki tekstur.
+- `create_framebuffer(width, height, format, address) -> u32` - tworzy framebuffer.
+- `bind_framebuffer(address)` - wiąże framebuffer pod podanym adresem.
+- `clear(color, depth, stencil)` - czyści buffory koloru, glebokosci i stencila.
+- `gtx_1000_clear(color, depth, stencil)` - eksportowana funkcja C.
+- `draw_arrays(primitive, first, count)` - rysuje z tablicy wierzcholkow (typ prymitywu, poczatek, liczba).
+- `gtx_1000_draw_arrays(primitive, first, count)` - eksportowana funkcja C.
+- `draw_elements(primitive, index_count, index_format, index_addr)` - rysuje z tablicy indeksow (typ prymitywu, liczba indeksow, format, adres indeksow).
+- `gtx_1000_draw_elements(primitive, index_count, index_format, index_addr)` - eksportowana funkcja C.
+- `create_command_buffer(size) -> u32` - tworzy bufor komend o podanym rozmiarze.
+- `command_buffer_begin(id)` / `command_buffer_write(id, dword)` / `command_buffer_end(id)` - nagrywanie komend do bufora.
+- `command_buffer_submit(id)` - wyslanie bufora komend do wykonania na GPU.
+- `command_buffer_reset(id)` - reset bufora komend.
+- `create_swap_chain(image_count, width, height, format) -> u32` - tworzy lancuch wymiany (swap chain) z podana liczba obrazow.
+- `swap_chain_acquire(id) -> u32` - pobiera indeks nastepnego obrazu.
+- `swap_chain_present(id)` - prezentuje obraz na ekranie.
+- `compute_dispatch(group_x, group_y, group_z)` - uruchamia obliczenia compute (dispatch grup watkow).
+- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `get_status() -> u32` / `gtx_1000_get_status() -> u32` - zwraca liczbe bledów sterownika.
+- `wait_idle()` - oczekuje na bezczynność GPU.
+
+### shadery i uniformy
+
+- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_uniform(program_id, index, values)` - ustawia uniformy (tablica floatow).
+
+### tekstury i framebuffery
+
+- `create_texture(desc) -> u32` / `bind_texture(unit, address)` - tworzenie i wiazanie tekstur.
+- `create_framebuffer(width, height, format, address) -> u32` / `bind_framebuffer(address)` - tworzenie i wiazanie framebufferow.
+
+### lancuch wymiany (swap chain)
+
+- `create_swap_chain(image_count, width, height, format) -> u32` - tworzy lancuch wymiany.
+- `swap_chain_acquire(id) -> u32` - pobiera indeks nastepnego obrazu.
+- `swap_chain_present(id)` - prezentuje obraz na ekranie.
+
+### informacje o sprzecie
+
+- `engine_clock()` / `memory_clock()` / `vram_size()` / `cuda_cores()` / `sm_count()` / `rop_count()` / `texture_units()` / `memory_bus_width()` / `vertex_cache_size()` / `primitive_buffer_size()` / `command_buffer_size()` / `error_count()` - podstawowe parametry karty.
+
+### globalna instancja
+
+- `gpu_instance() -> Option<&'static mut GpuInstance>` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton) lub None gdy nie zainicjowano.
 
 ## sterownik nvidia gtx 1020 - rust/drivers/karty_graficzne/nvidia/gtx_1020.rs
 

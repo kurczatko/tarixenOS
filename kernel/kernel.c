@@ -56,6 +56,8 @@ bool nvidia_gtx_1060_driver_init(void);
 bool nvidia_gtx_1060_driver_detected(void);
 bool __attribute__((weak)) nvidia_gtx_1060_driver_init(void) { return false; }
 bool __attribute__((weak)) nvidia_gtx_1060_driver_detected(void) { return false; }
+bool gtx_1000_driver_init(void);
+bool gtx_1000_driver_detected(void);
 #include "proces.h"
 #include "driver_manager.h"
 #include "timer.h"
@@ -119,6 +121,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("hd_4730", amd_hd_4730_driver_init, 0, 0, 4);
     driver_manager_register("gtx_1060", nvidia_gtx_1060_driver_init, 0, 0, 4);
     driver_manager_register("gtx_1080_ti", gtx_1080_ti_driver_init, 0, 0, 4);
+    driver_manager_register("gtx_1000", gtx_1000_driver_init, 0, 0, 4);
     driver_manager_register("intel_82578dc_wifi", intel_82578dc_driver_init, 0, 0, 4);
     driver_manager_register("qemu_vga", qemu_vga_init, 0, 0, 4);
     driver_manager_register("rtl8111f_net", rtl8111f_init, rtl8111f_shutdown, 0, 2);
@@ -194,7 +197,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             malowanie_obsluz_klawiature();
         }
         if (keyboard_windows_pressed()) {
-            menu_start_przelacz(); /*jak to mozliwe ze kompiluje sie z polskimi znakami?*/
+            menu_start_przelacz();
         }
         if (keyboard_dane_dostepne()) {
             char znak;
