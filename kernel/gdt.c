@@ -1,3 +1,9 @@
+/*
+* nie pozwolcie aby terry davis to zobaczyl
+* pewnie by mnie zjadl za to ze uzytkownik jest w ring 3
+* a nie w ring 0
+*/
+
 #include "gdt.h"
 
 static struct gdt_entry gdt[GDT_ENTRIES];
