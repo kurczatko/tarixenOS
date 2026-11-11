@@ -143,7 +143,7 @@ int e1000_init(void)
     e1000_write(0x3808, sizeof(tx_descriptors));
     e1000_write(0x3810, 0);
     e1000_write(0x3818, 0);
-    e1000_write(0x0400, 0x0004010A);
+    e1000_write(0x0400, 0x0004010B); 
     e1000_write(0x0410, 0x0060200A);
     e1000_write(0x0428, (1U << 0) | (1U << 1));
 
@@ -170,6 +170,10 @@ int e1000_send(const void *frame, uint16_t length)
     struct e1000_descriptor *descriptor;
     if (!ready || !frame || length == 0 || length > E1000_BUFFER_SIZE) return -1;
     descriptor = &tx_descriptors[tx_head];
+    for (uint32_t wait = 0; wait < 10000000U; wait++) {
+        if (descriptor->status & 1) break;
+        __asm__ volatile ("pause" ::: "memory");
+    }
     if (!(descriptor->status & 1)) return 0;
     for (uint32_t i = 0; i < length; i++) tx_buffers[tx_head][i] = ((const uint8_t *)frame)[i];
     descriptor->length = length;
