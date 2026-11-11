@@ -98,6 +98,17 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         *bss = 0;
     }
 
+    /* Włącz obsługę FPU i SSE (wymagane przez instrukcje xorps itp. w sterownikach). */
+    __asm__ volatile ("fninit" ::: "memory");
+    uint32_t cr0_val;
+    __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0_val));
+    cr0_val |= (1 << 1);                 /* CR0.MP = 1 */
+    __asm__ volatile ("mov %0, %%cr0" :: "r"(cr0_val));
+    uint32_t cr4_val;
+    __asm__ volatile ("mov %%cr4, %0" : "=r"(cr4_val));
+    cr4_val |= (1 << 9)  | (1 << 10);   /* CR4.OSFXSR | CR4.OSXMMEXCPT */
+    __asm__ volatile ("mov %0, %%cr4" :: "r"(cr4_val));
+
     __asm__ volatile ("movb $'A', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     rysowanie_init();
     __asm__ volatile ("movb $'B', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");

@@ -3,7 +3,6 @@
 
 void panika(const char *powod)
 {
-    __asm__ volatile ("movw $0x0003, %%ax; int $0x10" ::: "eax");
     printf(" !!!!!!!!!!!!!!!!!!!\n");
     printf(" system sie popsul\n");
     printf(" %s\n", powod ? powod : "this is the end");
