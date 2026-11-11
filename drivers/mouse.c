@@ -122,7 +122,9 @@ void mouse_poll(void) {
             if (!okno_obsluz_klikniecie(x, y)) {
                 if (!pulp_mouse_press(x, y)) {
                     if (y >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC && x >= PASEK_ICON_START_X) {
-                        if (bluetooth_ui_icon_at(x, y)) {
+                        if (quickcam_ui_icon_at(x, y)) {
+                            quickcam_ui_mouse_click(x, y);
+                        } else if (bluetooth_ui_icon_at(x, y)) {
                             bluetooth_ui_mouse_click(x, y);
                         } else {
                             struct okno *ikona_okno = pasek_zadan_ikona_na_pozycji(x, y);

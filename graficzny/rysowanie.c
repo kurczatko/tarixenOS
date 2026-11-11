@@ -489,6 +489,7 @@ void narysuj_pasek_zadan(void)
     narysuj_czas_paska();
     narysuj_ikone_internetu();
     bluetooth_ui_rysuj_pasek();
+    quickcam_ui_rysuj_pasek();
     odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
 }
 
@@ -861,4 +862,48 @@ void kursor_tekstowy_rysuj(int x, int y)
 {
     if (!kursor_tekstowy_stan) return;
     rysuj_prostokat(x, y, 2, 16, 0x00000000);
+}
+
+void quickcam_ui_init(void)
+{
+}
+
+void quickcam_ui_rysuj_pasek(void)
+{
+    extern unsigned char quickcam_driver_is_detected(void);
+    extern unsigned char quickcam_driver_is_streaming(void);
+    if (!quickcam_driver_is_detected()) return;
+    uint8_t streaming = quickcam_driver_is_streaming();
+    uint32_t kolor = streaming ? KOLOR_CZERWONY : KOLOR_BIALY;
+    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y, KAMERA_IKONA_W, KAMERA_IKONA_H, 0x003A4B5C);
+    rysuj_prostokat(KAMERA_IKONA_X + 6, KAMERA_IKONA_Y + 6, 12, 10, kolor);
+    rysuj_kwadrat(KAMERA_IKONA_X + 10, KAMERA_IKONA_Y + 10, 4, 0x00000000);
+    if (streaming) {
+        rysuj_prostokat(KAMERA_IKONA_X + 20, KAMERA_IKONA_Y + 2, 4, 4, KOLOR_CZERWONY);
+    }
+    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y, KAMERA_IKONA_W, 1, 0x00FFFFFF);
+    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y, 1, KAMERA_IKONA_H, 0x00FFFFFF);
+    rysuj_prostokat(KAMERA_IKONA_X + KAMERA_IKONA_W - 1, KAMERA_IKONA_Y, 1, KAMERA_IKONA_H, 0x00FFFFFF);
+    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y + KAMERA_IKONA_H - 1, KAMERA_IKONA_W, 1, 0x00FFFFFF);
+}
+
+int quickcam_ui_icon_at(int x, int y)
+{
+    if (y < KAMERA_IKONA_Y || y >= KAMERA_IKONA_Y + KAMERA_IKONA_H) return 0;
+    if (x < KAMERA_IKONA_X || x >= KAMERA_IKONA_X + KAMERA_IKONA_W) return 0;
+    return 1;
+}
+
+int quickcam_ui_mouse_click(int x, int y)
+{
+    if (!quickcam_ui_icon_at(x, y)) return 0;
+    extern void kamera_ui_toggle(void);
+    kamera_ui_toggle();
+    return 1;
+}
+
+void quickcam_ui_toggle(void)
+{
+    extern void kamera_ui_toggle(void);
+    kamera_ui_toggle();
 }

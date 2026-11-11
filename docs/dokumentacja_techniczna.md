@@ -6901,190 +6901,376 @@ Sterownik definiuje stale dla:
 
 - `gpu_instance() -> Option<&'static mut GpuInstance>` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton) lub None gdy nie zainicjowano.
 
-## sterownik nvidia gtx 1020 - rust/drivers/karty_graficzne/nvidia/gtx_1020.rs
+## sterownik ekranu dotykowego - rust/drivers/ekrany_dotykowe/
 
-Zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 1020 (architektura Pascal, chip GP108) z obsluga zaawansowanej akceleracji 3D i shaderow. Sterownik napisany w Rust, kompilowany dla trybu freestanding (#[no_std]), wykorzystujacy bezpieczne operacje MMIO (volatile read/write) oraz atomowe struktury ring bufferow do przesylania komend do GPU. Jest to wariant o nizszej wydajnosci niz GTX 1040, ale z tym samym zestawem funkcji architektonicznych Pascala.
-
-### stale i i adresy rejestrow
-
-Sterownik definiuje stale dla:
-- Identyfikatorow dostawcy i urzadzenia: `NVIDIA_VENDOR_ID` (0x10DE), `NVIDIA_GTX_1020_DEVICE_ID` (0x1D01), `CHIP_GP108` (0x1D01), `PASCAL_ARCH_VERSION` (1).
-- Baz MMIO, VRAM, GART i doorbell: `REG_MMIO_BASE` (0xF0000000), `REG_VRAM_BASE` (0xE0000000), `REG_GART_BASE` (0xD0000000), `REG_DOORBELL_BASE` (0xC0000000).
-- Rejestrow PMC (zarzadzanie zasilaniem i inicjalizacja), PGRAPH (potok graficzny, konteksty, przerwania, FECS), GPCCS, GPC, TPC, SM (procesory strumieniowe), ROP, TEX, SHADER (vertex, fragment, geometry, compute, tessellation, uniform, attribute), COMPUTE, RASTER, DEPTH, STENCIL, BLEND, COLOR_BUFFER, FRAMEBUFFER, RENDER_TARGET, DEPTH_STENCIL_BUFFER, MULTISAMPLE, ANTIALIAS, VIEWPORT, SCISSOR, VERTEX_CACHE, INDEX_BUFFER, PRIMITIVE_BUFFER, UNIFORM_BUFFER, SHADER_STORAGE, ATOMIC_COUNTER, QUERY_OBJECT, PCIE, POWER_PLAY, SMU, UVD, VCE, SDMA, CP, VGT, PA_SC, DB, CB.
+Zaawansowany sterownik ekranów dotykowych napisany w Rust (`#[no_std]`), kompilowany przez makefile (wildcard `$(wildcard rust/drivers/ekrany_dotykowe/*.rs)`) i linkowany do jadra. obsluguje wykrycie urzadzenia na magistrali PCI/MMIO, soft-reset, konfiguracje magistrali, kolejke zdarzen dotykowych, kalibracje affine (macierz 2D), obsluge wielodotykowa (max 10 punktow jednoczesnie), gesty (tap, double tap, swipe, pinch zoom, rotate, long press, edge swipe), tryb polling i przerwania, statystyki zdarzen i bledow. eksponuje pelne API przez strukture `TouchDriverApi` oraz funkcje `#[no_mangle]` dla integracji ze stosem C (`kernel/kernel.c` rejestruje go przez `driver_manager_register`). caly kod jest wolny od komentarzy w zrodle.
 
 ### struktury danych
 
-- `Matrix4x4` - macierz 4x4 (16 floatow) dla transformacji zwiazanych z kamera, swiatem i rzutowaniem.
-- `Vector4`, `Vector3`, `Vector2` - wektory dla pozycji, koloru, tekstur, normalnych, tangentow i bitangentow.
-- `Vertex` - struktura wierzcholka z pozycja, kolorem, tekstura, normalna, tangentem i bitangentem.
-- `Color` - kolor RGBA w formacie float.
-- `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
-- `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
-- `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute oraz offsetami uniformow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
-- `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tablicami ring bufferow dla tresci komend.
+| nazwa | opis |
+|------|------|
+| `TouchEventType` | typ zdarzenia: Press, Release, Move, Gesture |
+| `GestureType` | typ gestu: None, Tap, DoubleTap, Swipe, PinchZoom, Rotate, LongPress, EdgeSwipeLeft/Right/Up/Down |
+| `TouchPoint` | pojedynczy punkt dotyku (id, x, y, raw_x, raw_y, pressure, width, height, active) |
+| `TouchEvent` | zdarzenie dotykowe (typ, id, pozycja, surowa pozycja, cisnienie, rozmiar, timestamp, gest) |
+| `TouchEventQueue` | kolejka FIFO zdarzen (rozmiar 64) z push/pop/peek/clear |
+| `TouchState` | aktualny stan dotykowy (do 10 punktow jednoczesnie, licznik aktywnych) |
+| `CalibrationMatrix` | macierz affine 2D (a, b, c, d, e, f) do mapowania surowych wspolrzednych na ekran |
+| `CalibrationPoint` | punkt kalibracji (raw_x, raw_y, screen_x, screen_y) |
+| `Calibration` | kalibracja (macierz, 5 punkty, flaga skalibrowany, rozmiar ekranu) |
+| `TouchConfig` | konfiguracja (tryb polling/przerwanie, nr IRQ, interwal, rozmiar ekranu, gesty, multi-touch, próg cisnienia) |
+| `TouchScreenController` | glowna kontroler sterownika (MMIO, konfiguracja, kalibracja, stan, kolejka, statystyki) |
+| `TouchDriverApi` | eksportowane API C (wszystkie funkcje sterownika jako wskaźniki) |
 
-### inicjalizacja
+### stale
 
-- `gtx_1020_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
-- `gtx_1020_detected()` -> bool - sprawdza czy karta GTX 1020 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
-- `gtx_1020_driver_init()` / `gtx_1020_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| `TOUCH_VENDOR_ID` | 0x1234 | vendor ID urzadzenia dotykowego |
+| `TOUCH_DEVICE_ID` | 0x5678 | device ID urzadzenia dotykowego |
+| `REG_MMIO_BASE` | 0xF0001000 | baza MMIO kontrolera |
+| `REG_IRQ_BASE` | 0x10 | baza numeru przerwania |
+| `REG_STATUS` | 0x00 | rejestr statusu |
+| `REG_DATA` | 0x04 | rejestr danych |
+| `REG_CONTROL` | 0x08 | rejestr sterowania |
+| `REG_CONFIG` | 0x0C | rejestr konfiguracji |
+| `REG_INT_ENABLE` | 0x10 | rejestr wlaczenia przerwan |
+| `REG_INT_STATUS` | 0x14 | rejestr statusu przerwan |
+| `REG_INT_CLEAR` | 0x18 | rejestr potwierdzenia przerwan |
+| `REG_X_MIN / REG_X_MAX` | 0x20 / 0x24 | zakres osi X |
+| `REG_Y_MIN / REG_Y_MAX` | 0x28 / 0x2C | zakres osi Y |
+| `REG_WIDTH / REG_HEIGHT` | 0x30 / 0x34 | rozmiar ekranu |
+| `REG_PRESSURE_MAX` | 0x38 | maksymalne cisnienie |
+| `REG_FIRMWARE` | 0x3C | wersja firmware |
+| `REG_RESET` | 0x40 | rejestr resetu |
+| `CTRL_ENABLE` | 0x00000001 | wlacz kontroler |
+| `CTRL_INTERRUPT` | 0x00000002 | wlacz przerwania |
+| `CTRL_CALIBRATION_MODE` | 0x00000004 | tryb kalibracji |
+| `CTRL_GESTURE_MODE` | 0x00000008 | wlacz gesty |
+| `STATUS_DATA_READY` | 0x00000001 | dane gotowe |
+| `STATUS_ERROR` | 0x00000002 | blad |
+| `STATUS_BUSY` | 0x00000004 | zajete |
+| `INT_TOUCH` | 0x00000001 | przerwanie dotyku |
+| `INT_GESTURE` | 0x00000002 | przerwanie gestu |
+| `INT_ERROR` | 0x00000004 | przerwanie bledu |
+| `MODE_POLLING` | 0 | tryb polling |
+| `MODE_INTERRUPT` | 1 | tryb przerwan |
+| `MAX_TOUCH_POINTS` | 10 | maksymalna liczba punktow jednoczesnych |
+| `EVENT_QUEUE_SIZE` | 64 | rozmiar kolejki zdarzen |
+| `NUM_CALIBRATION_POINTS` | 5 | liczba punktow kalibracji |
 
-### operacje MMIO
+### funkcje sterownika
 
-- `read_mmio(offset: u32) -> u32` - odczyt 32-bitowy z rejestru MMIO pod podanym offsetem.
-- `write_mmio(offset: u32, value: u32)` - zapis 32-bitowy do rejestru MMIO.
-- `read_mmio_64(offset: u32) -> u64` - odczyt 64-bitowy (dwa rejestry 32-bitowe).
-- `write_mmio_64(offset: u32, value: u64)` - zapis 64-bitowy (dwa rejestry 32-bitowe).
+#### touch_driver_init
 
-### ring buffer i doorbell
+inicjalizuje sterownik ekranu dotykowego: wykrywa urzadzenie na MMIO, wykonuje soft-reset, czeka na gotowosc, wlacza kontroler i przerwania, konfiguruje gesty i multi-touch, ustawia zakresy osi i rozmiar ekranu. zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
 
-- `init_ring_buffers()` - konfiguruje bazy i rejestry procesora komend oraz SDMA dla tresci ring bufferow GFX, compute i DMA.
-- `submit_doorbell(ring_index: u32, value: u32)` - wysyla sygnal doorbell do wybranego ring bufferu (0=GFX, 1=compute, 2=DMA).
-- `ring_write(ring_index: u32, dword: u32)` - zapisuje slowo do ring bufferu z atomowa aktualizacja wptr.
-- `ring_submit(ring_index: u32)` - zatwierdza ring bufferu przez zapis RPTR i doorbell.
+```
+bool touch_driver_init(void);
+```
 
-### akceleracja 3D i potok graficzny
+#### touch_driver_shutdown
 
-- `enable_3d_acceleration()` - wlacza akceleracje 3D w rejestrach sterujacych.
-- `submit_3d_command(command, param1, param2, param3)` - przesyla komende 3D z trzema parametrami do GPU.
-- `draw_triangle_3d(x1,y1,z1,x2,y2,z2,x3,y3,z3,color)` - rysuje trojkat 3D o podanych wierzcholkach i kolorze.
-- `draw_line_3d(x1,y1,z1,x2,y2,z2,color)` - rysuje linie 3D.
-- `clear_screen_3d(color)` - czysci ekran podanym kolorem.
-- `set_viewport(x,y,width,height)` - ustawia viewport renderowania.
-- `set_projection_matrix(matrix)` / `set_world_matrix(matrix)` / `set_view_matrix(matrix)` - ustawia macierze rzutowania, swiata i widoku (16 floatow kazda).
-- `enable_depth_test(enabled)` / `set_depth_func(func)` - konfiguracja testu bufora glebokosci.
-- `enable_blending(enabled)` / `set_blend_func(src,dst)` / `set_blend_equation(rgb,alpha)` / `set_blend_color(color)` - konfiguracja mieszania kolorow.
-- `set_cull_mode(mode)` / `set_wireframe(enabled)` - tryb wycinania i ramki druciane.
-- `set_multisample_count(count)` / `enable_multisampling(enabled)` / `enable_antialiasing(enabled)` - MSAA i antialiasing.
-- `set_depth_bounds_test(enabled,min,max)` - test granic glebokosci.
-- `set_stencil_test(enabled,func,ref,mask)` / `set_stencil_op(fail,zfail,zpass)` - test i operacje stencila.
-- `set_logic_op(op,enabled)` / `set_dither(enabled)` - operacje logiczne i dithering.
-- `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
-- `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
-- `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
-- `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
+zatrzymuje sterownik: wylacza kontroler i przerwania, czysci kolejke zdarzen i stan dotykowy, oznacz jako niezainicjowany.
 
-### shadery i uniformy
+```
+void touch_driver_shutdown(void);
+```
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
-- `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
-- `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
+#### touch_driver_detected
 
-### tekstury i framebuffery
+sprawdza czy urzadzenie ekranu dotykowego jest wykryte na MMIO (porownuje vendor ID, device ID i revision). zwraca 1 gdy wykryte, 0 gdy nie.
 
-- `bind_texture(unit, texture_id)` / `bind_framebuffer(id)` / `bind_renderbuffer(id)` - wiazanie tekstur, framebufferow i renderbufferow do jednostek.
-- `create_texture(width,height,format) -> u32` / `delete_texture(id)` - tworzenie i usuwanie tekstur.
-- `upload_texture_data(texture_id, data, size)` - przesylanie danych tekstury do VRAM.
-- `generate_mipmaps(texture_id)` - generowanie mipmap.
-- `set_texture_filter(texture_id, min_filter, mag_filter)` / `set_texture_wrap(texture_id, wrap_s, wrap_t)` - filtry i owijanie tekstur.
-- `create_renderbuffer(width,height,format) -> u32` / `delete_renderbuffer(id)` - renderbuffery.
-- `create_framebuffer() -> u32` / `delete_framebuffer(id)` - framebuffery.
-- `attach_texture_to_framebuffer(fbo, attachment, texture_id, mip_level)` / `attach_renderbuffer_to_framebuffer(fbo, attachment, rbo_id)` - podlaczenie tekstur/renderbufferow do framebufferu.
-- `set_draw_buffers(count, attachments)` / `set_read_buffer(attachment)` - buforowe rysowania i odczytu.
-- `blit_framebuffer(src_x0,y0,x1,y1, dst_x0,y0,x1,y1, mask, filter)` - blitowanie miedzy framebufferami.
-- `read_pixels(x,y,width,height,format,type,pixels)` - odczyt pikseli z framebufferu.
+```
+bool touch_driver_detected(void);
+```
 
-### informacje o sprzecie
+#### touch_driver_is_initialized
 
-- `engine_clock()` / `memory_clock()` / `vram_size()` / `cuda_cores()` / `sm_count()` / `rop_count()` / `texture_units()` / `memory_bus_width()` / `vertex_cache_size()` / `primitive_buffer_size()` / `command_buffer_size()` / `error_count()` - podstawowe parametry karty.
+zwraca 1 gdy sterownik jest zainicjowany, 0 gdy nie.
 
-### globalna instancja
+```
+bool touch_driver_is_initialized(void);
+```
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+#### touch_driver_poll
 
-## sterownik nvidia gtx 1010 - rust/drivers/karty_graficzne/nvidia/gtx_1010.rs
+wykonuje polling zdarzen dotykowych (wywolywane co interwal z konfiguracji, przez driver_manager). sprawdza status MMIO, potwierdza przerwania, przetwarza zdarzenia dotykowe i gesty. zwraca 1 gdy wystapilo zdarzenie, 0 gdy brak.
 
-Zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 1010 (architektura Pascal, chip GP107) z obsluga zaawansowanej akceleracji 3D i shaderow. Sterownik napisany w Rust, kompilowany dla trybu freestanding (#[no_std]), wykorzystujacy bezpieczne operacje MMIO (volatile read/write) oraz atomowe struktury ring bufferow do przesylania komend do GPU. Jest to wariant o nizszej wydajnosci niz GTX 1040, ale z tym samym zestawem funkcji architektonicznych Pascala.
+```
+bool touch_driver_poll(uint32_t tick);
+```
 
-### stale i i adresy rejestrow
+#### touch_driver_interrupt
 
-Sterownik definiuje stale dla:
-- Identyfikatorow dostawcy i urzadzenia: `NVIDIA_VENDOR_ID` (0x10DE), `NVIDIA_GTX_1010_DEVICE_ID` (0x1C82), `CHIP_GP107` (0x1C82), `PASCAL_ARCH_VERSION` (1).
-- Baz MMIO, VRAM, GART i doorbell: `REG_MMIO_BASE` (0xF0000000), `REG_VRAM_BASE` (0xE0000000), `REG_GART_BASE` (0xD0000000), `REG_DOORBELL_BASE` (0xC0000000).
-- Rejestrow PMC (zarzadzanie zasilaniem i inicjalizacja), PGRAPH (potok graficzny, konteksty, przerwania, FECS), GPCCS, GPC, TPC, SM (procesory strumieniowe), ROP, TEX, SHADER (vertex, fragment, geometry, compute, tessellation, uniform, attribute), COMPUTE, RASTER, DEPTH, STENCIL, BLEND, COLOR_BUFFER, FRAMEBUFFER, RENDER_TARGET, DEPTH_STENCIL_BUFFER, MULTISAMPLE, ANTIALIAS, VIEWPORT, SCISSOR, VERTEX_CACHE, INDEX_BUFFER, PRIMITIVE_BUFFER, UNIFORM_BUFFER, SHADER_STORAGE, ATOMIC_COUNTER, QUERY_OBJECT, PCIE, POWER_PLAY, SMU, UVD, VCE, SDMA, CP, VGT, PA_SC, DB, CB.
+obsluguje przerwanie sprzetowe z kontrolera dotykowego: czysci status przerwan i przetwarza oczekujace zdarzenia dotykowe oraz gesty.
 
-### struktury danych
+```
+void touch_driver_interrupt(void);
+```
 
-- `Matrix4x4` - macierz 4x4 (16 floatow) dla transformacji zwiazanych z kamera, swiatem i rzutowaniem.
-- `Vector4`, `Vector3`, `Vector2` - wektory dla pozycji, koloru, tekstur, normalnych, tangentow i bitangentow.
-- `Vertex` - struktura wierzcholka z pozycja, kolorem, tekstura, normalna, tangentem i bitangentem.
-- `Color` - kolor RGBA w formacie float.
-- `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
-- `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
-- `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute oraz offsetami uniformow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
-- `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tablicami ring bufferow dla tresci komend.
+#### touch_driver_read_event
 
-### inicjalizacja
+pobiera nastepne zdarzenie z kolejki FIFO. zwraca 1 i zapisuje zdarzenie do bufora wyjsciowego gdy jest dostepne, 0 gdy kolejka pusta.
 
-- `gtx_1010_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
-- `gtx_1010_detected()` -> bool - sprawdza czy karta GTX 1010 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
-- `gtx_1010_driver_init()` / `gtx_1010_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
+```
+bool touch_driver_read_event(struct TouchEvent *out);
+```
 
-### operacje MMIO
+#### touch_driver_peek_event
 
-- `read_mmio(offset: u32) -> u32` - odczyt 32-bitowy z rejestru MMIO pod podanym offsetem.
-- `write_mmio(offset: u32, value: u32)` - zapis 32-bitowy do rejestru MMIO.
-- `read_mmio_64(offset: u32) -> u64` - odczyt 64-bitowy (dwa rejestry 32-bitowe).
-- `write_mmio_64(offset: u32, value: u64)` - zapis 64-bitowy (dwa rejestry 32-bitowe).
+podglada nastepne zdarzenie z kolejki bez usuwania go. zwraca 1 gdy jest dostepne, 0 gdy puste.
 
-### ring buffer i doorbell
+```
+bool touch_driver_peek_event(struct TouchEvent *out);
+```
 
-- `init_ring_buffers()` - konfiguruje bazy i rejestry procesora komend oraz SDMA dla tresci ring bufferow GFX, compute i DMA.
-- `submit_doorbell(ring_index: u32, value: u32)` - wysyla sygnal doorbell do wybranego ring bufferu (0=GFX, 1=compute, 2=DMA).
-- `ring_write(ring_index: u32, dword: u32)` - zapisuje slowo do ring bufferu z atomowa aktualizacja wptr.
-- `ring_submit(ring_index: u32)` - zatwierdza ring bufferu przez zapis RPTR i doorbell.
+#### touch_driver_event_count
 
-### akceleracja 3D i potok graficzny
+zwraca liczbe oczekujacych zdarzen w kolejce.
 
-- `enable_3d_acceleration()` - wlacza akceleracje 3D w rejestrach sterujacych.
-- `submit_3d_command(command, param1, param2, param3)` - przesyla komende 3D z trzema parametrami do GPU.
-- `draw_triangle_3d(x1,y1,z1,x2,y2,z2,x3,y3,z3,color)` - rysuje trojkat 3D o podanych wierzcholkach i kolorze.
-- `draw_line_3d(x1,y1,z1,x2,y2,z2,color)` - rysuje linie 3D.
-- `clear_screen_3d(color)` - czysci ekran podanym kolorem.
-- `set_viewport(x,y,width,height)` - ustawia viewport renderowania.
-- `set_projection_matrix(matrix)` / `set_world_matrix(matrix)` / `set_view_matrix(matrix)` - ustawia macierze rzutowania, swiata i widoku (16 floatow kazda).
-- `enable_depth_test(enabled)` / `set_depth_func(func)` - konfiguracja testu bufora glebokosci.
-- `enable_blending(enabled)` / `set_blend_func(src,dst)` / `set_blend_equation(rgb,alpha)` / `set_blend_color(color)` - konfiguracja mieszania kolorow.
-- `set_cull_mode(mode)` / `set_wireframe(enabled)` - tryb wycinania i ramki druciane.
-- `set_multisample_count(count)` / `enable_multisampling(enabled)` / `enable_antialiasing(enabled)` - MSAA i antialiasing.
-- `set_depth_bounds_test(enabled,min,max)` - test granic glebokosci.
-- `set_stencil_test(enabled,func,ref,mask)` / `set_stencil_op(fail,zfail,zpass)` - test i operacje stencila.
-- `set_logic_op(op,enabled)` / `set_dither(enabled)` - operacje logiczne i dithering.
-- `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
-- `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
-- `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
-- `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
+```
+uint32_t touch_driver_event_count(void);
+```
 
-### shadery i uniformy
+#### touch_driver_clear_events
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
-- `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
-- `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
+czysci cala kolejke zdarzen dotykowych.
 
-### tekstury i framebuffery
+```
+void touch_driver_clear_events(void);
+```
 
-- `bind_texture(unit, texture_id)` / `bind_framebuffer(id)` / `bind_renderbuffer(id)` - wiazanie tekstur, framebufferow i renderbufferow do jednostek.
-- `create_texture(width,height,format) -> u32` / `delete_texture(id)` - tworzenie i usuwanie tekstur.
-- `upload_texture_data(texture_id, data, size)` - przesylanie danych tekstury do VRAM.
-- `generate_mipmaps(texture_id)` - generowanie mipmap.
-- `set_texture_filter(texture_id, min_filter, mag_filter)` / `set_texture_wrap(texture_id, wrap_s, wrap_t)` - filtry i owijanie tekstur.
-- `create_renderbuffer(width,height,format) -> u32` / `delete_renderbuffer(id)` - renderbuffery.
-- `create_framebuffer() -> u32` / `delete_framebuffer(id)` - framebuffery.
-- `attach_texture_to_framebuffer(fbo, attachment, texture_id, mip_level)` / `attach_renderbuffer_to_framebuffer(fbo, attachment, rbo_id)` - podlaczenie tekstur/renderbufferow do framebufferu.
-- `set_draw_buffers(count, attachments)` / `set_read_buffer(attachment)` - buforowe rysowania i odczytu.
-- `blit_framebuffer(src_x0,y0,x1,y1, dst_x0,y0,x1,y1, mask, filter)` - blitowanie miedzy framebufferami.
-- `read_pixels(x,y,width,height,format,type,pixels)` - odczyt pikseli z framebufferu.
+#### touch_driver_set_calibration_point
 
-### informacje o sprzecie
+dodaje punkt kalibracji (indeks 0-4, surowa pozycja i odpowiadajaca pozycja na ekranie). zwraca 1 przy sukcesie, 0 gdy indeks poza zakresem.
 
-- `engine_clock()` / `memory_clock()` / `vram_size()` / `cuda_cores()` / `sm_count()` / `rop_count()` / `texture_units()` / `memory_bus_width()` / `vertex_cache_size()` / `primitive_buffer_size()` / `command_buffer_size()` / `error_count()` - podstawowe parametry karty.
+```
+bool touch_driver_set_calibration_point(uint8_t index, int32_t raw_x, int32_t raw_y, int32_t screen_x, int32_t screen_y);
+```
 
-### globalna instancja
+#### touch_driver_compute_calibration
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+oblicza macierz kalibracji affine na podstawie zarejestrowanych punktow (wymaga conajmniej 3). zwraca 1 przy sukcesie, 0 przy bledzie (za malo punktow lub osobliwa macierz).
+
+```
+bool touch_driver_compute_calibration(void);
+```
+
+#### touch_driver_is_calibrated
+
+zwraca 1 gdy ekran jest skalibrowany, 0 gdy nie.
+
+```
+bool touch_driver_is_calibrated(void);
+```
+
+#### touch_driver_reset_calibration
+
+resetuje kalibracje do macierzy jednostkowej, czysci punkty i flage skalibrowany.
+
+```
+void touch_driver_reset_calibration(void);
+```
+
+#### touch_driver_map_to_screen
+
+mapuje surowe wspolrzedne dotykowe (raw_x, raw_y) na wspolrzedne ekranu uzywajac macierzy kalibracji. zapisuje wyniki do out_x i out_y.
+
+```
+void touch_driver_map_to_screen(int32_t raw_x, int32_t raw_y, int32_t *out_x, int32_t *out_y);
+```
+
+#### touch_driver_total_events
+
+zwraca calkowita liczbe przetworzonych zdarzen dotykowych.
+
+```
+uint32_t touch_driver_total_events(void);
+```
+
+#### touch_driver_error_count
+
+zwraca liczbe bledow sterownika.
+
+```
+uint32_t touch_driver_error_count(void);
+```
+
+#### touch_driver_api
+
+zwraca wskaznik na statyczna strukture `TouchDriverApi` zawierajaca wszystkie funkcje sterownika jako wskaźniki C (uzywane przez integracje ze stosem C).
+
+```
+const struct TouchDriverApi *touch_driver_api(void);
+```
+
+### integracja z jadrem
+
+sterownik jest rejestrowany w `kernel/kernel.c` przez:
+
+```
+driver_manager_register("ekran_dotykowy", touch_driver_init, 0, 0, 4);
+```
+
+co oznacza ze jest inicjowany przez `driver_manager_init_all()` i polling jest wywolywany co 4 tiki przez `driver_manager_poll_all()`. funkcje `touch_driver_poll(tick)` i `touch_driver_interrupt()` moga byc wywolywane bezpośrednio z obslugi przerwan lub petli kernela.
+
+## sterownik kamery Logitech QuickCam Express - rust/drivers/kamerki/quickcam.rs
+
+zaawansowany sterownik kamery internetowej Logitech QuickCam Express napisany w Rust z `#[no_std]` i `#[no_main]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/kamerki/*.rs)`) i linkowany do jadra. obsluguje wykrycie urzadzenia na magistrali USB (vendor 0x046C, produkt 0x0900), inicjalizacje konfiguracji USB (set address, set configuration, set interface), pobieranie klatek wideo przez transfery bulk (endpoint IN), konwersje formatu YUYV na RGB oraz podglad na zywo w oknie graficznym. po wykryciu sprzetu na pasku zadan pojawia sie czerwona kropka, a po kliknieciu ikony otwiera sie okno z podgladem tego co kamera aktualnie widzi.
+
+### quickcam_driver_init
+
+inicjalizuje sterownik kamery: wykrywa urzadzenie Logitech QuickCam Express na USB, konfiguruje adres USB, konfiguracje i interfejs, przygotowuje bufor klatki. zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione.
+
+```
+bool quickcam_driver_init(void);
+```
+
+### quickcam_driver_detected
+
+sprawdza czy kamera Logitech QuickCam Express jest wykryta na USB (porownuje vendor ID i product ID). zwraca 1 gdy wykryta, 0 gdy nie.
+
+```
+uint8_t quickcam_driver_detected(void);
+```
+
+### quickcam_driver_shutdown
+
+zatrzymuje strumieniowanie, dezaktywuje kamere i czysci stan sterownika.
+
+```
+void quickcam_driver_shutdown(void);
+```
+
+### quickcam_driver_poll
+
+wywolywane przez `driver_manager_poll_all()` co zadeklarowany interwal (5 tiki). pobiera nastepna klatke wideo z kamery przez transfer bulk na endpoint IN. gdy brak danych ze sprzetu, wypelnia bufor wzorcem testowym (pasek kolorow z zegarem), aby podglad dzialal nawet bez podlaczonego urzadzenia.
+
+```
+uint8_t quickcam_driver_poll(void);
+```
+
+### quickcam_driver_is_streaming
+
+zwraca 1 gdy kamera strumieniuje klatki (aktywny podglad), 0 gdy wylaczona.
+
+```
+uint8_t quickcam_driver_is_streaming(void);
+```
+
+### quickcam_driver_toggle_preview
+
+wlacza lub wylacza podglad na zywo z kamery (strumieniowanie klatek).
+
+```
+void quickcam_driver_toggle_preview(void);
+```
+
+### quickcam_driver_get_frame
+
+zwraca wskaznik na bufor z ostatnia klatka wideo w formacie YUYV (640x480, 2 bajty na piksel).
+
+```
+unsigned char *quickcam_driver_get_frame(void);
+```
+
+### quickcam_driver_get_frame_size
+
+zwraca rozmiar ostatniej klatki w bajtach.
+
+```
+unsigned int quickcam_driver_get_frame_size(void);
+```
+
+### quickcam_driver_get_width
+
+zwraca szerokosc klatki w pikselach (640).
+
+```
+unsigned int quickcam_driver_get_width(void);
+```
+
+### quickcam_driver_get_height
+
+zwraca wysokosc klatki w pikselach (480).
+
+```
+unsigned int quickcam_driver_get_height(void);
+```
+
+### quickcam_driver_is_detected
+
+zwraca 1 gdy kamera zostala wykryta na USB.
+
+```
+uint8_t quickcam_driver_is_detected(void);
+```
+
+### quickcam_driver_is_active
+
+zwraca 1 gdy sterownik jest zainicjowany i aktywny.
+
+```
+uint8_t quickcam_driver_is_active(void);
+```
+
+### interfejs uzytkownika (pasek zadan i okno podgladu)
+
+#### quickcam_ui_init
+
+inicjalizuje interfejs uzytkownika kamery (ikona na pasku zadan).
+
+```
+void quickcam_ui_init(void);
+```
+
+#### quickcam_ui_rysuj_pasek
+
+rysuje ikone kamery na pasku zadan (wywolywane z `narysuj_pasek_zadan`). ikona jest biala gdy kamera jest wykryta i nieaktywna, czerwona gdy strumieniuje klatki (kropka nagrywania).
+
+```
+void quickcam_ui_rysuj_pasek(void);
+```
+
+#### quickcam_ui_icon_at
+
+zwraca 1 gdy pozycja (x, y) znajduje sie nad ikona kamery na pasku zadan.
+
+```
+int quickcam_ui_icon_at(int x, int y);
+```
+
+#### quickcam_ui_mouse_click
+
+obsluguje klikniecie myszy na ikonie kamery na pasku zadan. otwiera lub zamyka okno podgladu kamery. zwraca 1 gdy klikniecie bylo na ikonie kamery.
+
+```
+int quickcam_ui_mouse_click(int x, int y);
+```
+
+#### quickcam_ui_toggle
+
+otwiera lub zamyka okno podgladu kamery z obrazem na zywo.
+
+```
+void quickcam_ui_toggle(void);
+```
+
+#### kamera_ui_toggle
+
+otwiera lub zamyka okno podgladu kamery (`graficzny/kamera_ui.c`). okno wyswietla konwertowana klatke YUYV->RGB z tytulem "KAMERA - QUICKCAM EXPRESS".
+
+```
+void kamera_ui_toggle(void);
+```
+
+### integracja z jadrem
+
+sterownik jest rejestrowany w `kernel/kernel.c` przez:
+
+```
+driver_manager_register("kamera_quickcam", quickcam_driver_init, quickcam_driver_shutdown, quickcam_driver_poll, 5);
+```
+
+co oznacza ze jest inicjowany przez `driver_manager_init_all()` i polling (pobieranie klatek) jest wywolywany co 5 tikow przez `driver_manager_poll_all()`. interfejs uzytkownika jest inicjowany przez `kamera_ui_init()` w `kernel_main`, a ikona kamery oraz czerwona kropka sa rysowane na pasku zadan przez `quickcam_ui_rysuj_pasek()` wywolywane z `narysuj_pasek_zadan()`. klikniecie ikony na pasku zadan jest obslugiwane w `drivers/mouse.c` przez `quickcam_ui_mouse_click()`, ktore otwiera okno podgladu kamery.

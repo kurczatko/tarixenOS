@@ -50,4 +50,17 @@ void kursor_tekstowy_tick(void);
 uint8_t kursor_tekstowy_widoczny(void);
 void kursor_tekstowy_rysuj(int x, int y);
 
+#define KAMERA_IKONA_X (EKRAN_SZEROKOSC - 74)
+#define KAMERA_IKONA_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 4)
+#define KAMERA_IKONA_W 24
+#define KAMERA_IKONA_H 22
+
+void quickcam_ui_init(void);
+void kamera_ui_init(void);
+void quickcam_ui_rysuj_pasek(void);
+int quickcam_ui_icon_at(int x, int y);
+int quickcam_ui_mouse_click(int x, int y);
+void quickcam_ui_toggle(void);
+void kamera_ui_toggle(void);
+
 #endif

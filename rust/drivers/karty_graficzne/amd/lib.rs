@@ -11,3 +11,4 @@ fn panic(_info: &PanicInfo) -> ! {
 pub mod r7_265;
 pub mod rx_580;
 pub mod hd_4730;
+pub mod rx_460;

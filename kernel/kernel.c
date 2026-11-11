@@ -58,6 +58,14 @@ bool __attribute__((weak)) nvidia_gtx_1060_driver_init(void) { return false; }
 bool __attribute__((weak)) nvidia_gtx_1060_driver_detected(void) { return false; }
 bool gtx_1000_driver_init(void);
 bool gtx_1000_driver_detected(void);
+bool rx_460_driver_init(void);
+bool rx_460_driver_detected(void);
+bool touch_driver_init(void);
+bool touch_driver_detected(void);
+bool quickcam_driver_init(void);
+uint8_t quickcam_driver_detected(void);
+void quickcam_driver_shutdown(void);
+uint8_t quickcam_driver_poll(void);
 #include "proces.h"
 #include "driver_manager.h"
 #include "timer.h"
@@ -122,6 +130,9 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("gtx_1060", nvidia_gtx_1060_driver_init, 0, 0, 4);
     driver_manager_register("gtx_1080_ti", gtx_1080_ti_driver_init, 0, 0, 4);
     driver_manager_register("gtx_1000", gtx_1000_driver_init, 0, 0, 4);
+    driver_manager_register("rx_460", rx_460_driver_init, 0, 0, 4);
+    driver_manager_register("ekran_dotykowy", touch_driver_init, 0, 0, 4);
+    driver_manager_register("kamera_quickcam", quickcam_driver_init, quickcam_driver_shutdown, quickcam_driver_poll, 5);
     driver_manager_register("intel_82578dc_wifi", intel_82578dc_driver_init, 0, 0, 4);
     driver_manager_register("qemu_vga", qemu_vga_init, 0, 0, 4);
     driver_manager_register("rtl8111f_net", rtl8111f_init, rtl8111f_shutdown, 0, 2);
@@ -141,6 +152,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     idt_install();
     syscall_install();
     bluetooth_ui_init();
+    kamera_ui_init();
     pulp_init();
     tapeta_app();
     __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
