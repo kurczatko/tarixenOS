@@ -98,7 +98,10 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         *bss = 0;
     }
 
-    /* Włącz obsługę FPU i SSE (wymagane przez instrukcje xorps itp. w sterownikach). */
+    /*
+    * i tak nie zrozumiesz tych hackow w assemblerze
+    */
+
     __asm__ volatile ("fninit" ::: "memory");
     uint32_t cr0_val;
     __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0_val));
