@@ -6,7 +6,8 @@ mod events;
 mod calibration;
 mod driver;
 
-use crate::driver::{TouchScreenController, TouchConfig, TouchEvent};
+use crate::driver::{TouchScreenController, TouchConfig};
+use crate::events::TouchEvent;
 
 pub use driver::{
     touch_driver_init,
@@ -28,7 +29,7 @@ pub use driver::{
     touch_driver_error_count,
 };
 
-pub use driver::{TouchScreenController, TouchConfig};
+pub use crate::events::TouchEventType;
 
 pub fn touch_driver_register_config(
     mode: u32,

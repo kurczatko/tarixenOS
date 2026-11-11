@@ -3,7 +3,7 @@
 use core::sync::atomic::{AtomicU32, AtomicBool, Ordering};
 
 use crate::calibration::{Calibration, NUM_CALIBRATION_POINTS};
-use crate::events::{TouchEvent, TouchEventQueue, TouchPoint, TouchState, MAX_TOUCH_POINTS};
+use crate::events::{TouchEvent, TouchEventQueue, TouchPoint, TouchState, TouchEventType, MAX_TOUCH_POINTS};
 
 pub const TOUCH_VENDOR_ID: u16 = 0x1234;
 pub const TOUCH_DEVICE_ID: u16 = 0x5678;
@@ -75,7 +75,7 @@ impl TouchConfig {
 
 pub struct TouchScreenController {
     mmio_base: *mut u32,
-    config: TouchConfig,
+    pub(crate) config: TouchConfig,
     calibration: Calibration,
     state: TouchState,
     queue: TouchEventQueue,
@@ -319,13 +319,13 @@ impl TouchScreenController {
             let (screen_x, screen_y) = self.calibration.map_to_screen(raw_x, raw_y);
             let width = (self.read_mmio(REG_DATA + 20 + base) & 0xFFFF) as u16;
             let height = (self.read_mmio(REG_DATA + 24 + base) & 0xFFFF) as u16;
-            let active = if pressure > self.config.touch_threshold { 1u8 } else { 0 };
+            let active = if u16::from(pressure) > self.config.touch_threshold { 1u8 } else { 0 };
             let slot = self.state.find_point(touch_id);
             let event_type = match (slot, active) {
                 (None, 1) => TouchEventType::Press,
                 (Some(_), 0) => TouchEventType::Release,
                 (Some(_), 1) => TouchEventType::Move,
-                (None, 0) => TouchEventType::Move,
+                _ => TouchEventType::Move,
             };
             if let Some(slot_idx) = slot {
                 if active == 0 {
@@ -402,7 +402,7 @@ impl TouchScreenController {
 
 static mut CTRL_INSTANCE: Option<TouchScreenController> = None;
 
-fn ctrl_instance() -> &'static mut TouchScreenController {
+pub(crate) fn ctrl_instance() -> &'static mut TouchScreenController {
     unsafe {
         if CTRL_INSTANCE.is_none() {
             CTRL_INSTANCE = Some(TouchScreenController::new());
@@ -411,6 +411,7 @@ fn ctrl_instance() -> &'static mut TouchScreenController {
     }
 }
 
+#[no_mangle]
 pub fn touch_driver_init() -> bool {
     let ctrl = ctrl_instance();
     ctrl.init()

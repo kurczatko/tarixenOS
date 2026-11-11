@@ -64,6 +64,9 @@ pub const NV_PGRAPH_TRAPPED_CTX: u32 = 0x4008E8;
 pub const NV_PGRAPH_TRAPPED_MTHD: u32 = 0x4008EC;
 pub const NV_PGRAPH_TRAPPED_CLASS: u32 = 0x4008F0;
 pub const NV_PGRAPH_TRAPPED_SUBCH: u32 = 0x4008F4;
+pub const NV_GPCCS_GPCCS_CNTL: u32 = 0x400C00;
+pub const NV_GPCCS_GPCCS_PWR: u32 = 0x400C04;
+pub const NV_GPCCS_GPCCS_CLK: u32 = 0x400C08;
 pub const NV_PGRAPH_TRAPPED_TIMESTAMP: u32 = 0x4008F8;
 pub const NV_PGRAPH_TRAPPED_NOTIFY: u32 = 0x4008FC;
 pub const NV_PGRAPH_TRAPPED_OFFSET: u32 = 0x400900;
@@ -734,7 +737,7 @@ impl GpuInstance {
             initialized: AtomicBool::new(false),
             error_count: AtomicU32::new(0),
             ring_gfx: RingBuffer {
-                base_addr: REG_VRAM_BASE + 0x100000,
+                base_addr: (REG_VRAM_BASE as u64) + 0x100000,
                 size: 16 * 1024 * 1024,
                 rptr: AtomicU32::new(0),
                 wptr: AtomicU32::new(0),
@@ -742,7 +745,7 @@ impl GpuInstance {
                 doorbell_page: unsafe { (REG_DOORBELL_BASE as *mut u32).add(0) },
             },
             ring_compute: RingBuffer {
-                base_addr: REG_VRAM_BASE + 0x2000000,
+                base_addr: (REG_VRAM_BASE as u64) + 0x2000000,
                 size: 8 * 1024 * 1024,
                 rptr: AtomicU32::new(0),
                 wptr: AtomicU32::new(0),
@@ -750,7 +753,7 @@ impl GpuInstance {
                 doorbell_page: unsafe { (REG_DOORBELL_BASE as *mut u32).add(1) },
             },
             ring_dma: RingBuffer {
-                base_addr: REG_VRAM_BASE + 0x4000000,
+                base_addr: (REG_VRAM_BASE as u64) + 0x4000000,
                 size: 8 * 1024 * 1024,
                 rptr: AtomicU32::new(0),
                 wptr: AtomicU32::new(0),
@@ -842,7 +845,7 @@ impl GpuInstance {
 
     pub fn init_ring_buffers(&mut self) {
         self.write_mmio(NV_CP_PFFETCH_BASE, (REG_VRAM_BASE + 0x100000) as u32);
-        self.write_mmio(NV_CP_PFFETCH_BASE + 4, ((REG_VRAM_BASE + 0x100000) >> 32) as u32);
+        self.write_mmio(NV_CP_PFFETCH_BASE + 4, (((REG_VRAM_BASE as u64) + 0x100000) >> 32) as u32);
         self.write_mmio(NV_CP_PFFETCH_CNTL, 0x00000001);
         self.write_mmio(NV_CP_PFFETCH_CNTL2, 0x00000001);
         self.write_mmio(NV_CP_QUEUE_THRESHOLDS, 0x00000001);
@@ -851,16 +854,16 @@ impl GpuInstance {
         self.write_mmio(NV_CP_INT_MASK, 0xFFFFFFFF);
         self.write_mmio(NV_CP_PFFETCH_RPTR, 0x00000000);
         self.write_mmio(NV_SDMA0_RB_BASE, (REG_VRAM_BASE + 0x2000000) as u32);
-        self.write_mmio(NV_SDMA0_RB_BASE + 4, ((REG_VRAM_BASE + 0x2000000) >> 32) as u32);
+        self.write_mmio(NV_SDMA0_RB_BASE + 4, (((REG_VRAM_BASE as u64) + 0x2000000) >> 32) as u32);
         self.write_mmio(NV_SDMA0_RB_CNTL, 0x00000001);
         self.write_mmio(NV_SDMA0_IB_BASE, (REG_VRAM_BASE + 0x3000000) as u32);
-        self.write_mmio(NV_SDMA0_IB_BASE + 4, ((REG_VRAM_BASE + 0x3000000) >> 32) as u32);
+        self.write_mmio(NV_SDMA0_IB_BASE + 4, (((REG_VRAM_BASE as u64) + 0x3000000) >> 32) as u32);
         self.write_mmio(NV_SDMA0_IB_CNTL, 0x00000001);
         self.write_mmio(NV_SDMA1_RB_BASE, (REG_VRAM_BASE + 0x4000000) as u32);
-        self.write_mmio(NV_SDMA1_RB_BASE + 4, ((REG_VRAM_BASE + 0x4000000) >> 32) as u32);
+        self.write_mmio(NV_SDMA1_RB_BASE + 4, (((REG_VRAM_BASE as u64) + 0x4000000) >> 32) as u32);
         self.write_mmio(NV_SDMA1_RB_CNTL, 0x00000001);
         self.write_mmio(NV_SDMA1_IB_BASE, (REG_VRAM_BASE + 0x5000000) as u32);
-        self.write_mmio(NV_SDMA1_IB_BASE + 4, ((REG_VRAM_BASE + 0x5000000) >> 32) as u32);
+        self.write_mmio(NV_SDMA1_IB_BASE + 4, (((REG_VRAM_BASE as u64) + 0x5000000) >> 32) as u32);
         self.write_mmio(NV_SDMA1_IB_CNTL, 0x00000001);
     }
 
@@ -1310,10 +1313,12 @@ impl GpuInstance {
             return;
         }
         let prog = &self.shader_programs[program_id as usize];
+        let vs_addr = prog.vertex_shader_addr;
+        let fs_addr = prog.fragment_shader_addr;
         self.write_mmio(NV_SHADER_VTX_CNTL, 0x00000001);
         self.write_mmio(NV_SHADER_FRAG_CNTL, 0x00000001);
-        self.write_mmio_64(NV_SHADER_MODULE_SPIRV_ADDR, prog.vertex_shader_addr);
-        self.write_mmio_64(NV_SHADER_MODULE_SPIRV_ADDR + 8, prog.fragment_shader_addr);
+        self.write_mmio_64(NV_SHADER_MODULE_SPIRV_ADDR, vs_addr);
+        self.write_mmio_64(NV_SHADER_MODULE_SPIRV_ADDR + 8, fs_addr);
         self.write_mmio(NV_SHADER_CNTL, 0x00000001);
     }
 
@@ -1449,7 +1454,7 @@ impl GpuInstance {
         self.write_mmio(NV_COMMAND_BUFFER_SIZE, size);
         self.command_buffers[id as usize] = CommandBuffer {
             id,
-            addr: REG_VRAM_BASE + 0x10000000 + id as u64 * size as u64,
+            addr: (REG_VRAM_BASE as u64) + 0x10000000 + id as u64 * size as u64,
             size,
             offset: AtomicU32::new(0),
             submitted: AtomicBool::new(false),
@@ -1479,7 +1484,7 @@ impl GpuInstance {
         unsafe {
             (cb.addr as *mut u32).add(offset / 4).write_volatile(dword);
         }
-        cb.offset.store(offset + 4, Ordering::SeqCst);
+        cb.offset.store((offset + 4) as u32, Ordering::SeqCst);
     }
 
     pub fn command_buffer_end(&mut self, id: u32) {
@@ -1494,9 +1499,11 @@ impl GpuInstance {
             return;
         }
         let cb = &self.command_buffers[id as usize];
-        self.write_mmio(NV_COMMAND_BUFFER_ADDR, cb.addr as u32);
-        self.write_mmio(NV_COMMAND_BUFFER_ADDR + 4, (cb.addr >> 32) as u32);
-        self.write_mmio(NV_COMMAND_BUFFER_SIZE, cb.size);
+        let addr = cb.addr;
+        let size = cb.size;
+        self.write_mmio(NV_COMMAND_BUFFER_ADDR, addr as u32);
+        self.write_mmio(NV_COMMAND_BUFFER_ADDR + 4, (addr >> 32) as u32);
+        self.write_mmio(NV_COMMAND_BUFFER_SIZE, size);
         self.write_mmio(NV_COMMAND_BUFFER_SUBMIT, id);
         self.command_buffers[id as usize].submitted.store(true, Ordering::SeqCst);
         self.wait_idle();
@@ -1521,7 +1528,7 @@ impl GpuInstance {
         self.write_mmio(NV_SWAP_CHAIN_IMAGE_COUNT, image_count);
         self.write_mmio(NV_SWAP_CHAIN_IMAGE_FORMAT, format);
         for i in 0..image_count as usize {
-            self.write_mmio_64(NV_SWAP_CHAIN_IMAGE_ADDR + i as u32 * 8, REG_VRAM_BASE + 0x20000000 + i as u64 * (width as u64 * height as u64 * 4));
+            self.write_mmio_64(NV_SWAP_CHAIN_IMAGE_ADDR + i as u32 * 8, (REG_VRAM_BASE as u64) + 0x20000000 + i as u64 * (width as u64 * height as u64 * 4));
         }
         self.swap_chains[id as usize] = SwapChain {
             id,
@@ -1541,11 +1548,10 @@ impl GpuInstance {
         if id >= self.swap_chain_count {
             return 0xFFFFFFFF;
         }
-        let sc = &mut self.swap_chains[id as usize];
-        let idx = sc.current_image.load(Ordering::SeqCst);
+        let idx = self.swap_chains[id as usize].current_image.load(Ordering::SeqCst);
         self.write_mmio(NV_SWAP_CHAIN_ACQUIRE, id);
-        sc.current_image.store((idx + 1) % sc.image_count, Ordering::SeqCst);
-        sc.acquired.store(true, Ordering::SeqCst);
+        self.swap_chains[id as usize].current_image.store((idx + 1) % self.swap_chains[id as usize].image_count, Ordering::SeqCst);
+        self.swap_chains[id as usize].acquired.store(true, Ordering::SeqCst);
         idx
     }
 
@@ -1554,7 +1560,7 @@ impl GpuInstance {
             return;
         }
         let sc = &self.swap_chains[id as usize];
-        self.write_mmio(NV_SWAP_CHAIN_IMAGE_ADDR, sc.image_addrs[sc.current_image.load(Ordering::SeqCst) as usize]);
+        self.write_mmio(NV_SWAP_CHAIN_IMAGE_ADDR, sc.image_addrs[sc.current_image.load(Ordering::SeqCst) as usize] as u32);
         self.write_mmio(NV_SWAP_CHAIN_PRESENT, id);
         self.wait_idle();
     }

@@ -223,7 +223,7 @@ fn quickcam_fill_test_pattern() {
                 let g = ((y * 255) / height) as u8;
                 let b = (ticks % 256) as u8;
                 let yuv_y = ((r as u32 * 66 + g as u32 * 129 + b as u32 * 25) / 256 + 16) as u8;
-                let yuv_u = (((-r as i32) * 38 + (-g as i32) * 74 + (b as i32) * 112) / 256 + 128) as u8;
+                let yuv_u = (((-(r as i32)) * 38 + (-(g as i32)) * 74 + (b as i32) * 112) / 256 + 128) as u8;
                 *cam.frame_buf.add(offset) = yuv_y;
                 *cam.frame_buf.add(offset + 1) = yuv_u;
             }
@@ -327,4 +327,13 @@ pub extern "C" fn quickcam_driver_is_detected() -> bool {
 #[no_mangle]
 pub extern "C" fn quickcam_driver_is_active() -> bool {
     quickcam_is_active()
+}
+
+#[no_mangle]
+pub extern "C" fn quickcam_driver_poll() -> u8 {
+    if quickcam_is_detected() {
+        1
+    } else {
+        0
+    }
 }
