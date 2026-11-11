@@ -6379,3 +6379,121 @@ Sterownik definiuje stale dla:
 ### globalna instancja
 
 - `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+
+## sterownik nvidia gtx 5070 - rust/drivers/karty_graficzne/nvidia/gtx_5070.rs
+
+Zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 5070 (architektura Blackwell, chip GB205) z obsluga zaawansowanej akceleracji 3D i shaderow. Sterownik napisany w Rust, kompilowany dla trybu freestanding (#[no_std]), wykorzystujacy bezpieczne operacje MMIO (volatile read/write) oraz atomowe struktury ring bufferow do przesylania komend do GPU. Jest to wariant o nizszej wydajnosci niz GTX 5080 i GTX 5090, ale z tym samym zestawem funkcji architektonicznych Blackwell.
+
+### adresy rejestrow
+
+Sterownik definiuje stale dla:
+- Identyfikatorow dostawcy i urzadzenia: `NVIDIA_VENDOR_ID` (0x10DE), `NVIDIA_GTX_5070_DEVICE_ID` (0x2A03), `CHIP_GB205` (0x2A03), `BLACKWELL_ARCH_VERSION` (2).
+- Baz MMIO, VRAM, GART i doorbell: `REG_MMIO_BASE` (0xF0000000), `REG_VRAM_BASE` (0xE0000000), `REG_GART_BASE` (0xD0000000), `REG_DOORBELL_BASE` (0xC0000000).
+- Rejestrow PMC (zarzadzanie zasilaniem i inicjalizacja), PGRAPH (potok graficzny, konteksty, przerwania, FECS), GPCCS, GPC, TPC, SM (procesory strumieniowe), ROP, TEX, SHADER (vertex, fragment, geometry, compute, tessellation, uniform, attribute), COMPUTE, RASTER, DEPTH, STENCIL, BLEND, COLOR_BUFFER, FRAMEBUFFER, RENDER_TARGET, DEPTH_STENCIL_BUFFER, MULTISAMPLE, ANTIALIAS, VIEWPORT, SCISSOR, VERTEX_CACHE, INDEX_BUFFER, PRIMITIVE_BUFFER, UNIFORM_BUFFER, SHADER_STORAGE, ATOMIC_COUNTER, QUERY_OBJECT, PCIE, POWER_PLAY, SMU, UVD, VCE, SDMA, CP, VGT, PA_SC, DB, CB.
+- Rejestrow specyficznych dla Blackwell: ray tracing (`NV_RAY_TRACING_BASE`), mesh shader (`NV_MESH_SHADER_BASE`), tensor core (`NV_TENSOR_CORE_BASE`), DLSS (`NV_DLSS_BASE`), variable rate shading (`NV_VARIABLE_RATE_SHADING_BASE`), meshlet compression (`NV_MESHLET_COMPRESSION_BASE`), displacement micro map (`NV_DISPLACEMENT_MICRO_MAP_BASE`), opacity micro map (`NV_OPACITY_MICRO_MAP_BASE`), serialized write (`NV_SERIALIZED_WRITE_BASE`), shader execution reorder (`NV_SHADER_EXECUTION_REORDER_BASE`), path tracing (`NV_PATH_TRACING_BASE`), pipeline i shader module (`NV_GRAPHICS_PIPELINE_BASE`, `NV_RAY_TRACING_PIPELINE_BASE`, `NV_SHADER_MODULE_BASE`), descriptor set (`NV_DESCRIPTOR_SET_BASE`), command buffer (`NV_COMMAND_BUFFER_BASE`), query pool (`NV_QUERY_POOL_BASE`), swap chain (`NV_SWAP_CHAIN_BASE`).
+
+### struktury danych
+
+- `Matrix4x4` - macierz 4x4 (16 floatow) dla transformacji zwiazanych z kamera, swiatem i rzutowaniem.
+- `Vector4`, `Vector3`, `Vector2` - wektory dla pozycji, koloru, tekstur, normalnych, tangentow i bitangentow.
+- `Vertex` - struktura wierzcholka z pozycja, kolorem, tekstura, normalna, tangentem i bitangentem.
+- `Color` - kolor RGBA w formacie float.
+- `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
+- `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
+- `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute, mesh, task, ray generation, miss, closest hit, any hit, intersection oraz offsetami uniformow i deskryptorow.
+- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
+- `ShaderModule`, `DescriptorSet`, `CommandBuffer`, `QueryPool`, `SwapChain` - obiekty pipeline Vulkanopodobnego API.
+- `RayTracingPipeline`, `MeshShader` - potoki ray tracing i mesh shader.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
+
+### inicjalizacja
+
+- `gtx_5070_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_5070_detected()` -> bool - sprawdza czy karta GTX 5070 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
+- `gtx_5070_driver_init()` / `gtx_5070_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
+
+### operacje MMIO
+
+- `read_mmio(offset: u32) -> u32` - odczyt 32-bitowy z rejestru MMIO pod podanym offsetem.
+- `write_mmio(offset: u32, value: u32)` - zapis 32-bitowy do rejestru MMIO.
+- `read_mmio_64(offset: u32) -> u64` - odczyt 64-bitowy (dwa rejestry 32-bitowe).
+- `write_mmio_64(offset: u32, value: u64)` - zapis 64-bitowy (dwa rejestry 32-bitowe).
+
+### ring buffer i doorbell
+
+- `init_ring_buffers()` - konfiguruje bazy i rejestry procesora komend oraz SDMA dla tresci ring bufferow GFX, compute i DMA.
+- `submit_doorbell(ring_index: u32, value: u32)` - wysyla sygnal doorbell do wybranego ring bufferu (0=GFX, 1=compute, 2=DMA).
+- `ring_write(ring_index: u32, dword: u32)` - zapisuje slowo do ring bufferu z atomowa aktualizacja wptr.
+- `ring_submit(ring_index: u32)` - zatwierdza ring bufferu przez zapis RPTR i doorbell.
+
+### akceleracja 3D i potok graficzny
+
+- `enable_3d_acceleration()` - wlacza akceleracje 3D w rejestrach sterujacych.
+- `submit_3d_command(command, param1, param2, param3)` - przesyla komende 3D z trzema parametrami do GPU.
+- `draw_triangle_3d(x1,y1,z1,x2,y2,z2,x3,y3,z3,color)` - rysuje trojkat 3D o podanych wierzcholkach i kolorze.
+- `draw_line_3d(x1,y1,z1,x2,y2,z2,color)` - rysuje linie 3D.
+- `clear_screen_3d(color)` - czysci ekran podanym kolorem.
+- `set_viewport(x,y,width,height)` - ustawia viewport renderowania.
+- `set_projection_matrix(matrix)` / `set_world_matrix(matrix)` / `set_view_matrix(matrix)` - ustawia macierze rzutowania, swiata i widoku (16 floatow kazda).
+- `enable_depth_test(enabled)` / `set_depth_func(func)` - konfiguracja testu bufora glebokosci.
+- `enable_blending(enabled)` / `set_blend_func(src,dst)` / `set_blend_equation(rgb,alpha)` / `set_blend_color(color)` - konfiguracja mieszania kolorow.
+- `set_cull_mode(mode)` / `set_wireframe(enabled)` - tryb wycinania i ramki druciane.
+- `set_multisample_count(count)` / `enable_multisampling(enabled)` / `enable_antialiasing(enabled)` - MSAA i antialiasing.
+- `set_depth_bounds_test(enabled,min,max)` - test granic glebokosci.
+- `set_stencil_test(enabled,func,ref,mask)` / `set_stencil_op(fail,zfail,zpass)` - test i operacje stencila.
+- `set_logic_op(op,enabled)` / `set_dither(enabled)` - operacje logiczne i dithering.
+- `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
+- `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
+- `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
+- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
+
+### shadery i uniformy
+
+- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
+- `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
+
+### tekstury i framebuffery
+
+- `bind_texture(unit, texture_id)` / `bind_framebuffer(id)` / `bind_renderbuffer(id)` - wiazanie tekstur, framebufferow i renderbufferow do jednostek.
+- `create_texture(width,height,format) -> u32` / `delete_texture(id)` - tworzenie i usuwanie tekstur.
+- `upload_texture_data(texture_id, data, size)` - przesylanie danych tekstury do VRAM.
+- `generate_mipmaps(texture_id)` - generowanie mipmap.
+- `set_texture_filter(texture_id, min_filter, mag_filter)` / `set_texture_wrap(texture_id, wrap_s, wrap_t)` - filtry i owijanie tekstur.
+- `create_renderbuffer(width,height,format) -> u32` / `delete_renderbuffer(id)` - renderbuffery.
+- `create_framebuffer() -> u32` / `delete_framebuffer(id)` - framebuffery.
+- `attach_texture_to_framebuffer(fbo, attachment, texture_id, mip_level)` / `attach_renderbuffer_to_framebuffer(fbo, attachment, rbo_id)` - podlaczenie tekstur/renderbufferow do framebufferu.
+- `set_draw_buffers(count, attachments)` / `set_read_buffer(attachment)` - buforowe rysowania i odczytu.
+- `blit_framebuffer(src_x0,y0,x1,y1, dst_x0,y0,x1,y1, mask, filter)` - blitowanie miedzy framebufferami.
+- `read_pixels(x,y,width,height,format,type,pixels)` - odczyt pikseli z framebufferu.
+
+### informacje o sprzecie
+
+- `engine_clock()` / `memory_clock()` / `vram_size()` / `cuda_cores()` / `sm_count()` / `rop_count()` / `texture_units()` / `memory_bus_width()` / `vertex_cache_size()` / `primitive_buffer_size()` / `command_buffer_size()` / `error_count()` - podstawowe parametry karty.
+- `tensor_cores()` / `rt_cores()` / `dlss_units()` - liczba tensor core, RT core i jednostek DLSS.
+- `variable_rate_shading()` / `meshlet_compression()` / `displacement_micro_map()` / `opacity_micro_map()` / `serialized_write()` / `shader_execution_reorder()` / `path_tracing()` - flagi funkcji specyficznych dla Blackwell.
+
+### zarządzanie shaderami i pipeline (Blackwell)
+
+- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy moduł cieniujacy z kodu SPIR-V.
+- `destroy_shader_module(id)` - niszczy moduł cieniujacy.
+- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbiór deskryptorow.
+- `create_command_buffer(addr, size) -> u32` - tworzy bufor komend.
+- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pulę zapytań.
+- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy łańcuch swap (swap chain).
+- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiązań.
+- `create_mesh_shader(task_shader_addr, task_shader_size, mesh_shader_addr, mesh_shader_size, amplification_shader_addr, amplification_shader_size, vertex_attr_count, vertex_attr_addrs) -> u32` - tworzy mesh shader z shaderami task, mesh i amplification.
+
+### operacje Blackwell specyficzne
+
+- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna śledzenie promieni (ray tracing) dla podanych wymiarów.
+- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyła mesh shader do wykonania z podaną liczbą tasków.
+- `tensor_op(mma_addr, dot_addr, accum_addr, m, n, k)` - operacja macierzowa na tensor core (MMA, DOT, ACCUM).
+- `dlss_upscale(input_addr, output_addr, input_w, input_h, output_w, output_h)` - skalowanie DLSS (super resolution, ray reconstruction, frame generation).
+- `path_trace(pipeline_id, samples, bounces, denoise)` - ścieżkowe renderowanie (path tracing) z podaną liczbą próbek, odbić i opcjonalnym denoisingiem.
+
+### globalna instancja
+
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
