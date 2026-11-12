@@ -17,10 +17,8 @@
 #include "../graficzny/rysowanie.h"
 #include "../graficzny/menu_start.h"
 #include "../graficzny/okno.h"
-#include "../graficzny/eksplorator_plikow.h"
 #include "../graficzny/pulpit.h"
-#include "notatnik.h"
-#include "malowanie.h"
+
 #include "../drivers/sound/intel_hd.h"
 #include "../drivers/alc650.h"
 #include "../drivers/net.h"
@@ -33,16 +31,15 @@
 #include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
 #include "../drivers/karty_graficzne/radeon_hd_6870.h"
 #include "../drivers/bluetooth/bluetooth.h"
-#include "browser.h"
 #include "zegar.h"
 #include <../user_land/konta.h>
-#include "kalkulator.h"
 #include "gdt.h"
 #include "idt.h"
 #include "syscall.h"
 #include "../user_land/tapeta.h"
 #include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
 #include "../graficzny/podzespoly.h"
+#include "panika.h"
 
 bool amd_r7_265_driver_init(void);
 bool amd_r7_265_driver_detected(void);
@@ -207,21 +204,6 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             keyboard_discard_pending();
             continue;
         }
-        if (aktywne_okno && aktywne_okno->otwarte && !aktywne_okno->zminimalizowane && aktywne_okno->w_polu_tekstowym) {
-            char znak;
-            while (keyboard_try_getchar(&znak)) {
-                uint8_t ctrl = keyboard_ctrl_pressed();
-                if (aktywne_okno->pole_tekstowe_znak) {
-                    if (!aktywne_okno->pole_tekstowe_znak(aktywne_okno, znak, ctrl)) break;
-                }
-            }
-        } else {
-            browser_handle_keyboard();
-            eksplorator_plikow_obsluz_klawiature();
-            notatnik_obsluz_klawiature();
-            kalkulator_obsluz_klawiature();
-            malowanie_obsluz_klawiature();
-        }
         if (keyboard_windows_pressed()) {
             menu_start_przelacz();
         }
@@ -235,7 +217,6 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
                 }
             }
         }
-        keyboard_discard_pending();
         if (!aktywne_okno || !aktywne_okno->otwarte) {
             if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
         }

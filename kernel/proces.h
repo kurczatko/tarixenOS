@@ -13,12 +13,24 @@ extern "C" {
 
 #define MAX_PROCESSES 64
 #define MAX_OKNA_PROCESU 8
+#define SMP_MAX_CPUS 8
 
 #define NR_PRIORITIES 140
 #define MAX_WAIT_QUEUES 32
 #define IDLE_PRIORITY (NR_PRIORITIES - 1)
 #define DEFAULT_TIME_SLICE 4
 #define TICK_NS 10000000ULL
+
+extern struct proces *current_cpu[SMP_MAX_CPUS];
+extern uint32_t smp_cpu_count;
+extern uint32_t cpu_online_mask;
+extern volatile uint32_t smp_this_cpu;
+
+uint32_t cpu_id(void);
+
+void sched_enqueue(struct proces *p);
+void sched_dequeue(struct proces *p, uint32_t cpu);
+struct proces *sched_pick_next(uint32_t cpu);
 
 typedef enum {
     PROCES_TERMINATED = 0,
