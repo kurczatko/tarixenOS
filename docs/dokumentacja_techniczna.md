@@ -7274,3 +7274,900 @@ driver_manager_register("kamera_quickcam", quickcam_driver_init, quickcam_driver
 ```
 
 co oznacza ze jest inicjowany przez `driver_manager_init_all()` i polling (pobieranie klatek) jest wywolywany co 5 tikow przez `driver_manager_poll_all()`. interfejs uzytkownika jest inicjowany przez `kamera_ui_init()` w `kernel_main`, a ikona kamery oraz czerwona kropka sa rysowane na pasku zadan przez `quickcam_ui_rysuj_pasek()` wywolywane z `narysuj_pasek_zadan()`. klikniecie ikony na pasku zadan jest obslugiwane w `drivers/mouse.c` przez `quickcam_ui_mouse_click()`, ktore otwiera okno podgladu kamery.
+
+## sterownik AMD Radeon HD 5850 - rust/drivers/karty_graficzne/amd/hd_5850.rs
+
+sterownik karty graficznej AMD Radeon HD 5850 (chip Cypress, architektura Evergreen, generacja VCE 3.0) napisany w Rust z `#[no_std]`. obsluguje wykrycie urzadzenia na PCI (vendor 0x1002, urzadzenie 0x6899), mapowanie MMIO, soft-reset chipa (GRBM + SRBM), inicjalizacje procesora komend (CP), potoku wierzchołkowego (VGT), rastrowania (PA/SC), eksportu (SX), bufora glebi (DB), bufora kolorow (CB), shaderow, rastrowania, testu glebi, stencila, blendowania, buforow koloru, ramki graficznej, render targetow, bufora glebi-stencila, probkowania wielokrotnego, wygładzania krawedzi, widoku, nozyca, cache wierzcholkow, bufora indeksow, bufora primitivow, buforow jednostajnych, buforow skladnikow shaderow, licznikow atomowych, obiektow zapytan, PCI Express, zarządzania zasilaniem oraz SMU. nastepnie inicjalizuje bufora pikcieli (graficzny, obliczeniowy, DMA) i wlacza zaawansowana akceleracje 3D. kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/amd/*.rs)`) i linkowany do jadra.
+
+### hd_5850_driver_init
+
+inicjalizuje sterownik: tworzy instancje GPU, wykrywa urzadzenie na PCI, wykonuje soft-reset, konfiguruje wszystkie bloki sprzetowe, inicjalizuje bufora pikcieli i wlacza akceleracje 3D. zwraca 1 po udanej inicjalizacji, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+```
+bool hd_5850_driver_init(void);
+```
+
+### hd_5850_driver_detected
+
+sprawdza czy karta AMD Radeon HD 5850 jest wykryta na PCI (porownuje vendor ID i device ID). zwraca 1 gdy wykryta, 0 gdy nie.
+
+```
+bool hd_5850_driver_detected(void);
+```
+
+### hd_5850_draw_triangle_3d
+
+rysuje trojkat 3D o wierzcholkach (x1,y1,z1), (x2,y2,z2), (x3,y3,z3) i podanym kolorze.
+
+```
+void hd_5850_draw_triangle_3d(int x1, int y1, int z1, int x2, int y2, int z2, int x3, int y3, int z3, uint32_t color);
+```
+
+### hd_5850_draw_line_3d
+
+rysuje linie 3D od (x1,y1,z1) do (x2,y2,z2) podanym kolorem.
+
+```
+void hd_5850_draw_line_3d(int x1, int y1, int z1, int x2, int y2, int z2, uint32_t color);
+```
+
+### hd_5850_clear_screen_3d
+
+czysci ekran podanym kolorem w trybie 3D.
+
+```
+void hd_5850_clear_screen_3d(uint32_t color);
+```
+
+### hd_5850_set_viewport
+
+ustawia viewport na pozycji (x, y) o rozmiarze (width, height).
+
+```
+void hd_5850_set_viewport(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
+```
+
+### hd_5850_set_projection_matrix / hd_5850_set_world_matrix / hd_5850_set_view_matrix
+
+ustawia odpowiednio macierz rzutowania, swiata lub widoku (16 wartosci f32 w formacie column-major).
+
+```
+void hd_5850_set_projection_matrix(const struct Matrix4x4 *matrix);
+void hd_5850_set_world_matrix(const struct Matrix4x4 *matrix);
+void hd_5850_set_view_matrix(const struct Matrix4x4 *matrix);
+```
+
+struktura `Matrix4x4` zawiera pole `m` — tablice 16 floatow.
+
+### hd_5850_enable_depth_test / hd_5850_enable_blending
+
+wlacza/wylacza test glebi lub blendowanie.
+
+```
+void hd_5850_enable_depth_test(uint8_t enabled);
+void hd_5850_enable_blending(uint8_t enabled);
+```
+
+### hd_5850_set_blend_func
+
+ustawia funkcje blendowania zrodlowego i docelowego.
+
+```
+void hd_5850_set_blend_func(uint32_t src, uint32_t dst);
+```
+
+### hd_5850_set_depth_func
+
+ustawia funkcje porownania glebi.
+
+```
+void hd_5850_set_depth_func(uint32_t func);
+```
+
+### hd_5850_set_cull_mode
+
+ustawia tryb usuwania scian (culling).
+
+```
+void hd_5850_set_cull_mode(uint32_t mode);
+```
+
+### hd_5850_set_wireframe
+
+wlacza/wylacza tryb siatki (wireframe).
+
+```
+void hd_5850_set_wireframe(uint8_t enabled);
+```
+
+### hd_5850_set_multisample_count
+
+ustawia liczba probek dla probkowania wielokrotnego (MSAA).
+
+```
+void hd_5850_set_multisample_count(uint32_t count);
+```
+
+### hd_5850_enable_multisampling / hd_5850_enable_antialiasing
+
+wlacza/wylacza probkowanie wielokrotne lub wygładzanie krawedzi.
+
+```
+void hd_5850_enable_multisampling(uint8_t enabled);
+void hd_5850_enable_antialiasing(uint8_t enabled);
+```
+
+### hd_5850_finish / hd_5850_flush
+
+czeka na zakonczenie wszystkich operacji GPU (finish) lub wymusza wypelnienie potoku komend (flush).
+
+```
+void hd_5850_finish(void);
+void hd_5850_flush(void);
+```
+
+### hd_5850_get_status
+
+zwraca aktualny stan rejestru statusu GPU.
+
+```
+uint32_t hd_5850_get_status(void);
+```
+
+### hd_5850_engine_clock / hd_5850_memory_clock / hd_5850_vram_size
+
+zwracaja odpowiednio taktowanie rdzenia, pamieci i rozmiar VRAM.
+
+```
+uint32_t hd_5850_engine_clock(void);
+uint32_t hd_5850_memory_clock(void);
+uint32_t hd_5850_vram_size(void);
+```
+
+### hd_5850_stream_cores / hd_5850_simd_count / hd_5850_rop_count / hd_5850_texture_units / hd_5850_memory_bus_width
+
+zwracaja liczba rdzeni strumieniowych, SIMD, ROP, jednostek teksturowych i szerokość szyny pamieci.
+
+```
+uint32_t hd_5850_stream_cores(void);
+uint32_t hd_5850_simd_count(void);
+uint32_t hd_5850_rop_count(void);
+uint32_t hd_5850_texture_units(void);
+uint32_t hd_5850_memory_bus_width(void);
+```
+
+### hd_5850_error_count
+
+zwraca liczbe bledów zanotowanych przez sterownik.
+
+```
+uint32_t hd_5850_error_count(void);
+```
+
+### hd_5850_create_shader_module / hd_5850_destroy_shader_module
+
+tworzy modul shadera z kodu SPIR-V pod podanym adresem i rozmiarze, z podanym punktem wejscia i etapie (vertex, fragment, geometry, tessellation, compute). niszczy modul shadera o podanym id.
+
+```
+uint32_t hd_5850_create_shader_module(uint64_t spirv_addr, uint32_t spirv_size, uint64_t entry_point_addr, uint32_t entry_point_size, uint32_t stage);
+void hd_5850_destroy_shader_module(uint32_t id);
+```
+
+### hd_5850_create_descriptor_set
+
+tworzy zbior deskryptorow pod podanym adresie, rozmiarze i liczbie powiazan (bindings). zwraca id zbioru.
+
+```
+uint32_t hd_5850_create_descriptor_set(uint64_t addr, uint32_t size, uint32_t binding_count, const uint64_t *bindings);
+```
+
+### hd_5850_create_command_buffer
+
+tworzy bufor komend pod podanym adresem i rozmiarze. zwraca id bufora.
+
+```
+uint32_t hd_5850_create_command_buffer(uint64_t addr, uint32_t size);
+```
+
+### hd_5850_create_query_pool
+
+tworzy pule zapytan o podanej liczbie i typie, z buforem wynikow pod podanym adresem. zwraca id puli.
+
+```
+uint32_t hd_5850_create_query_pool(uint64_t addr, uint32_t count, uint32_t query_type, uint64_t results_addr);
+```
+
+### hd_5850_create_swap_chain
+
+tworzy lancuch wymiany (swap chain) o podanej liczbie obrazow, adresie, rozmiarze i formacie. zwraca id lancucha.
+
+```
+uint32_t hd_5850_create_swap_chain(uint32_t image_count, uint64_t image_addr, uint32_t image_size, uint32_t image_format);
+```
+
+### hd_5850_create_shader_pipeline / hd_5850_create_compute_pipeline
+
+tworzy potok graficzny (shader pipeline) z modułami vertex, fragment, geometry oraz tessellation ctrl/eval, lub potok obliczeniowy (compute pipeline) z modułem compute, pod adresem i rozmiarem stanu. zwraca id potoku.
+
+```
+uint32_t hd_5850_create_shader_pipeline(uint32_t vs_module_id, uint32_t fs_module_id, uint32_t gs_module_id, uint32_t tess_ctrl_module_id, uint32_t tess_eval_module_id, uint64_t state_addr, uint32_t state_size);
+uint32_t hd_5850_create_compute_pipeline(uint32_t compute_module_id, uint64_t state_addr, uint32_t state_size);
+```
+
+### hd_5850_bind_shader_pipeline / hd_5850_bind_compute_pipeline
+
+powiazuje aktywny potok graficzny lub obliczeniowy o podanym id.
+
+```
+void hd_5850_bind_shader_pipeline(uint32_t pipeline_id);
+void hd_5850_bind_compute_pipeline(uint32_t pipeline_id);
+```
+
+### hd_5850_dispatch_compute
+
+wysyla zadanie obliczeniowe (compute dispatch) o podanej liczbie grup roboczych (x, y, z).
+
+```
+void hd_5850_dispatch_compute(uint32_t group_x, uint32_t group_y, uint32_t group_z);
+```
+
+### hd_5850_present / hd_5850_acquire_image
+
+wyswietla nastepny obraz z lancucha wymiany lub nabywa nastepny dostepny obraz (zwraca indeks obrazu).
+
+```
+void hd_5850_present(uint32_t swap_chain_id);
+uint32_t hd_5850_acquire_image(uint32_t swap_chain_id);
+```
+
+### funkcje zwiazane z teksturami, framebufferami i renderbufferami (dostepne przez instancje GPU)
+
+- `create_texture` / `delete_texture` — tworzy/niszy teksture o podanej szerokosci, wysokosci i formacie.
+- `upload_texture_data` — wgrywa dane tekstury do VRAM.
+- `generate_mipmaps` — generuje mipmapy dla tekstury.
+- `set_texture_filter` / `set_texture_wrap` — ustawia filtr i tryb owijania tekstury.
+- `bind_texture` — powiazuje teksture z jednostka teksturowa.
+- `create_framebuffer` / `delete_framebuffer` — tworzy/niszy framebuffer.
+- `create_renderbuffer` / `delete_renderbuffer` — tworzy/niszy renderbuffer.
+- `attach_texture_to_framebuffer` / `attach_renderbuffer_to_framebuffer` — dołącza teksture/renderbuffer do punktu zaczepienia framebuffera.
+- `set_draw_buffers` / `set_read_buffer` — ustawia bufora rysowania i odczytu.
+- `blit_framebuffer` — kopiuje obszar miedzy framebufferami.
+- `read_pixels` — odczytuje piksele z framebuffera do bufora.
+
+### funkcje zwiazane z tablicami wierzcholkow i rysowaniem (dostepne przez instancje GPU)
+
+- `set_vertex_array` / `set_index_array` — ustawia tablice wierzcholkow i indeksow.
+- `draw_arrays` / `draw_elements` — rysuje z tablicy wierzcholkow lub z indeksow.
+- `draw_instanced` / `draw_elements_instanced` — rysuje z instancjami.
+- `set_shader_program` — aktywuje program shadera.
+- `set_uniform_1f/2f/3f/4f` / `set_uniform_matrix4fv` — ustawia wartosci uniformow (skalar, wektor 2/3/4, macierz 4x4).
+
+### struktura GpuInstance
+
+| pole | typ | opis |
+|------|-----|------|
+| mmio_base | *mut u32 | adres bazowy MMIO karty |
+| vram_base | *mut u32 | adres bazowy pamieci VRAM |
+| gart_base | *mut u32 | adres bazowy GART |
+| doorbell_base | *mut u32 | adres bazowy doorbelli |
+| vram_size | u64 | rozmiar pamieci VRAM (1 GB) |
+| vram_used | AtomicU64 | zuzycie pamieci VRAM |
+| gart_size | u64 | rozmiar GART (512 MB) |
+| engine_clock | u32 | taktowanie rdzenia (725 MHz) |
+| memory_clock | u32 | taktowanie pamieci (1000 MHz) |
+| stream_cores | u32 | liczba rdzeni strumieniowych (1440) |
+| simd_count | u32 | liczba jednostek SIMD (18) |
+| rop_count | u32 | liczba jednostek ROP (32) |
+| texture_units | u32 | liczba jednostek teksturowych (72) |
+| memory_bus_width | u32 | szerokosc szyny pamieci (256 bit) |
+| vertex_cache_size | u32 | rozmiar cache wierzcholkow (64 KB) |
+| primitive_buffer_size | u32 | rozmiar bufora primitivow (32 KB) |
+| command_buffer_size | u32 | rozmiar bufora komend (16 MB) |
+| initialized | AtomicBool | czy sterownik jest zainicjowany |
+| error_count | AtomicU32 | licznik bledow sterownika |
+
+stale:
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| AMD_RADEON_HD_5850_VENDOR_ID | 0x1002 | vendor ID AMD/ATI |
+| AMD_RADEON_HD_5850_DEVICE_ID | 0x6899 | device ID Radeon HD 5850 |
+| CHIP_CYPRESS | 0x6899 | oznaczenie chipa Cypress |
+| EVERGREEN_ARCH_VERSION | 5 | wersja architektury Evergreen |
+| HD5850_VRAM_SIZE | 1073741824 | rozmiar VRAM w bajtach (1 GB) |
+| HD5850_GART_SIZE | 536870912 | rozmiar GART w bajtach (512 MB) |
+| HD5850_ENGINE_CLOCK | 725000 | taktowanie rdzenia w kHz |
+| HD5850_MEMORY_CLOCK | 1000000 | taktowanie pamieci w kHz |
+| HD5850_STREAM_CORES | 1440 | liczba rdzeni strumieniowych |
+| HD5850_SIMD_COUNT | 18 | liczba jednostek SIMD |
+| HD5850_ROP_COUNT | 32 | liczba jednostek ROP |
+| HD5850_TEXTURE_UNITS | 72 | liczba jednostek teksturowych |
+| HD5850_MEMORY_BUS_WIDTH | 256 | szerokosc szyny pamieci w bitach |
+
+## karta graficzna - rust/drivers/karty_graficzne/amd/radeon_hd_6870.rs
+
+sterownik karty graficznej AMD Radeon HD 6870 (chip Barts, architektura Northern Islands) napisany w Rust. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), tekstury z mipmapami, shadery (vertex/pixel/geometry/compute/tessellation), render targety, depth-stencil, command buffer oraz presentation. napisany z `#[no_std]`, kompilowany przez makefile i linkowany do jadra.
+
+### radeon_hd_6870_init
+
+inicjalizuje sterownik Radeon HD 6870: wyszukuje urzadzenie na PCI (vendor 0x1002, urzadzenie 0x6738), mapuje adresy MMIO, resetuje Command Processor, inicjalizuje ring buffer CP i SDMA, wlacza potok 3D Northern Islands.
+
+```
+bool radeon_hd_6870_init(void);
+```
+
+zwraca true po udanej inicjalizacji, false gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### radeon_hd_6870_is_ready
+
+zwraca true gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+bool radeon_hd_6870_is_ready(void);
+```
+
+### radeon_hd_6870_putpixel
+
+rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem.
+
+```
+void radeon_hd_6870_putpixel(uint32_t x, uint32_t y, uint32_t color);
+```
+
+### radeon_hd_6870_fillrect
+
+wypelnia prostokat o podanym rozmiarze i kolorem petla CPU.
+
+```
+void radeon_hd_6870_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
+```
+
+### radeon_hd_6870_blt
+
+kopiuje blok pikseli z (src_x, src_y) do (dst_x, dst_y) o rozmiarze (w, h) petla CPU.
+
+```
+void radeon_hd_6870_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h);
+```
+
+### radeon_hd_6870_get_width / radeon_hd_6870_get_height
+
+zwracaja szerokosc i wysokosc ekranu (1920x1080).
+
+```
+uint32_t radeon_hd_6870_get_width(void);
+uint32_t radeon_hd_6870_get_height(void);
+```
+
+### radeon_hd_6870_get_device_id / radeon_hd_6870_get_revision
+
+zwracaja id urzadzenia i revisje karty graficznej.
+
+```
+uint16_t radeon_hd_6870_get_device_id(void);
+uint8_t radeon_hd_6870_get_revision(void);
+```
+
+### radeon_hd_6870_info_get
+
+pobiera pelne informacje o urzadzeniu do struktury radeon_hd_6870_info (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, gcn_generation).
+
+```
+void radeon_hd_6870_info_get(struct radeon_hd_6870_info *out);
+```
+
+## akceleracja 3D Northern Islands - rust/drivers/karty_graficzne/amd/radeon_hd_6870.rs
+
+### tworzenie i niszczenie zasobow 3D
+
+#### radeon_hd_6870_vertex_buffer_create
+
+tworzy vertex buffer (wierzcholki). zwraca handle lub HANDLE_NULL przy bledzie.
+
+```
+uint32_t radeon_hd_6870_vertex_buffer_create(uint32_t vertex_count, uint32_t vertex_size, uint32_t format, const void *data);
+```
+
+#### radeon_hd_6870_vertex_buffer_destroy / radeon_hd_6870_vertex_buffer_update
+
+niszczy vertex buffer lub aktualizuje jego dane od podanego offsetu.
+
+```
+void radeon_hd_6870_vertex_buffer_destroy(uint32_t handle);
+void radeon_hd_6870_vertex_buffer_update(uint32_t handle, uint32_t offset, uint32_t size, const void *data);
+```
+
+#### radeon_hd_6870_index_buffer_create
+
+tworzy index buffer (indeksy wierzcholkow, 16 lub 32 bitowe). zwraca handle.
+
+```
+uint32_t radeon_hd_6870_index_buffer_create(uint32_t index_count, uint32_t format, const void *data);
+```
+
+#### radeon_hd_6870_index_buffer_destroy / radeon_hd_6870_index_buffer_update
+
+niszczy index buffer lub aktualizuje jego dane.
+
+```
+void radeon_hd_6870_index_buffer_destroy(uint32_t handle);
+void radeon_hd_6870_index_buffer_update(uint32_t handle, uint32_t offset, uint32_t size, const void *data);
+```
+
+#### radeon_hd_6870_texture_create
+
+tworzy teksture 2D o podanym rozmiarze, formacie i liczbie poziomow mipmap. zwraca handle.
+
+```
+uint32_t radeon_hd_6870_texture_create(uint32_t width, uint32_t height, uint32_t format, uint32_t mip_levels, const void *data);
+```
+
+#### radeon_hd_6870_texture_destroy / radeon_hd_6870_texture_update / radeon_hd_6870_texture_generate_mipmaps
+
+niszczy teksture, aktualizuje jej zawartosc (upload z pamieci systemowej do FB) lub generuje mipmapy.
+
+```
+void radeon_hd_6870_texture_destroy(uint32_t handle);
+void radeon_hd_6870_texture_update(uint32_t handle, uint32_t level, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *data);
+void radeon_hd_6870_texture_generate_mipmaps(uint32_t handle);
+```
+
+#### radeon_hd_6870_render_target_create / radeon_hd_6870_render_target_destroy
+
+tworzy lub niszczy render target (bufor koloru do renderowania 3D z obsluga przezroczystosci alpha).
+
+```
+uint32_t radeon_hd_6870_render_target_create(uint32_t width, uint32_t height, uint32_t format, uint8_t alpha_blend);
+void radeon_hd_6870_render_target_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_depth_stencil_create / radeon_hd_6870_depth_stencil_destroy
+
+tworzy lub niszczy depth-stencil buffer (bufor glebi i stencil).
+
+```
+uint32_t radeon_hd_6870_depth_stencil_create(uint32_t width, uint32_t height, uint32_t format);
+void radeon_hd_6870_depth_stencil_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_shader_create / radeon_hd_6870_shader_destroy
+
+tworzy shader (vertex/pixel/geometry/compute/tessellation) z kodu bajtowego ISA GPU lub niszczy shader.
+
+```
+uint32_t radeon_hd_6870_shader_create(uint32_t type, const uint8_t *code, uint32_t code_size);
+void radeon_hd_6870_shader_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_sampler_state_create / radeon_hd_6870_sampler_state_destroy
+
+tworzy lub niszczy stan probki tekstury (filtrowanie min/mag/mip, adresowanie, anisotropia, porownanie).
+
+```
+uint32_t radeon_hd_6870_sampler_state_create(uint32_t filter_min, uint32_t filter_mag, uint32_t filter_mip, uint32_t address_u, uint32_t address_v, uint32_t address_w, uint32_t max_anisotropy, uint8_t compare_enable);
+void radeon_hd_6870_sampler_state_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_blend_state_create / radeon_hd_6870_blend_state_destroy
+
+tworzy lub niszczy stan blendowania (przezroczystosc alpha, operacje blendowania, staly kolor blendowania).
+
+```
+uint32_t radeon_hd_6870_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor);
+void radeon_hd_6870_blend_state_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_rasterizer_state_create / radeon_hd_6870_rasterizer_state_destroy
+
+tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygладzone, alpha to coverage dla przezroczystosci).
+
+```
+uint32_t radeon_hd_6870_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage);
+void radeon_hd_6870_rasterizer_state_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_depth_stencil_state_create / radeon_hd_6870_depth_stencil_state_destroy
+
+tworzy lub niszczy stan depth-stencil (testy glebi i stencil z przodem i tylem).
+
+```
+uint32_t radeon_hd_6870_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func);
+void radeon_hd_6870_depth_stencil_state_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_input_layout_create / radeon_hd_6870_input_layout_destroy
+
+tworzy lub niszczy input layout (mapowanie atrybutow vertex do slotow Northern Islands).
+
+```
+uint32_t radeon_hd_6870_input_layout_create(uint32_t element_count, const uint32_t *slots, const uint32_t *offsets, const uint32_t *formats);
+void radeon_hd_6870_input_layout_destroy(uint32_t handle);
+```
+
+#### radeon_hd_6870_constant_buffer_create / radeon_hd_6870_constant_buffer_destroy / radeon_hd_6870_constant_buffer_update
+
+tworzy, niszczy lub aktualizuje constant buffer (stale shadera / uniforms Northern Islands).
+
+```
+uint32_t radeon_hd_6870_constant_buffer_create(uint32_t size);
+void radeon_hd_6870_constant_buffer_destroy(uint32_t handle);
+void radeon_hd_6870_constant_buffer_update(uint32_t handle, uint32_t offset, uint32_t size, const void *data);
+```
+
+### bindowanie stanow potoku 3D Northern Islands
+
+#### radeon_hd_6870_bind_vertex_buffer / radeon_hd_6870_bind_index_buffer / radeon_hd_6870_bind_input_layout
+
+binduje vertex buffer, index buffer lub input layout do potoku 3D Northern Islands.
+
+```
+void radeon_hd_6870_bind_vertex_buffer(uint32_t handle);
+void radeon_hd_6870_bind_index_buffer(uint32_t handle);
+void radeon_hd_6870_bind_input_layout(uint32_t handle);
+```
+
+#### radeon_hd_6870_bind_vertex_shader / radeon_hd_6870_bind_pixel_shader / radeon_hd_6870_bind_geometry_shader / radeon_hd_6870_bind_compute_shader
+
+binduje shader vertex, pixel, geometry lub compute do potoku 3D Northern Islands.
+
+```
+void radeon_hd_6870_bind_vertex_shader(uint32_t handle);
+void radeon_hd_6870_bind_pixel_shader(uint32_t handle);
+void radeon_hd_6870_bind_geometry_shader(uint32_t handle);
+void radeon_hd_6870_bind_compute_shader(uint32_t handle);
+```
+
+#### radeon_hd_6870_bind_render_target / radeon_hd_6870_bind_depth_stencil
+
+binduje render target lub depth-stencil do potoku 3D Northern Islands.
+
+```
+void radeon_hd_6870_bind_render_target(uint32_t handle);
+void radeon_hd_6870_bind_depth_stencil(uint32_t handle);
+```
+
+#### radeon_hd_6870_bind_blend_state / radeon_hd_6870_bind_rasterizer_state / radeon_hd_6870_bind_depth_stencil_state
+
+binduje stan blendowania, rasterizera lub depth-stencil do potoku 3D Northern Islands.
+
+```
+void radeon_hd_6870_bind_blend_state(uint32_t handle);
+void radeon_hd_6870_bind_rasterizer_state(uint32_t handle);
+void radeon_hd_6870_bind_depth_stencil_state(uint32_t handle);
+```
+
+#### radeon_hd_6870_bind_sampler_and_texture / radeon_hd_6870_bind_constant_buffer
+
+binduje probke tekstury i teksture do slotu lub constant buffer do slotu.
+
+```
+void radeon_hd_6870_bind_sampler_and_texture(uint32_t slot, uint32_t sampler, uint32_t texture);
+void radeon_hd_6870_bind_constant_buffer(uint32_t slot, uint32_t handle);
+```
+
+### konfiguracja potoku 3D Northern Islands
+
+#### radeon_hd_6870_set_viewport
+
+ustawia viewport (prostokat wyswietlania w NDCS do ekranu) oraz granice glebi.
+
+```
+void radeon_hd_6870_set_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_depth, float max_depth);
+```
+
+#### radeon_hd_6870_set_scissor
+
+ustawia prostokat przyciecia renderowania (scissor).
+
+```
+void radeon_hd_6870_set_scissor(uint32_t left, uint32_t top, uint32_t right, uint32_t bottom);
+```
+
+#### radeon_hd_6870_set_primitive_topology
+
+ustawia typ primitivu do rysowania (punkt, linia, trojkat itp.).
+
+```
+void radeon_hd_6870_set_primitive_topology(uint32_t topology);
+```
+
+### rysowanie 3D
+
+#### radeon_hd_6870_clear_render_target
+
+czyści render target podanym kolorem.
+
+```
+void radeon_hd_6870_clear_render_target(uint32_t rt, uint32_t color);
+```
+
+#### radeon_hd_6870_clear_depth_stencil
+
+czyści depth-stencil podanymi wartosciami glebi i stencil.
+
+```
+void radeon_hd_6870_clear_depth_stencil(uint32_t ds, float depth, uint8_t stencil);
+```
+
+#### radeon_hd_6870_draw
+
+rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex.
+
+```
+void radeon_hd_6870_draw(uint32_t vertex_count, uint32_t start_vertex);
+```
+
+#### radeon_hd_6870_draw_indexed
+
+rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex.
+
+```
+void radeon_hd_6870_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex);
+```
+
+### command buffer (akceleracja 3D w strumieniu)
+
+#### radeon_hd_6870_command_begin / radeon_hd_6870_command_end
+
+rozpoczyna nagrywanie polecen do command buffer lub zakoncza nagrywanie i wykonuje wszystkie polecenia.
+
+```
+void radeon_hd_6870_command_begin(void);
+void radeon_hd_6870_command_end(void);
+```
+
+### presentation (swap chain)
+
+#### radeon_hd_6870_swap_chain_create / radeon_hd_6870_swap_chain_destroy / radeon_hd_6870_present
+
+tworzy swap chain (podwojne buforowanie z opcja vsync), niszczy swap chain lub przebija tylny bufor na przedni (present).
+
+```
+uint32_t radeon_hd_6870_swap_chain_create(uint32_t width, uint32_t height, uint8_t vsync);
+void radeon_hd_6870_swap_chain_destroy(uint32_t handle);
+void radeon_hd_6870_present(uint32_t chain);
+```
+
+### informacje o akceleracji 3D
+
+#### radeon_hd_6870_context_get / radeon_hd_6870_3d_available
+
+pobiera biezacy kontekst 3D lub zwraca true gdy akceleracja 3D jest dostepna (pipeline Northern Islands).
+
+```
+void radeon_hd_6870_context_get(struct radeon_hd_6870_context *out);
+bool radeon_hd_6870_3d_available(void);
+```
+
+## karta graficzna - rust/drivers/karty_graficzne/amd/radeon_hd_5570.rs
+
+sterownik karty graficznej AMD Radeon HD 5570 (chip Redwood, rodzina Evergreen, architektura TeraScale 2 / VLIW5) napisany w Rust. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), tekstury, shadery (vertex/fragment/geometry/compute), render targety, depth-stencil, ring buffory (gfx/compute/dma), doorbelle oraz presentation. napisany z `#[no_std]`, kompilowany przez makefile i linkowany do jadra. rejestrowany w `lib.rs` jako `pub mod radeon_hd_5570`.
+
+### stale
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| RADEON_VENDOR_ID | 0x1002 | vendor ID AMD/ATI |
+| RADEON_HD_5570_DEVICE_ID | 0x68BE | device ID Radeon HD 5570 |
+| CHIP_REDWOOD | 0x68BE | identyfikator chipa Redwood |
+| EVERGREEN_ARCH_VERSION | 2 | wersja architektury Evergreen |
+| REG_MMIO_BASE | 0xF0000000 | baza rejestrow MMIO |
+| REG_VRAM_BASE | 0xE0000000 | baza pamieci wideo |
+| REG_GART_BASE | 0xD0000000 | baza GART |
+| REG_DOORBELL_BASE | 0xC0000000 | baza doorbelli |
+| RADEON_HD5570_VRAM_SIZE | 1024*1024*1024 | rozmiar VRAM (1 GB) |
+| RADEON_HD5570_GART_SIZE | 512*1024*1024 | rozmiar GART (512 MB) |
+| RADEON_HD5570_ENGINE_CLOCK | 650000 | taktowanie rdzenia |
+| RADEON_HD5570_MEMORY_CLOCK | 900000 | taktowanie pamieci |
+| RADEON_HD5570_SHADER_UNITS | 400 | liczba jednostek shaderowych |
+| RADEON_HD5570_SIMD_COUNT | 5 | liczba SIMD |
+| RADEON_HD5570_ROP_COUNT | 8 | liczba ROP |
+| RADEON_HD5570_TEXTURE_UNITS | 20 | liczba jednostek tekstur |
+| RADEON_HD5570_MEMORY_BUS_WIDTH | 128 | szerokość szyny pamieci |
+
+### inicjalizacja
+
+#### radeon_hd5570_driver_init
+
+inicjalizuje sterownik Radeon HD 5570: tworzy instancje GPU, wykrywa urzadzenie na PCI (porownanie vendor/device ID), wykonuje soft-reset GRBM, konfiguruje CP, VGT, PA, DB, CB, SQ, SPI, SX, GB_TILE, zasilanie, inicjalizuje ring buffory i wlacza akceleracje 3D.
+
+```
+bool radeon_hd5570_driver_init(void);
+```
+
+zwraca true po udanej inicjalizacji, false gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+#### radeon_hd5570_driver_detected
+
+sprawdza czy karta Radeon HD 5570 jest wykryta (vendor 0x1002, urzadzenie 0x68BE, revisja rozna od 0xFFFFFFFF).
+
+```
+bool radeon_hd5570_driver_detected(void);
+```
+
+zwraca true gdy wykryta, false gdy nie.
+
+#### radeon_hd5570_driver_is_ready
+
+zwraca true gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+bool radeon_hd5570_driver_is_ready(void);
+```
+
+### rysowanie 2D
+
+#### radeon_hd5570_driver_putpixel
+
+rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem (bezposredni zapis do VRAM).
+
+```
+void radeon_hd5570_driver_putpixel(uint32_t x, uint32_t y, uint32_t color);
+```
+
+#### radeon_hd5570_driver_fillrect
+
+wypelnia prostokat o rozmiarze (w, h) na pozycji (x, y) podanym kolorem petla CPU z zapisem do VRAM.
+
+```
+void radeon_hd5570_driver_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color);
+```
+
+#### radeon_hd5570_driver_get_width / radeon_hd5570_driver_get_height
+
+zwracaja szerokosc i wysokosc ekranu (1024x768).
+
+```
+uint32_t radeon_hd5570_driver_get_width(void);
+uint32_t radeon_hd5570_driver_get_height(void);
+```
+
+#### radeon_hd5570_driver_get_vram_size
+
+zwraca rozmiar pamieci wideo karty w bajtach.
+
+```
+uint64_t radeon_hd5570_driver_get_vram_size(void);
+```
+
+#### radeon_hd5570_driver_get_shader_units
+
+zwraca liczbe jednostek shaderowych (400).
+
+```
+uint32_t radeon_hd5570_driver_get_shader_units(void);
+```
+
+#### radeon_hd5570_driver_get_error_count
+
+zwraca liczbe bledow zliczonych przez sterownik (timeouty wait_idle).
+
+```
+uint32_t radeon_hd5570_driver_get_error_count(void);
+```
+
+### shadery i akceleracja 3D (Evergreen / TeraScale 2)
+
+#### radeon_hd5570_driver_load_shader
+
+laduje modul shaderu (kod TGSI) pod podanym id, adresem, rozmiarem i etapie potoku (stage: 0=vertex, 1=fragment, 2=geometry, 3=tessellation). zapisuje modul w tablicy shaderow (max 32).
+
+```
+bool radeon_hd5570_driver_load_shader(uint32_t id, uint64_t addr, uint32_t size, uint32_t stage);
+```
+
+zwraca true po udanym zaladowaniu, false gdy tablica shaderow jest pelna.
+
+#### radeon_hd5570_driver_bind_shader
+
+binduje shader o danym id do wybranego etapu potoku (ustawia adres poczatkowy programu SQ oraz zasoby).
+
+```
+void radeon_hd5570_driver_bind_shader(uint32_t stage, uint32_t module_id);
+```
+
+#### radeon_hd5570_driver_set_uniform
+
+ustawia stala jednorodna (uniform/constant register) w rejestrach SQ_VTX_CONSTANT_WORD dla podanej lokalizacji (cztery wartosci f32).
+
+```
+void radeon_hd5570_driver_set_uniform(uint32_t location, float v0, float v1, float v2, float v3);
+```
+
+### rysowanie 3D
+
+#### radeon_hd5570_driver_draw_arrays
+
+rysuje primitivy z vertex buffera bez indeksow (vertex_count wierzcholkow) przez ring buffer gfx i doorbell CP.
+
+```
+void radeon_hd5570_driver_draw_arrays(uint32_t primitive, uint32_t count);
+```
+
+#### radeon_hd5570_driver_draw_indexed
+
+rysuje indeksowane primitivy z index buffera (index_count indeksow, adres indexow w VRAM) przez ring buffer gfx i doorbell CP.
+
+```
+void radeon_hd5570_driver_draw_indexed(uint32_t primitive, uint32_t count, uint64_t addr);
+```
+
+#### radeon_hd5570_driver_present
+
+oznacza swap chain jako prezentowany i wysyla doorbell CP (podwojne buforowanie).
+
+```
+void radeon_hd5570_driver_present(uint32_t swap_chain_id);
+```
+
+#### radeon_hd5570_driver_clear_color
+
+wlacza czyszczenie koloru (CB_COLOR_CONTROL).
+
+```
+void radeon_hd5570_driver_clear_color(uint32_t color);
+```
+
+#### radeon_hd5570_driver_clear_depth
+
+wlacza czyszczenie glebi (DB_Z_INFO / DB_DEPTH_CONTROL).
+
+```
+void radeon_hd5570_driver_clear_depth(uint32_t depth);
+```
+
+### konfiguracja potoku 3D
+
+#### radeon_hd5570_driver_set_viewport
+
+ustawia viewport (skala i przesuniecie X/Y oraz granice glebi) w rejestrach PA_CL_VPORT i PA_SC_VPORT.
+
+```
+void radeon_hd5570_driver_set_viewport(float x, float y, float width, float height);
+```
+
+#### radeon_hd5570_driver_set_render_target
+
+ustawia render target (adres, rozmiar, pitch) w rejestrach CB_COLOR_BASE/SIZE/PITCH dla danego indeksu (0 lub 1).
+
+```
+void radeon_hd5570_driver_set_render_target(uint32_t index, uint64_t address, uint32_t size, uint32_t pitch);
+```
+
+### struktury
+
+#### GpuInstance
+
+glowna instancja GPU. pola: mmio_base, vram_base, gart_base, doorbell_base, vram_size, vram_used, gart_size, engine_clock, memory_clock, shader_units, simd_count, rop_count, texture_units, memory_bus_width, vertex_cache_size, primitive_buffer_size, command_buffer_size, initialized, error_count, ring_gfx, ring_compute, ring_dma, shader_modules, descriptor_sets, command_buffers, query_pools, swap_chains, tessellation, geometry_shader, compute_shader, vertex_texture_fetch, stream_out.
+
+#### ShaderProgram
+
+program shaderowy: id, adresy shaderow vertex/fragment/geometry/tessellation/compute, liczba uniformow, offsety uniformow, liczba rejestrow stalych i ich offsety.
+
+#### RingBuffer
+
+ring buffer CP: base_addr, size, rptr, wptr, doorbell_offset, doorbell_page.
+
+#### ShaderModule
+
+modul shaderu: id, tgsi_addr, tgsi_size, entry_point_addr, entry_point_size, stage, gpr_count, stack_count.
+
+#### Viewport
+
+x, y, width, height, min_depth, max_depth.
+
+#### Scissor
+
+x, y, width, height.
+
+#### BufferDescriptor
+
+address, size, stride, flags.
+
+#### TextureDescriptor
+
+width, height, depth, mip_levels, array_size, format, flags, address.
+
+### wazne uwagi
+
+sterownik jest symulacja sprzetowa sterownika graficznego dla systemu operacyjnego tarixenOS. rejestry MMIO (EVERGREEN_*) sa mapowane na adresy pod REG_MMIO_BASE i nie odzwierciedlaja rzeczywistego chipu AMD Redwood. wszystkie operacje VRAM korzystaja z mapowania pamieci pod REG_VRAM_BASE.
