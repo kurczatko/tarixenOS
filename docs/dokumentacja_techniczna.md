@@ -8171,3 +8171,1002 @@ width, height, depth, mip_levels, array_size, format, flags, address.
 ### wazne uwagi
 
 sterownik jest symulacja sprzetowa sterownika graficznego dla systemu operacyjnego tarixenOS. rejestry MMIO (EVERGREEN_*) sa mapowane na adresy pod REG_MMIO_BASE i nie odzwierciedlaja rzeczywistego chipu AMD Redwood. wszystkie operacje VRAM korzystaja z mapowania pamieci pod REG_VRAM_BASE.
+
+## karta graficzna - rust/drivers/karty_graficzne/amd/hd_2900_xt.rs
+
+sterownik karty graficznej ATI Radeon HD 2900 XT (chip RV670, vendor 0x1002, urzadzenie 0x9505) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (porownanie vendor ID i device ID), mapowanie MMIO, soft-reset, potok grafiki 3D (VGT, primitive assembly, rasterizer, depth buffer, stencil, blend, color buffer), jednostki teksturujace (TA), samplery, cache wierzcholkow, bufor indeksow, bufor primityw, rejestry shaderow, jednostki shaderow (vertex, fragment, geometry, tessellation, compute), potok geometrii, tessellation, potok compute, ramki graficzne, render targety, bufor depth-stencil, multisampling, antialiasing, depth bounds, stencil ref, blend constants, viewport, scissor, PCIe, zasilanie i zegary (power play), SMU, ring buffory (grafika, compute, DMA) oraz akceleracje 3D. napisany w Rust z `#[no_std]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/amd/*.rs)`) i linkowany do jadra.
+
+### hd_2900_xt_init
+
+inicjalizuje sterownik: wykrywa urzadzenie na MMIO, wykonuje soft-reset, konfiguruje wszystkie jednostki graficzne (SRBM, GRBM, procesor komend, VGT, montaz primitywow, interpolator shaderow, rastrowanie, bufor glebi, stencil, blend, bufor koloru, jednostki tekstur, samplery, cache wierzcholkow, bufor indeksow, bufor primityw, rejestry shaderow, jednostki shaderow, potok geometrii, tessellation, potok compute, ramki graficzne, render targety, bufor depth-stencil, multisampling, antialiasing, depth bounds, stencil ref, blend constants, viewport, scissor, PCIe, power play, SMU), inicjalizuje ring buffory i wlacza akceleracje 3D. zwraca true po udanej inicjalizacji, false gdy urzadzenie nie zostalo wykryte lub inicjalizacja nie powiodla sie.
+
+```
+pub fn init(&mut self) -> bool;
+```
+
+### hd_2900_xt_detect
+
+sprawdza czy karta ATI Radeon HD 2900 XT jest wykryta na MMIO (porownuje vendor ID, device ID i rewizję). zwraca true gdy wykryta, false gdy nie.
+
+```
+pub fn detect(&self) -> bool;
+```
+
+### hd_2900_xt_soft_reset
+
+wykonuje soft-reset chipa: wlacza SRBM GFX CNTL, resetuje GRBM, czeka az chip wrocí do stanu bezczynnego i wylacza reset.
+
+```
+pub fn soft_reset(&mut self);
+```
+
+### hd_2900_xt_wait_idle
+
+czeka az karta graficzna wroci do stanu bezczynnego (odczyt SRBM STATUS).
+
+```
+pub fn wait_idle(&self);
+```
+
+### hd_2900_xt_init_ring_buffers
+
+inicjalizuje ring buffory (grafika, compute, DMA) oraz procesor komend (CP): ustawia adresy bazowe, prefetch, cntl, maski przerwan i wskazniki rptr/wptr.
+
+```
+pub fn init_ring_buffers(&mut self);
+```
+
+### hd_2900_xt_submit_doorbell
+
+wysyla sygnał doorbell dla danego ringu (0 = grafika, 1 = compute, 2 = DMA) z podana wartoscia.
+
+```
+pub fn submit_doorbell(&mut self, ring_index: u32, value: u32);
+```
+
+### hd_2900_xt_ring_write
+
+zapisuje pojedyncze slowo (dword) do ring buffora o danym indeksie i przesuwa wptr.
+
+```
+pub fn ring_write(&mut self, ring_index: u32, dword: u32);
+```
+
+### hd_2900_xt_ring_submit
+
+zatwierdza ring buffor: zapisuje wptr do CP_PFFETCH_RPTR i wysyla doorbell.
+
+```
+pub fn ring_submit(&mut self, ring_index: u32);
+```
+
+### hd_2900_xt_read_mmio / hd_2900_xt_write_mmio
+
+odczytuje/zapisuje 32-bitowa wartosc z/rejestru MMIO o podanym offsetcie.
+
+```
+pub fn read_mmio(&self, offset: u32) -> u32;
+pub fn write_mmio(&mut self, offset: u32, value: u32);
+```
+
+### hd_2900_xt_read_mmio_64 / hd_2900_xt_write_mmio_64
+
+odczytuje/zapisuje 64-bitowa wartosc z/rejestru MMIO o podanym offsetcie.
+
+```
+pub fn read_mmio_64(&self, offset: u32) -> u64;
+pub fn write_mmio_64(&mut self, offset: u32, value: u64);
+```
+
+### hd_2900_xt_submit_3d_command
+
+wysyla pojedyncza komende 3D z trzema parametrami do karty graficznej.
+
+```
+pub fn submit_3d_command(&mut self, command: u32, param1: u32, param2: u32, param3: u32);
+```
+
+### hd_2900_xt_draw_triangle_3d
+
+rysuje trojkat 3D z trzema wierzcholkami (x,y,z) i kolorem.
+
+```
+pub fn draw_triangle_3d(&mut self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32, x3: i32, y3: i32, z3: i32, color: u32);
+```
+
+### hd_2900_xt_draw_line_3d
+
+rysuje linie 3D z dwoma punktami (x,y,z) i kolorem.
+
+```
+pub fn draw_line_3d(&mut self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32, color: u32);
+```
+
+### hd_2900_xt_clear_screen_3d
+
+czysci ekran podanym kolorem w trybie 3D.
+
+```
+pub fn clear_screen_3d(&mut self, color: u32);
+```
+
+### hd_2900_xt_set_viewport
+
+ustawia viewport (x, y, szerokosc, wysokosc).
+
+```
+pub fn set_viewport(&mut self, x: u32, y: u32, width: u32, height: u32);
+```
+
+### hd_2900_xt_set_projection_matrix / hd_2900_xt_set_world_matrix / hd_2900_xt_set_view_matrix
+
+ustawia macierz rzutowania, swiata lub widoku (16 wartosci f32).
+
+```
+pub fn set_projection_matrix(&mut self, matrix: &Matrix4x4);
+pub fn set_world_matrix(&mut self, matrix: &Matrix4x4);
+pub fn set_view_matrix(&mut self, matrix: &Matrix4x4);
+```
+
+### hd_2900_xt_enable_depth_test / hd_2900_xt_enable_blending
+
+wlacza/wylacza test glebi lub blendowanie.
+
+```
+pub fn enable_depth_test(&mut self, enabled: bool);
+pub fn enable_blending(&mut self, enabled: bool);
+```
+
+### hd_2900_xt_set_blend_func / hd_2900_xt_set_depth_func / hd_2900_xt_set_cull_mode
+
+ustawia funkcje blendowania (src, dst), funkcje testu glebi lub tryb usuwania tylnych scian (cull mode).
+
+```
+pub fn set_blend_func(&mut self, src: u32, dst: u32);
+pub fn set_depth_func(&mut self, func: u32);
+pub fn set_cull_mode(&mut self, mode: u32);
+```
+
+### hd_2900_xt_set_wireframe / hd_2900_xt_enable_multisampling / hd_2900_xt_enable_antialiasing
+
+wlacza/wylacza tryb siatki (wireframe), multisampling lub wygładzanie krawedzi (antialiasing).
+
+```
+pub fn set_wireframe(&mut self, enabled: bool);
+pub fn enable_multisampling(&mut self, enabled: bool);
+pub fn enable_antialiasing(&mut self, enabled: bool);
+```
+
+### hd_2900_xt_set_multisample_count
+
+ustawia liczbe probek multisamplingu.
+
+```
+pub fn set_multisample_count(&mut self, count: u32);
+```
+
+### hd_2900_xt_set_depth_bounds_test
+
+wlacza/wylacza test granic glebi z podanym minimum i maximum.
+
+```
+pub fn set_depth_bounds_test(&mut self, enabled: bool, min: f32, max: f32);
+```
+
+### hd_2900_xt_set_stencil_test / hd_2900_xt_set_stencil_op
+
+konfiguruje test stencila (wlaczenie, funkcja, referencja, maska) oraz operacje stencila (fail, zfail, zpass).
+
+```
+pub fn set_stencil_test(&mut self, enabled: bool, func: u32, ref_value: u32, mask: u32);
+pub fn set_stencil_op(&mut self, fail: u32, zfail: u32, zpass: u32);
+```
+
+### hd_2900_xt_set_blend_equation / hd_2900_xt_set_blend_color / hd_2900_xt_set_logic_op / hd_2900_xt_set_dither
+
+ustawia rownanie blendowania (rgb, alpha), kolor blendowania, operacje logiczna oraz dithering.
+
+```
+pub fn set_blend_equation(&mut self, rgb: u32, alpha: u32);
+pub fn set_blend_color(&mut self, color: u32);
+pub fn set_logic_op(&mut self, op: u32, enabled: bool);
+pub fn set_dither(&mut self, enabled: bool);
+```
+
+### hd_2900_xt_set_polygon_offset / hd_2900_xt_set_sample_coverage
+
+ustawia offset wielokata (wlaczenie, factor, units) oraz probkowanie probek (sample coverage, invert).
+
+```
+pub fn set_polygon_offset(&mut self, enabled: bool, factor: f32, units: f32);
+pub fn set_sample_coverage(&mut self, value: f32, invert: bool);
+```
+
+### hd_2900_xt_set_vertex_array / hd_2900_xt_set_index_array
+
+ustawia tablice wierzcholkow (bufor, stride, offset) lub tablice indeksow (bufor, format, offset).
+
+```
+pub fn set_vertex_array(&mut self, buffer: u32, stride: u32, offset: u32);
+pub fn set_index_array(&mut self, buffer: u32, format: u32, offset: u32);
+```
+
+### hd_2900_xt_draw_arrays / hd_2900_xt_draw_elements
+
+rysuje primitive z tablicy wierzcholkow (tryb, first, count) lub z indeksow (tryb, count, typ, offset).
+
+```
+pub fn draw_arrays(&mut self, mode: u32, first: u32, count: u32);
+pub fn draw_elements(&mut self, mode: u32, count: u32, type_: u32, offset: u32);
+```
+
+### hd_2900_xt_draw_instanced / hd_2900_xt_draw_elements_instanced
+
+rysuje z instancjami (liczba instancji) z tablicy wierzcholkow lub indeksow.
+
+```
+pub fn draw_instanced(&mut self, mode: u32, first: u32, count: u32, instance_count: u32);
+pub fn draw_elements_instanced(&mut self, mode: u32, count: u32, type_: u32, offset: u32, instance_count: u32);
+```
+
+### hd_2900_xt_set_shader_program
+
+ustawia aktywny program shadera po id.
+
+```
+pub fn set_shader_program(&mut self, program_id: u32);
+```
+
+### hd_2900_xt_set_uniform_1f / 2f / 3f / 4f
+
+ustawia jednolity (uniform) o podanej lokalizacji jako 1, 2, 3 lub 4 wartosci float.
+
+```
+pub fn set_uniform_1f(&mut self, location: u32, value: f32);
+pub fn set_uniform_2f(&mut self, location: u32, x: f32, y: f32);
+pub fn set_uniform_3f(&mut self, location: u32, x: f32, y: f32, z: f32);
+pub fn set_uniform_4f(&mut self, location: u32, x: f32, y: f32, z: f32, w: f32);
+```
+
+### hd_2900_xt_set_uniform_matrix4fv
+
+ustawia jednolita macierz 4x4 o podanej lokalizacji.
+
+```
+pub fn set_uniform_matrix4fv(&mut self, location: u32, matrix: &Matrix4x4);
+```
+
+### hd_2900_xt_bind_texture / hd_2900_xt_bind_framebuffer / hd_2900_xt_bind_renderbuffer
+
+binduje teksture (jednostka, id), ramke graficzna (id) lub bufor renderowania (id).
+
+```
+pub fn bind_texture(&mut self, unit: u32, texture_id: u32);
+pub fn bind_framebuffer(&mut self, framebuffer_id: u32);
+pub fn bind_renderbuffer(&mut self, renderbuffer_id: u32);
+```
+
+### hd_2900_xt_create_texture / hd_2900_xt_delete_texture
+
+tworzy teksture (szerokosc, wysokosc, format) zwracajac id lub usuwa teksture o danym id.
+
+```
+pub fn create_texture(&mut self, width: u32, height: u32, format: u32) -> u32;
+pub fn delete_texture(&mut self, texture_id: u32);
+```
+
+### hd_2900_xt_upload_texture_data
+
+wgrywa dane tekstury (id, wskaznik na dane, rozmiar).
+
+```
+pub fn upload_texture_data(&mut self, texture_id: u32, data: *const u32, size: u32);
+```
+
+### hd_2900_xt_generate_mipmaps
+
+generuje mipmapy dla tekstury o danym id.
+
+```
+pub fn generate_mipmaps(&mut self, texture_id: u32);
+```
+
+### hd_2900_xt_set_texture_filter / hd_2900_xt_set_texture_wrap
+
+ustawia filtr tekstury (min, mag) lub owijanie tekstury (wrap_s, wrap_t).
+
+```
+pub fn set_texture_filter(&mut self, texture_id: u32, min_filter: u32, mag_filter: u32);
+pub fn set_texture_wrap(&mut self, texture_id: u32, wrap_s: u32, wrap_t: u32);
+```
+
+### hd_2900_xt_create_renderbuffer / hd_2900_xt_delete_renderbuffer
+
+tworzy bufor renderowania (szerokosc, wysokosc, format) zwracajac id lub usuwa bufor o danym id.
+
+```
+pub fn create_renderbuffer(&mut self, width: u32, height: u32, format: u32) -> u32;
+pub fn delete_renderbuffer(&mut self, renderbuffer_id: u32);
+```
+
+### hd_2900_xt_create_framebuffer / hd_2900_xt_delete_framebuffer
+
+tworzy ramke graficzna zwracajac id lub usuwa ramke o danym id.
+
+```
+pub fn create_framebuffer(&mut self) -> u32;
+pub fn delete_framebuffer(&mut self, framebuffer_id: u32);
+```
+
+### hd_2900_xt_attach_texture_to_framebuffer / hd_2900_xt_attach_renderbuffer_to_framebuffer
+
+dołącza teksture lub bufor renderowania do ramki graficznej jako danego przyłączenia (attachment).
+
+```
+pub fn attach_texture_to_framebuffer(&mut self, framebuffer_id: u32, attachment: u32, texture_id: u32, mip_level: u32);
+pub fn attach_renderbuffer_to_framebuffer(&mut self, framebuffer_id: u32, attachment: u32, renderbuffer_id: u32);
+```
+
+### hd_2900_xt_set_draw_buffers / hd_2900_xt_set_read_buffer
+
+ustawia bufora rysowania (liczba, wskaznik na przyłącza) lub bufor odczytu (przyłącze).
+
+```
+pub fn set_draw_buffers(&mut self, count: u32, attachments: *const u32);
+pub fn set_read_buffer(&mut self, attachment: u32);
+```
+
+### hd_2900_xt_blit_framebuffer
+
+wykonuje blit ramki graficznej z obszaru zrodlowego do obszaru docelowego z maska i filtrem.
+
+```
+pub fn blit_framebuffer(&mut self, src_x0: i32, src_y0: i32, src_x1: i32, src_y1: i32, dst_x0: i32, dst_y0: i32, dst_x1: i32, dst_y1: i32, mask: u32, filter: u32);
+```
+
+### hd_2900_xt_create_shader_program / hd_2900_xt_delete_shader_program
+
+tworzy program shadera z adresami shaderow (vertex, fragment, geometry, tess ctrl, tess eval, compute) zwracajac id lub usuwa program o danym id.
+
+```
+pub fn create_shader_program(&mut self, vs_addr: u64, fs_addr: u64, gs_addr: u64, tc_addr: u64, te_addr: u64, cs_addr: u64) -> u32;
+pub fn delete_shader_program(&mut self, program_id: u32);
+```
+
+### hd_2900_xt_load_vertex_shader / hd_2900_xt_load_fragment_shader / hd_2900_xt_load_geometry_shader / hd_2900_xt_load_compute_shader
+
+wadruje shader wierzcholkow, fragmentow, geometrii lub compute pod danym adresem i rozmiarem dla programu o danym id.
+
+```
+pub fn load_vertex_shader(&mut self, program_id: u32, addr: u64, size: u32);
+pub fn load_fragment_shader(&mut self, program_id: u32, addr: u64, size: u32);
+pub fn load_geometry_shader(&mut self, program_id: u32, addr: u64, size: u32);
+pub fn load_compute_shader(&mut self, program_id: u32, addr: u64, size: u32);
+```
+
+### hd_2900_xt_compile_shader
+
+kompiluje program shadera o danym id. zwraca true przy sukcesie.
+
+```
+pub fn compile_shader(&mut self, program_id: u32) -> bool;
+```
+
+### hd_2900_xt_bind_shader_resources
+
+wiaz zasoby shaderow (bufora, tekstury) dla programu o danym id.
+
+```
+pub fn bind_shader_resources(&mut self, program_id: u32);
+```
+
+### hd_2900_xt_set_shader_constant
+
+ustawia stala shadera (lokalizacja, wartosci float) dla programu o danym id.
+
+```
+pub fn set_shader_constant(&mut self, program_id: u32, location: u32, values: &[f32]);
+```
+
+### hd_2900_xt_set_vertex_shader / hd_2900_xt_set_fragment_shader / hd_2900_xt_set_geometry_shader
+
+ustawia aktywny shader wierzcholkow, fragmentow lub geometrii po id programu.
+
+```
+pub fn set_vertex_shader(&mut self, program_id: u32);
+pub fn set_fragment_shader(&mut self, program_id: u32);
+pub fn set_geometry_shader(&mut self, program_id: u32);
+```
+
+### hd_2900_xt_enable_shader_stage
+
+wlacza/wylacza etap shadera o danym indeksie.
+
+```
+pub fn enable_shader_stage(&mut self, stage: u32, enabled: bool);
+```
+
+### hd_2900_xt_set_uniform_block / hd_2900_xt_set_shader_storage_buffer
+
+ustawia blok jednolity (block index, adres, rozmiar) lub bufor almacen shaderow (binding, adres, rozmiar).
+
+```
+pub fn set_uniform_block(&mut self, block_index: u32, addr: u64, size: u32);
+pub fn set_shader_storage_buffer(&mut self, binding: u32, addr: u64, size: u32);
+```
+
+### hd_2900_xt_dispatch_compute
+
+uruchamia obliczenia compute dla programu o danym id z wymiarami (x, y, z).
+
+```
+pub fn dispatch_compute(&mut self, program_id: u32, x: u32, y: u32, z: u32);
+```
+
+### struktura GpuInstance
+
+| pole | typ | opis |
+|------|-----|------|
+| mmio_base | *mut u32 | baza rejestrow MMIO |
+| vram_base | *mut u32 | baza pamieci VRAM |
+| gart_base | *mut u32 | baza GART |
+| doorbell_base | *mut u32 | baza doorbell |
+| vram_size | u64 | rozmiar pamieci VRAM |
+| vram_used | AtomicU64 | zuzycie pamieci VRAM |
+| gart_size | u64 | rozmiar GART |
+| engine_clock | u32 | zegar rdzenia |
+| memory_clock | u32 | zegar pamieci |
+| compute_units | u32 | liczba jednostek obliczeniowych |
+| shader_engines | u32 | liczba silnikow shaderow |
+| shader_arrays | u32 | liczba tablic shaderow |
+| rasterizers | u32 | liczba rastrowaczy |
+| backends | u32 | liczba backendu |
+| texture_units | u32 | liczba jednostek teksturujacych |
+| vertex_cache_size | u32 | rozmiar cache wierzcholkow |
+| primitive_buffer_size | u32 | rozmiar bufora primitywow |
+| command_buffer_size | u32 | rozmiar bufora komend |
+| initialized | AtomicBool | czy sterownik jest zainicjowany |
+| error_count | AtomicU32 | licznik bledow |
+| ring_gfx | RingBuffer | ring buffor grafiki |
+| ring_compute | RingBuffer | ring buffor compute |
+| ring_dma | RingBuffer | ring buffor DMA |
+
+stale:
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| ATI_RADEON_HD_2900_XT_VENDOR_ID | 0x1002 | vendor ID ATI |
+| ATI_RADEON_HD_2900_XT_DEVICE_ID | 0x9505 | device ID HD 2900 XT |
+| CHIP_RV670 | 0x9505 | identyfikator chipu RV670 |
+| R600_ARCH_VERSION | 2 | wersja architektury R600 |
+| HD2900_XT_VRAM_SIZE | 512MB | rozmiar pamieci VRAM |
+| HD2900_XT_GART_SIZE | 256MB | rozmiar GART |
+| HD2900_XT_ENGINE_CLOCK | 742000 | zegar rdzenia |
+| HD2900_XT_MEMORY_CLOCK | 1656000 | zegar pamieci |
+| HD2900_XT_COMPUTE_UNITS | 32 | liczba jednostek obliczeniowych |
+| HD2900_XT_SHADER_ENGINES | 4 | liczba silnikow shaderow |
+| HD2900_XT_RASTERIZERS | 4 | liczba rastrowaczy |
+| HD2900_XT_BACKENDS | 16 | liczba backendu |
+| HD2900_XT_TEXTURE_UNITS | 16 | liczba jednostek teksturujacych |
+| REG_MMIO_BASE | 0xF0000000 | baza MMIO |
+| REG_VRAM_BASE | 0xE0000000 | baza VRAM |
+| REG_GART_BASE | 0xD0000000 | baza GART |
+| REG_DOORBELL_BASE | 0xC0000000 | baza doorbell |
+
+## sterownik karty graficznej AMD Radeon RX 590 - rust/drivers/karty_graficzne/amd/rx_590.rs
+
+sterownik zaawansowanej akceleracji 3D i shaderow dla karty AMD Radeon RX 590 (Polaris 30, GCN 4, 8 GB VRAM, 36 CU). zapisany w Rust (#![no_std]), bez zaleznienia od standardowej biblioteki. rejestrowany jako `pub mod rx_590;` w `rust/drivers/karty_graficzne/amd/lib.rs`.
+
+### stale
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| AMD_RADEON_RX_590_VENDOR_ID | 0x1002 | vendor ID AMD |
+| AMD_RADEON_RX_590_DEVICE_ID | 0x67DF | device ID RX 590 |
+| CHIP_POLARIS_30 | 0x67DF | identyfikator chipu Polaris 30 |
+| GCN_ARCH_VERSION | 4 | wersja architektury GCN |
+| REG_MMIO_BASE | 0xF0000000 | baza rejestrow MMIO |
+| REG_VRAM_BASE | 0xE0000000 | baza pamieci VRAM |
+| REG_GART_BASE | 0xD0000000 | baza GART |
+| REG_DOORBELL_BASE | 0xC0000000 | baza doorbell |
+| RX590_VRAM_SIZE | 8 GB | rozmiar pamieci VRAM |
+| RX590_GART_SIZE | 4 GB | rozmiar GART |
+| RX590_ENGINE_CLOCK | 1545000 | zegar rdzenia w kHz |
+| RX590_MEMORY_CLOCK | 8000000 | zegar pamieci w kHz |
+| RX590_COMPUTE_UNITS | 36 | liczba jednostek obliczeniowych |
+| RX590_SHADER_ENGINES | 4 | liczba silnikow shaderow |
+| RX590_RASTERIZERS | 4 | liczba rastrowaczy |
+| RX590_BACKENDS | 16 | liczba backendu |
+| RX590_TEXTURE_UNITS | 72 | liczba jednostek teksturujacych |
+
+### typy
+
+- `Matrix4x4` - macierz 4x4 (16 x f32), używana dla macierzy rzutowania, widoku i swiata.
+- `Vector4` / `Vector3` / `Vector2` - wektory 4-, 3- i 2-elementowe (f32).
+- `Vertex` - wierzcholek: pozycja, kolor, wspolrzedne tekstury, normalna, styczna i po-drugiej stycznej.
+- `Color` - kolor RGBA (f32).
+- `Rect` - prostokat (x, y, szerokosc, wysokosc, i32).
+- `Viewport` - viewport: polozenie, wymiary, zakres glebokosci.
+- `Scissor` - obszar scissor testu.
+- `BufferDescriptor` - deskryptor bufora: adres, rozmiar, krok, flagi.
+- `TextureDescriptor` - deskryptor tekstury: wymiary, poziomy mipmap, tablica, format, adres.
+- `ShaderProgram` - program shaderowy z adresami shaderow wierzcholkow, fragmentow, geometrii, teselacji, obliczeniowych i lista offsetow uniformow.
+- `ShaderConstant` - stala shadera: lokalizacja, typ, liczba, offset.
+- `ShaderResource` - zasob shadera: wiazanie, typ, adres, rozmiar.
+- `ShaderModule` - modul shadera (SPIR-V): adres kodu, rozmiar, punkt wejscia, etykiet.
+- `DescriptorSet` - zbior deskryptorow z wiazaniami zasobow.
+- `CommandBuffer` - bufor komend GPU: adres, rozmiar, offset, flaga wyslania.
+- `QueryPool` - pula zapytań (occlusion, timestamp, pipeline statistics).
+- `SwapChain` - łańcuch wymiany obrazow: adresy obrazow, format, stan nabycia/prezentacji.
+- `RayTracingPipeline` - potok ray tracingu: grupy shaderow, tabela shaderow, max rekurencja.
+- `MeshShader` - shader siatki: task, mesh, amplification, atrybuty wierzcholkow.
+- `RingBuffer` - ring buffer z wskaźnikami rptr/wptr i strona doorbell.
+- `CommandProcessor` - konfiguracja procesora komend (ME cntl, pfetch, maski przerwan).
+- `GpuInstance` - instancja GPU: bazy MMIO/VRAM/GART/doorbell, rozmiary pamieci, zegary, liczniki CU/SE/RB/backendow/JT, ringi (grafika/compute/DMA), programy shaderowe, stale, zasoby, moduly, zbiory deskryptorow, bufora komend, pule zapytań, lancuchy wymiany, potoki ray tracingu i shadery siatki, flaga inicjalizacji, licznik bledow.
+
+### funkcje inicjalizacji
+
+`pub fn new() -> GpuInstance`
+
+tworzy nowa instancje GPU z domyslnymi adresami bazowymi, rozmiarami pamieci RX 590, zegarami i pustymi ringami. nie wymaga wywolania `detect`.
+
+`pub fn init(&mut self) -> bool`
+
+inicjalizuje kartę: sprawdza czy juz zainicjalizowana, wykrywa urzadzenie (`detect`), wykonuje soft reset, konfiguruje moduly SRBM, GRBM, procesor komend, VGT, montaz primitywow, interpolator shaderow, rastrowacz, bufor glebokosci, stencil, mieszanie, bufor koloru, jednostki tekstur, probowniki, cache wierzcholkow, bufor indeksow, bufor primitywow, rejestry shaderow, jednostki shaderow, potok geometrii, teselacje, potok obliczeniowy, ramki, cele renderowania, bufor glebokosci/stencila, probkowanie wielokrotne, wygładzanie krawedzi, granice glebokosci, referencje stencila, stale mieszania, viewport, scissor, PCIe, zarzadzanie zasilaniem, SMU, moduly shaderowe, zbiory deskryptorow, bufora komend, pule zapytań, lancuchy wymiany, ray tracing, shadery siatki, teselacje rozszerzone i cieniowanie zmiennej stawki. na koncu wlacza akceleracje 3D i ustawia flage `initialized`. zwraca `true` przy powodzeniu.
+
+`pub fn detect(&self) -> bool`
+
+odczytuje vendor ID, device ID i rewizje z rejestrow MMIO (offsety 0x00, 0x04, 0x08) i porownuje z identyfikatorami RX 590.
+
+`pub fn soft_reset(&mut self)`
+
+resetuje blok graficzny przez rejestr `GRBM_SOFT_RESET` i oczekuje na bezczynnosc (`wait_idle_inner`).
+
+`pub fn wait_idle(&self)`
+
+czeka na bit bezczynnosci w rejestrze `SRBM_STATUS`.
+
+`pub fn init_ring_buffers(&mut self)`
+
+konfiguruje prefetch procesora komend oraz ringi DMA (SDMA0, SDMA1) w pamieci VRAM.
+
+`pub fn submit_doorbell(&mut self, ring_index: u32, value: u32)`
+
+wysyla wartosc doorbell dla danego ringa (0 = grafika, 1 = compute, 2 = DMA).
+
+`pub fn ring_write(&mut self, ring_index: u32, dword: u32)`
+
+zapisuje slowo do ringa danego typu i przesuwa wptr.
+
+`pub fn ring_submit(&mut self, ring_index: u32)`
+
+zatwierdza ring przez rejestr `CP_PFFETCH_RPTR` i doorbell.
+
+`pub fn get_error_count(&self) -> u32`
+
+zwraca licznik bledow sterownika.
+
+`pub fn is_initialized(&self) -> bool`
+
+zwraca czy sterownik zostal zainicjalizowany.
+
+### funkcje MMIO
+
+`pub fn read_mmio(&self, offset: u32) -> u32`
+
+odczytuje u32 z MMIO pod podanym offsetem (odczyt wolatylny).
+
+`pub fn write_mmio(&mut self, offset: u32, value: u32)`
+
+zapisuje u32 do MMIO pod podanym offsetem (zapis wolatylny).
+
+`pub fn read_mmio_64(&self, offset: u32) -> u64`
+
+odczytuje u64 z MMIO jako dwa slowa u32 (lo + hi << 32).
+
+`pub fn write_mmio_64(&mut self, offset: u32, value: u64)`
+
+zapisuje u64 do MMIO jako dwa slowa u32.
+
+### funkcje akceleracji 3D
+
+`pub fn submit_3d_command(&mut self, command: u32, param1: u32, param2: u32, param3: u32)`
+
+wysyla komende 3D z trzema parametrami przez rejestry MMIO 0x1000-0x100C i wyzwalacz 0x1010.
+
+`pub fn draw_triangle_3d(&mut self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32, x3: i32, y3: i32, z3: i32, color: u32)`
+
+rysuje trojkat 3D z trzema wierzcholkami i kolorem.
+
+`pub fn draw_line_3d(&mut self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32, color: u32)`
+
+rysuje linie 3D z dwoma punktami i kolorem.
+
+`pub fn clear_screen_3d(&mut self, color: u32)`
+
+czysci ekran podanym kolorem.
+
+`pub fn set_viewport(&mut self, x: u32, y: u32, width: u32, height: u32)`
+
+ustawia viewport przez komendy 3D.
+
+`pub fn set_projection_matrix(&mut self, matrix: &Matrix4x4)`
+
+wgrywa macierz rzutowania do rejestrow 0x1100-0x113C.
+
+`pub fn set_world_matrix(&mut self, matrix: &Matrix4x4)`
+
+wgrywa macierz swiata do rejestrow 0x1200-0x123C.
+
+`pub fn set_view_matrix(&mut self, matrix: &Matrix4x4)`
+
+wgrywa macierz widoku do rejestrow 0x1300-0x133C.
+
+`pub fn enable_depth_test(&mut self, enabled: bool)`
+
+wlacza/wylacza test glebokosci (rejestr 0x1400).
+
+`pub fn enable_blending(&mut self, enabled: bool)`
+
+wlacza/wylacza mieszanie kolorow (rejestr 0x1500).
+
+`pub fn set_blend_func(&mut self, src: u32, dst: u32)`
+
+ustawia funkcje mieszania zrodla i celu (rejestry 0x1504, 0x1508).
+
+`pub fn set_depth_func(&mut self, func: u32)`
+
+ustawia funkcje porownania glebokosci (rejestr 0x1404).
+
+`pub fn set_cull_mode(&mut self, mode: u32)`
+
+ustawia tryb odrzucania scian (rejestr 0x1600).
+
+`pub fn set_wireframe(&mut self, enabled: bool)`
+
+wlacza/wylacza tryb szkieletowy (rejestr 0x1604).
+
+`pub fn set_multisample_count(&mut self, count: u32)`
+
+ustawia liczbe probek probkowania wielokrotnego (rejestr 0x1608).
+
+`pub fn enable_multisampling(&mut self, enabled: bool)`
+
+wlacza/wylacza probkowanie wielokrotne (rejestr 0x160C).
+
+`pub fn enable_antialiasing(&mut self, enabled: bool)`
+
+wlacza/wylacza wygładzanie krawedzi (rejestr 0x1610).
+
+`pub fn set_depth_bounds_test(&mut self, enabled: bool, min: f32, max: f32)`
+
+konfiguruje test granic glebokosci z zakresem min/max (rejestry 0x1614-0x161C).
+
+`pub fn set_stencil_test(&mut self, enabled: bool, func: u32, ref_value: u32, mask: u32)`
+
+konfiguruje test stencila: wlaczenie, funkcja, referencja, maska (rejestry 0x1620-0x162C).
+
+`pub fn set_stencil_op(&mut self, fail: u32, zfail: u32, zpass: u32)`
+
+ustawia operacje stencila dla fail, zfail, zpass (rejestry 0x1630-0x1638).
+
+`pub fn set_blend_equation(&mut self, rgb: u32, alpha: u32)`
+
+ustawia rownanie mieszania dla kanalu RGB i alpha (rejestry 0x1640, 0x1644).
+
+`pub fn set_blend_color(&mut self, color: u32)`
+
+ustawia stale koloru mieszania (rejestr 0x1648).
+
+`pub fn set_logic_op(&mut self, op: u32, enabled: bool)`
+
+ustawia operacje logiczna i wlaczenie/wylaczenie (rejestry 0x164C, 0x1650).
+
+`pub fn set_dither(&mut self, enabled: bool)`
+
+wlacza/wylacza dithering (rejestr 0x1654).
+
+`pub fn set_polygon_offset(&mut self, enabled: bool, factor: f32, units: f32)`
+
+ustawia offset polygona: wlaczenie, czynnik i jednostki (rejestry 0x1658-0x1660).
+
+`pub fn set_sample_coverage(&mut self, value: f32, invert: bool)`
+
+ustawia pokrycie probki i opcja odwrocenia (rejestry 0x1664, 0x1668).
+
+`pub fn set_vertex_array(&mut self, buffer: u32, stride: u32, offset: u32)`
+
+ustawia tablice wierzcholkow: bufor, krok, offset (rejestry 0x1700-0x1708).
+
+`pub fn set_index_array(&mut self, buffer: u32, format: u32, offset: u32)`
+
+ustawia tablice indeksow: bufor, format, offset (rejestry 0x170C-0x1714).
+
+`pub fn draw_arrays(&mut self, mode: u32, first: u32, count: u32)`
+
+rysuje primitywy z tablicy: tryb, poczatek, liczba (rejestry 0x1718-0x1724).
+
+`pub fn draw_elements(&mut self, mode: u32, count: u32, type_: u32, offset: u32)`
+
+rysuje indeksowane primitywy: tryb, liczba, typ, offset (rejestry 0x1728-0x1738).
+
+`pub fn draw_instanced(&mut self, mode: u32, first: u32, count: u32, instance_count: u32)`
+
+rysuje primitywy z instancjami: tryb, poczatek, liczba, liczba instancji (rejestry 0x173C-0x174C).
+
+`pub fn draw_elements_instanced(&mut self, mode: u32, count: u32, type_: u32, offset: u32, instance_count: u32)`
+
+rysuje indeksowane primitywy z instancjami (rejestry 0x1750-0x1764).
+
+### funkcje shaderow i programow
+
+`pub fn set_shader_program(&mut self, program_id: u32)`
+
+ustawia aktywny program shaderowy (rejestr 0x1800).
+
+`pub fn set_uniform_1f(&mut self, location: u32, value: f32)`
+
+ustawia uniform typu float (1 skladnik).
+
+`pub fn set_uniform_2f(&mut self, location: u32, x: f32, y: f32)`
+
+ustawia uniform float 2 skladniki.
+
+`pub fn set_uniform_3f(&mut self, location: u32, x: f32, y: f32, z: f32)`
+
+ustawia uniform float 3 skladniki.
+
+`pub fn set_uniform_4f(&mut self, location: u32, x: f32, y: f32, z: f32, w: f32)`
+
+ustawia uniform float 4 skladniki.
+
+`pub fn set_uniform_matrix4fv(&mut self, location: u32, matrix: &Matrix4x4)`
+
+wgrywa macierz 4x4 jako uniform do podanej lokalizacji.
+
+`pub fn bind_texture(&mut self, unit: u32, texture_id: u32)`
+
+wiazanie tekstury do jednostki teksturujacej (rejestry 0x1900, 0x1904).
+
+`pub fn bind_framebuffer(&mut self, framebuffer_id: u32)`
+
+wiazanie bufora ramki (rejestr 0x1910).
+
+`pub fn bind_renderbuffer(&mut self, renderbuffer_id: u32)`
+
+wiazanie bufora renderowania (rejestr 0x1920).
+
+`pub fn create_texture(&mut self, width: u32, height: u32, format: u32) -> u32`
+
+tworzy teksture i zwraca jej id (rejestry 0x1A00-0x1A10).
+
+`pub fn delete_texture(&mut self, texture_id: u32)`
+
+usuwa teksture o danym id (rejestr 0x1A20).
+
+`pub fn upload_texture_data(&mut self, texture_id: u32, data: *const u32, size: u32)`
+
+wgrywa dane tekstury do pamieci GPU (rejestry 0x1A30-0x1A3C).
+
+`pub fn generate_mipmaps(&mut self, texture_id: u32)`
+
+generuje mipmapy dla tekstury (rejestry 0x1A40, 0x1A44).
+
+`pub fn set_texture_filter(&mut self, texture_id: u32, min_filter: u32, mag_filter: u32)`
+
+ustawia filtry min i mag tekstury (rejestry 0x1A50-0x1A58).
+
+`pub fn set_texture_wrap(&mut self, texture_id: u32, wrap_s: u32, wrap_t: u32)`
+
+ustawia owijanie tekstury osi S i T (rejestry 0x1A60-0x1A68).
+
+`pub fn create_renderbuffer(&mut self, width: u32, height: u32, format: u32) -> u32`
+
+tworzy bufor renderowania i zwraca jego id (rejestry 0x1A80-0x1A90).
+
+`pub fn delete_renderbuffer(&mut self, renderbuffer_id: u32)`
+
+usuwa bufor renderowania (rejestr 0x1AA0).
+
+`pub fn create_framebuffer(&mut self) -> u32`
+
+tworzy bufor ramki i zwraca jego id (rejestry 0x1AB0-0x1AB4).
+
+`pub fn delete_framebuffer(&mut self, framebuffer_id: u32)`
+
+usuwa bufor ramki (rejestr 0x1AC0).
+
+`pub fn attach_texture_to_framebuffer(&mut self, framebuffer_id: u32, attachment: u32, texture_id: u32, mip_level: u32)`
+
+przylacza teksture do bufora ramki jako danego zaobrazenia (rejestry 0x1AD0-0x1AE0).
+
+`pub fn attach_renderbuffer_to_framebuffer(&mut self, framebuffer_id: u32, attachment: u32, renderbuffer_id: u32)`
+
+przylacza bufor renderowania do bufora ramki (rejestry 0x1AF0-0x1AFC).
+
+`pub fn set_draw_buffers(&mut self, count: u32, attachments: *const u32)`
+
+ustawia bufora rysowania (rejestry 0x1B00, 0x1B04).
+
+`pub fn set_read_buffer(&mut self, attachment: u32)`
+
+ustawia bufor odczytu (rejestr 0x1B10).
+
+`pub fn blit_framebuffer(&mut self, src_x0: i32, src_y0: i32, src_x1: i32, src_y1: i32, dst_x0: i32, dst_y0: i32, dst_x1: i32, dst_y1: i32, mask: u32, filter: u32)`
+
+kopiuje obszar miedzy buforami ramki z maska i filtrem (rejestry 0x1B20-0x1B48).
+
+`pub fn create_shader_program(&mut self, vs_addr: u64, fs_addr: u64, gs_addr: u64, tc_addr: u64, te_addr: u64, cs_addr: u64) -> u32`
+
+tworzy program shaderowy z adresami shaderow: wierzcholkow, fragmentow, geometrii, teselacji sterujacej, teselacji wyliczajacej i obliczeniowego. zwraca id (maksymalnie 32 programy).
+
+`pub fn delete_shader_program(&mut self, program_id: u32)`
+
+usuwa program shaderowy o danym id.
+
+`pub fn load_vertex_shader(&mut self, program_id: u32, addr: u64, size: u32)`
+
+wczytuje shader wierzcholkow pod podany adres i rozmiar.
+
+`pub fn load_fragment_shader(&mut self, program_id: u32, addr: u64, size: u32)`
+
+wczytuje shader fragmentow.
+
+`pub fn load_geometry_shader(&mut self, program_id: u32, addr: u64, size: u32)`
+
+wczytuje shader geometrii.
+
+`pub fn load_compute_shader(&mut self, program_id: u32, addr: u64, size: u32)`
+
+wczytuje shader obliczeniowy.
+
+`pub fn compile_shader(&mut self, program_id: u32) -> bool`
+
+kompiluje program shaderowy (rejestry 0x2200, 0x2204). zwraca true przy powodzeniu.
+
+`pub fn bind_shader_resources(&mut self, program_id: u32)`
+
+wiazanie zasobow shadera: wiazania, typy, adresy, rozmiary (rejestry 0x2240-0x2248 + 0x204 na zasob).
+
+`pub fn set_shader_constant(&mut self, program_id: u32, location: u32, values: &[f32])`
+
+ustawia stala shadera pod daną lokalizacja (do 4 wartosci f32, maksymalnie 512 stalych).
+
+`pub fn set_vertex_shader(&mut self, program_id: u32)`
+
+aktywuje shader wierzcholkow programu (rejestr 0x22C0).
+
+`pub fn set_fragment_shader(&mut self, program_id: u32)`
+
+aktywuje shader fragmentow (rejestr 0x22C4).
+
+`pub fn set_geometry_shader(&mut self, program_id: u32)`
+
+aktywuje shader geometrii (rejestr 0x22C8).
+
+`pub fn enable_shader_stage(&mut self, stage: u32, enabled: bool)`
+
+wlacza/wylacza etap potoku shaderowego (rejestry 0x22D0 + etapa * 4).
+
+`pub fn set_uniform_block(&mut self, block_index: u32, addr: u64, size: u32)`
+
+ustawia blok uniformow: indeks, adres, rozmiar (rejestry 0x22E0-0x22E8).
+
+`pub fn set_shader_storage_buffer(&mut self, binding: u32, addr: u64, size: u32)`
+
+ustawia bufor magazynu shadera: wiazanie, adres, rozmiar (rejestry 0x22F0-0x22F8).
+
+`pub fn dispatch_compute(&mut self, program_id: u32, x: u32, y: u32, z: u32)`
+
+uruchamia obliczenia compute dla programu o danym id z wymiarami (x, y, z) (rejestry 0x2300-0x2310).
+
+### funkcje modulow shaderowych, deskryptorow i buforow komend
+
+`pub fn create_shader_module(&mut self, spirv_addr: u64, spirv_size: u32, entry_point_addr: u64, entry_point_size: u32, stage: u32) -> u32`
+
+tworzy modul shadera z kodu SPIR-V: adres, rozmiar, punkt wejscia, rozmiar wejscia, etykiet (vertex/fragment/geometry/compute/ray). zwraca id (maksymalnie 64 moduly).
+
+`pub fn destroy_shader_module(&mut self, module_id: u32)`
+
+usuwa modul shadera o danym id (rejestr `SHADER_MODULE_DESTROY`).
+
+`pub fn create_descriptor_set(&mut self, addr: u64, size: u32, binding_count: u32, bindings: &[u64]) -> u32`
+
+tworzy zbior deskryptorow z adresem, rozmiarem i lista wiazan zasobow (maksymalnie 128 wiazan, 64 zbiory).
+
+`pub fn destroy_descriptor_set(&mut self, set_id: u32)`
+
+usuwa zbior deskryptorow (rejestr `DESCRIPTOR_SET_FREE`).
+
+`pub fn update_descriptor_set(&mut self, set_id: u32)`
+
+aktualizuje zbiór deskryptorow w GPU (rejestr `DESCRIPTOR_SET_UPDATE`).
+
+`pub fn bind_descriptor_set(&mut self, set_id: u32, slot: u32)`
+
+wiązuje zbiór deskryptorow do gniazda slot (rejestry `DESCRIPTOR_SET_BIND`, `DESCRIPTOR_SET_BIND_ADDR`).
+
+`pub fn create_command_buffer(&mut self, addr: u64, size: u32) -> u32`
+
+tworzy bufor komend GPU (maksymalnie 64 bufora).
+
+`pub fn destroy_command_buffer(&mut self, cb_id: u32)`
+
+usuwa bufor komend (rejestr `COMMAND_BUFFER_FREE`).
+
+`pub fn begin_command_buffer(&mut self, cb_id: u32)`
+
+rozpoczyna nagrywanie komend do bufora (rejestr `COMMAND_BUFFER_BEGIN`).
+
+`pub fn end_command_buffer(&mut self, cb_id: u32)`
+
+zakoncza nagrywanie komend (rejestr `COMMAND_BUFFER_END`).
+
+`pub fn submit_command_buffer(&mut self, cb_id: u32)`
+
+wysyla bufor komend do wykonania (rejestr `COMMAND_BUFFER_SUBMIT`).
+
+`pub fn reset_command_buffer(&mut self, cb_id: u32)`
+
+resetuje bufor komend: offset i flaga wyslania (rejestr `COMMAND_BUFFER_RESET`).
+
+### funkcje pul zapytań i lancuchow wymiany
+
+`pub fn create_query_pool(&mut self, addr: u64, count: u32, query_type: u32, results_addr: u64, results_size: u32) -> u32`
+
+tworzy pule zapytań GPU (occlusion, timestamp, statystyki potoku).
+
+`pub fn destroy_query_pool(&mut self, pool_id: u32)`
+
+usuwa pule zapytań (rejestr `QUERY_POOL_FREE`).
+
+`pub fn reset_query_pool(&mut self, pool_id: u32)`
+
+resetuje pule zapytań (rejestr `QUERY_POOL_RESET`).
+
+`pub fn get_query_pool_results(&mut self, pool_id: u32) -> u64`
+
+pobiera wyniki zapytań z pules (rejestr `QUERY_POOL_RESULTS`).
+
+`pub fn create_swap_chain(&mut self, image_count: u32, image_addrs: &[u64], image_size: u32, image_format: u32) -> u32`
+
+tworzy lancuch wymiany obrazow: liczba obrazow, ich adresy, rozmiar, format (maksymalnie 8 lancuchow, 8 obrazow na lancuch).
+
+`pub fn destroy_swap_chain(&mut self, chain_id: u32)`
+
+usuwa lancuch wymiany (rejestr `SWAP_CHAIN_DESTROY`).
+
+`pub fn present_swap_chain(&mut self, chain_id: u32)`
+
+prezentuje obraz lancucha wymiany na ekranie (rejestr `SWAP_CHAIN_PRESENT`).
+
+`pub fn acquire_swap_chain_image(&mut self, chain_id: u32) -> u32`
+
+nabiera nastepny obraz z lancucha wymiany i zwraca jego indeks (rejestr `SWAP_CHAIN_ACQUIRE` przez pole `current_image`).
+
+### funkcje ray tracingu i shaderow siatki
+
+`pub fn create_ray_tracing_pipeline(&mut self, group_addrs: &[u64], group_sizes: &[u32], max_recursion: u32, sbt_addr: u64, sbt_size: u32, ray_gen: u32, miss: u32, hit_group: u32) -> u32`
+
+tworzy potok ray tracingu z grupami shaderow, tabela shaderow (SBT), maksymalna rekurencja i offsety generowania promieni, chybien i trafien (maksymalnie 16 potokow).
+
+`pub fn destroy_ray_tracing_pipeline(&mut self, rt_id: u32)`
+
+usuwa potok ray tracingu o danym id.
+
+`pub fn trace_rays(&mut self, rt_id: u32, width: u32, height: u32, depth: u32)`
+
+uruchamia sladowanie promieni dla danego potoku o wymiarach obrazu i glębokosci (rejestry `RAY_TRACING_TRACE`, `RAY_TRACING_BVH_BUILD`).
+
+`pub fn create_mesh_shader(&mut self, task_addr: u64, task_size: u32, mesh_addr: u64, mesh_size: u32, amp_addr: u64, amp_size: u32, attr_count: u32, attr_addrs: &[u64]) -> u32`
+
+tworzy shader siatki z shaderami task, mesh, amplification i adresami atrybutow wierzcholkow (maksymalnie 16 shaderow siatki, 32 atrybuty).
+
+`pub fn destroy_mesh_shader(&mut self, ms_id: u32)`
+
+usuwa shader siatki o danym id.
+
+`pub fn dispatch_mesh(&mut self, ms_id: u32, group_x: u32, group_y: u32, group_z: u32)`
+
+uruchamia siatke o zadanej liczbie grup (x, y, z) (rejestry `MESH_SHADER_TASK_CNTL`).
+
