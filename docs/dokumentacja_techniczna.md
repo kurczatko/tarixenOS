@@ -20,7 +20,7 @@ musisz miec qemu.
 
 ## jadro - kernel/kernel.c
 
-`kernel_main` to punkt wejscia jadra. robi nastepujące rzeczy:
+`kernel_main` to punkt wejscia jadra. robi nastepujace rzeczy:
 
 1. wyzerowanie segmentu BSS
 2. inicjalizacja rysowania (`rysowanie_init`)
@@ -49,7 +49,7 @@ void proces_uruchom_pierwszy(struct proces *p)
 
 ## zaawansowany harmonogram procesow - kernel/proces.cpp
 
-sterownik harmonogramu procesow (scheduler) napisany w C++ zastępuje uproszczony round-robin z kernel/proces.c. implementuje wielopoziomowa kolejke z opinia zwrotna (MLFQ), sprawiedliwe dzielenie CPU w stylu CFS (Completely Fair Scheduler), stale priorytety dla procesow czasu rzeczywistego, kolejki oczekiwania, dziedziczenie priorytetu, obudzenie po czasie, statystyki per-proces oraz dynamiczne dostosowanie kwantumu czasu. harmonogram dziala w trybie wywlaszczajacym (preempcyjnym) wywolywany z obslugi przerwania timera (timer_handler -> proces_tick). kontekst sprzetowy (rejestry, CR3, TSS esp0) jest przelaczany przez `kernel/timer_entry.S` na podstawie wskaznika `current_process` wybranego przez `proces_tick`.
+sterownik harmonogramu procesow (scheduler) napisany w C++ zastepuje uproszczony round-robin z kernel/proces.c. implementuje wielopoziomowa kolejke z opinia zwrotna (MLFQ), sprawiedliwe dzielenie CPU w stylu CFS (Completely Fair Scheduler), stale priorytety dla procesow czasu rzeczywistego, kolejki oczekiwania, dziedziczenie priorytetu, obudzenie po czasie, statystyki per-proces oraz dynamiczne dostosowanie kwantumu czasu. harmonogram dziala w trybie wywlaszczajacym (preempcyjnym) wywolywany z obslugi przerwania timera (timer_handler -> proces_tick). kontekst sprzetowy (rejestry, CR3, TSS esp0) jest przelaczany przez `kernel/timer_entry.S` na podstawie wskaznika `current_process` wybranego przez `proces_tick`.
 
 klasy planowania:
 - SCHED_CRITICAL - najwyzszy priorytet, procesy krytyczne systemu, kwantum 2 tiki, FIFO w ramach priorytetu.
@@ -119,7 +119,7 @@ uint32_t proces_pobierz_pid(void)
 
 ### proces_sleep_until
 
-wstawia proces biezacy w stan SLEEPING na az do podanego tikta, dodaje do kolejki oczekiwania i przełacza na nastepny proces.
+wstawia proces biezacy w stan SLEEPING na az do podanego tikta, dodaje do kolejki oczekiwania i przelacza na nastepny proces.
 
 ```
 void proces_sleep_until(uint64_t ticks)
@@ -143,7 +143,7 @@ int proces_set_sched_class(uint32_t pid, sched_class_t cls)
 
 ### proces_block
 
-wstawia proces biezacy w stan BLOCKED (oczekiwanie na zasob), dodaje do kolejki oczekiwania i przełacza na nastepny proces.
+wstawia proces biezacy w stan BLOCKED (oczekiwanie na zasob), dodaje do kolejki oczekiwania i przelacza na nastepny proces.
 
 ```
 void proces_block(void)
@@ -206,7 +206,7 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno)
 | kernel_stack | uint32_t | wierzcholek stosu jadra (TSS esp0) |
 | user_stack | uint32_t | wierzcholek stosu userspace |
 | entry_point | uint32_t | adres wejscia procesu |
-| ctx_switches | uint64_t | liczba przełączen kontekstu |
+| ctx_switches | uint64_t | liczba przelaczen kontekstu |
 | nr_wakeups | uint64_t | liczba obudzen |
 | nr_blocked | uint64_t | liczba zablokowan |
 | run_next / run_prev | struct proces * | lacza kolejki gotowosci |
@@ -236,19 +236,19 @@ flagi: PAGE_PRESENT (0x1), PAGE_READWRITE (0x2), PAGE_USER (0x4).
 
 ### syscall_handler
 
-glowna obsługa wywołań systemowych. czyta eax jako numer funkcji i reszte rejestrow jako argumenty. zwraca 0xFFFFFFFF przy bledzie.
+glowna obsluga wywolan systemowych. czyta eax jako numer funkcji i reszte rejestrow jako argumenty. zwraca 0xFFFFFFFF przy bledzie.
 
-dostępne syscally:
+dostepne syscally:
 
 | numer | nazwa | opis |
 |-------|-------|------|
-| 0 | SYSCALL_TAPETA_ZMIEŃ | zmienia kolor tapety z ebx |
+| 0 | SYSCALL_TAPETA_ZMIEN | zmienia kolor tapety z ebx |
 | 1 | SYSCALL_TAPETA_POBIERZ | zwraca kolor tapety |
-| 2 | SYSCALL_EKRAN_CZYŚĆ | wypelnia ekran kolorem z ebx |
+| 2 | SYSCALL_EKRAN_CZYSC | wypelnia ekran kolorem z ebx |
 | 3 | SYSCALL_EKRAN_PIKSEL | rysuje piksel (ebx, ecx) kolorem edx |
-| 4 | SYSCALL_EKRAN_PROSTOKĄT | rysuje prostokat (ebx, ecx, edx, esi) kolorem edi |
+| 4 | SYSCALL_EKRAN_PROSTOKAT | rysuje prostokat (ebx, ecx, edx, esi) kolorem edi |
 | 5 | SYSCALL_TEKST_RYSUJ | rysuje tekst z edx na (ebx, ecx) kolorem esi |
-| 6 | SYSCALL_OKNO_STWÓRZ | tworzy okno, zwraca slot |
+| 6 | SYSCALL_OKNO_STWORZ | tworzy okno, zwraca slot |
 | 7 | SYSCALL_OKNO_RYSUJ | rysuje okno z slotu ebx |
 | 8 | SYSCALL_MYSZ_POZYCJA | zwraca pozycje myszy |
 | 9 | SYSCALL_DRUKUJ | drukuje tekst z ebx |
@@ -282,7 +282,7 @@ uint32_t syscall_handler(void)
 
 ### syscall_install
 
-instaluje obsługa syscall w IDT.
+instaluje obsluga syscall w IDT.
 
 ```
 void syscall_install(void)
@@ -809,12 +809,12 @@ obsluguje klikniecie myszy w menu.
 void menu_start_mouse_click(void)
 ```
 
-### menu_start_przełącz
+### menu_start_przelacz
 
 wlacza/wylacza menu start.
 
 ```
-void menu_start_przełącz(void)
+void menu_start_przelacz(void)
 ```
 
 ## pulpit - graficzny/pulpit.c
@@ -869,7 +869,7 @@ void pulp_mouse_release(int x, int y)
 
 ### ikony_wczytaj_uklad
 
-laduje układ ikon z dysku.
+laduje uklad ikon z dysku.
 
 ```
 int ikony_wczytaj_uklad(void)
@@ -877,7 +877,7 @@ int ikony_wczytaj_uklad(void)
 
 ### ikony_zapisz_uklad
 
-zapisuje układ ikon na dysk.
+zapisuje uklad ikon na dysk.
 
 ```
 void ikony_zapisz_uklad(void)
@@ -911,7 +911,7 @@ char keyboard_getchar(void)
 
 ### keyboard_try_getchar
 
-probuje pobrać znak, zwraca 1 gdy jest znak.
+probuje pobrac znak, zwraca 1 gdy jest znak.
 
 ```
 uint8_t keyboard_try_getchar(char *character)
@@ -927,7 +927,7 @@ void keyboard_discard_pending(void)
 
 ### keyboard_scancode_to_char
 
-konwertuje kod skanu na znak z uwzględnieniem shift.
+konwertuje kod skanu na znak z uwzglednieniem shift.
 
 ```
 uint8_t keyboard_scancode_to_char(uint8_t scancode, uint8_t shift)
@@ -1101,7 +1101,7 @@ zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
 
 ### rtl8168b_send
 
-wysyla ramke ethernet przez kartę. oczekuje az deskryptor nadawczy zostanie zwolniony przez kartę (wlasciciel = sterownik).
+wysyla ramke ethernet przez karte. oczekuje az deskryptor nadawczy zostanie zwolniony przez karte (wlasciciel = sterownik).
 
 ```
 int rtl8168b_send(const void *frame, uint16_t length)
@@ -1173,7 +1173,7 @@ zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
 
 ### rtl8111f_send
 
-wysyla ramke ethernet przez karte. oczekuje az deskryptor nadawczy zostanie zwolniony przez kartę (wlasciciel = sterownik), kopiuje ramke do bufora nadawczego, ustawia bity OWN i dlugosc w deskryptorze TSD oraz oczekuje na zakonczenie nadawania przez karte. aktualizuje statystyki TX (pakiety, bajty, bledy, underrun, aborted, carrier).
+wysyla ramke ethernet przez karte. oczekuje az deskryptor nadawczy zostanie zwolniony przez karte (wlasciciel = sterownik), kopiuje ramke do bufora nadawczego, ustawia bity OWN i dlugosc w deskryptorze TSD oraz oczekuje na zakonczenie nadawania przez karte. aktualizuje statystyki TX (pakiety, bajty, bledy, underrun, aborted, carrier).
 
 ```
 int rtl8111f_send(const void *frame, uint16_t length)
@@ -1281,7 +1281,7 @@ void rtl8111f_stats_reset(void)
 
 ### rtl8111f_shutdown
 
-zatrzymuje kartę (stop TX/RX, soft reset) i oznacz sterownik jako niegotowy.
+zatrzymuje karte (stop TX/RX, soft reset) i oznacz sterownik jako niegotowy.
 
 ```
 void rtl8111f_shutdown(void)
@@ -1381,7 +1381,7 @@ bool intel_82578dc_driver_detected(void);
 
 ### intel_82578dc_send_packet
 
-wysyla ramke ethernet przez kartę Intel 82578DC. zapisuje dane do deskryptora nadawczego (TX) i uruchamia nadajnik przez rejestr TDT. zwraca 1 po udanym wyslaniu, 0 gdy lacze nie jest aktywne lub deskryptor TX jest zajety.
+wysyla ramke ethernet przez karte Intel 82578DC. zapisuje dane do deskryptora nadawczego (TX) i uruchamia nadajnik przez rejestr TDT. zwraca 1 po udanym wyslaniu, 0 gdy lacze nie jest aktywne lub deskryptor TX jest zajety.
 
 ```
 bool intel_82578dc_send_packet(const void *data, uint32_t len);
@@ -1397,7 +1397,7 @@ int intel_82578dc_receive_packet(void *buffer, uint32_t len);
 
 ### intel_82578dc_link_up
 
-sprawdza czy lacze sieciowe jest aktywne. zwraca 1 gdy lacze jest w górę, 0 gdy nie.
+sprawdza czy lacze sieciowe jest aktywne. zwraca 1 gdy lacze jest w gore, 0 gdy nie.
 
 ```
 bool intel_82578dc_link_up(void);
@@ -1522,8 +1522,8 @@ struktura `bt_device` zawiera:
 | bonded | czy urzadzenie jest zsparowane |
 | connected | czy urzadzenie jest polaczone |
 | handle | uchwyt polaczenia hci |
-| services | lista usług sdp |
-| service_count | liczba usług |
+| services | lista uslug sdp |
+| service_count | liczba uslug |
 
 ### bluetooth_connect / bluetooth_disconnect / bluetooth_is_connected
 
@@ -1657,7 +1657,7 @@ int create_file(const char *name, uint32_t size)
 
 ### read_file
 
-czytą plik do bufora.
+czyta plik do bufora.
 
 ```
 int read_file(const char *name, char *buffer, uint32_t size)
@@ -1689,7 +1689,7 @@ int ls(const char *dir)
 
 ### cd
 
-zmienia katalog bieżący.
+zmienia katalog biezacy.
 
 ```
 int cd(const char *dir)
@@ -1815,7 +1815,7 @@ czeka podany czas.
 
 ## USB - drivers/usb/core/usb.c
 
-inicjalizacja i obsługa magistrali USB.
+inicjalizacja i obsluga magistrali USB.
 
 ### usb_init
 
@@ -1909,7 +1909,7 @@ int eax_set_listener(float x, float y, float z,
                      float ux, float uy, float uz);
 ```
 
-wlacz/wylacz EAX, ustaw srodowisko dzwiekowe (pokoj, room_hf, odbicia, poglos, czas rozpadu, dyfuzyjnosc, gestosc, flagi) oraz polozenie i orientacje słuchacza.
+wlacz/wylacz EAX, ustaw srodowisko dzwiekowe (pokoj, room_hf, odbicia, poglos, czas rozpadu, dyfuzyjnosc, gestosc, flagi) oraz polozenie i orientacje sluchacza.
 
 struktura `EaxEnvironment` zawiera: room, room_hf, reflections, reflections_delay, reverb, reverb_delay, decay_time, decay_hf_ratio, reflections_hf, reverb_hf, diffusion, density, flags.
 
@@ -2242,7 +2242,7 @@ void gma_x4500_set_primitive_topology(uint32_t topology)
 
 #### gma_x4500_clear_render_target
 
-czyści render target podanym kolorem.
+czysci render target podanym kolorem.
 
 ```
 void gma_x4500_clear_render_target(gma_handle_t rt, uint32_t color)
@@ -2250,7 +2250,7 @@ void gma_x4500_clear_render_target(gma_handle_t rt, uint32_t color)
 
 #### gma_x4500_clear_depth_stencil
 
-czyści depth-stencil podanymi wartosciami glebi i stencil.
+czysci depth-stencil podanymi wartosciami glebi i stencil.
 
 ```
 void gma_x4500_clear_depth_stencil(gma_handle_t ds, float depth, uint8_t stencil)
@@ -2505,7 +2505,7 @@ void radeon_hd_8370d_blend_state_destroy(radeon_handle_t handle)
 
 #### radeon_hd_8370d_rasterizer_state_create / radeon_hd_8370d_rasterizer_state_destroy
 
-tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage dla przezroczystosci).
+tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygladzone, alpha to coverage dla przezroczystosci).
 
 ```
 radeon_handle_t radeon_hd_8370d_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage);
@@ -2629,7 +2629,7 @@ void radeon_hd_8370d_set_alpha_blend_global(uint8_t enable)
 
 #### radeon_hd_8370d_clear_render_target
 
-czyści render target podanym kolorem.
+czysci render target podanym kolorem.
 
 ```
 void radeon_hd_8370d_clear_render_target(radeon_handle_t rt, uint32_t color)
@@ -2637,7 +2637,7 @@ void radeon_hd_8370d_clear_render_target(radeon_handle_t rt, uint32_t color)
 
 #### radeon_hd_8370d_clear_depth_stencil
 
-czyści depth-stencil podanymi wartosciami glebi i stencil.
+czysci depth-stencil podanymi wartosciami glebi i stencil.
 
 ```
 void radeon_hd_8370d_clear_depth_stencil(radeon_handle_t ds, float depth, uint8_t stencil)
@@ -2928,7 +2928,7 @@ void radeon_6790_blend_state_destroy(radeon_6790_handle_t handle)
 
 #### radeon_6790_rasterizer_state_create / radeon_6790_rasterizer_state_destroy
 
-tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage, depth bias, rasteryzacja zachowawcza).
+tworzy lub niszczy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygladzone, alpha to coverage, depth bias, rasteryzacja zachowawcza).
 
 ```
 radeon_6790_handle_t radeon_6790_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage, uint8_t depth_bias_enable, float depth_bias_constant, float depth_bias_slope, uint8_t conservative_raster);
@@ -3090,7 +3090,7 @@ void radeon_6790_set_render_target_array_slice(uint32_t slice)
 
 #### radeon_6790_set_msaa_samples
 
-ustawia liczba probek MSAA (wieloprobekowe wygładzanie krawedzi).
+ustawia liczba probek MSAA (wieloprobekowe wygladzanie krawedzi).
 
 ```
 void radeon_6790_set_msaa_samples(uint32_t samples)
@@ -3100,7 +3100,7 @@ void radeon_6790_set_msaa_samples(uint32_t samples)
 
 #### radeon_6790_clear_render_target
 
-czyści render target podanym kolorem.
+czysci render target podanym kolorem.
 
 ```
 void radeon_6790_clear_render_target(radeon_6790_handle_t rt, uint32_t color)
@@ -3108,7 +3108,7 @@ void radeon_6790_clear_render_target(radeon_6790_handle_t rt, uint32_t color)
 
 #### radeon_6790_clear_depth_stencil
 
-czyści depth-stencil podanymi wartosciami glebi i stencil.
+czysci depth-stencil podanymi wartosciami glebi i stencil.
 
 ```
 void radeon_6790_clear_depth_stencil(radeon_6790_handle_t ds, float depth, uint8_t stencil)
@@ -3414,7 +3414,7 @@ tarixenOS/
 │   └── *.h               # naglowki
 ├── graficzny/
 │   ├── rysowanie.c       # rysowanie pikseli, prostokatow, tekstu
-│   ├── okno.c            # zarządzanie oknami
+│   ├── okno.c            # zarzadzanie oknami
 │   ├── czcionka.c        # czcionka Chicago
 │   ├── menu_start.c      # menu start
 │   ├── pulpit.c          # pulpit i ikony
@@ -4374,7 +4374,7 @@ komponenty HDA:
 | selector | selektor wejsc |
 | mux | multipleksor |
 | volume | sterowanie glosnoscia |
-| switch | przełącznik |
+| switch | przelacznik |
 
 typy potokow:
 
@@ -4419,7 +4419,7 @@ extern "C" void hda_codec_irq(void);
 
 ## sterownik plyty glownej ASUS P4P800 - drivers/plyty_glowne/asus_p4p800.cpp
 
-Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.
+Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stacje dyskowetek, RTC/CMOS oraz monitorowanie sprzetowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.
 
 ### Inicjalizacja i stan
 
@@ -4437,7 +4437,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 
 | funkcja | opis |
 |---------|------|
-| `int p4p_pci_find_device(uint16_t vendor, uint16_t device, uint8_t index, uint8_t *bus, uint8_t *slot, uint8_t *func)` | Wyszukuje urządzenie PCI po vendor/device ID, zwraca index dla wielu urządzeń tego samego typu. |
+| `int p4p_pci_find_device(uint16_t vendor, uint16_t device, uint8_t index, uint8_t *bus, uint8_t *slot, uint8_t *func)` | Wyszukuje urzadzenie PCI po vendor/device ID, zwraca index dla wielu urzadzen tego samego typu. |
 | `uint32_t p4p_pci_read32(...)` / `void p4p_pci_write32(...)` | Odczyt/zapis 32-bitowy do rejestru konfiguracji PCI. |
 | `uint16_t p4p_pci_read16(...)` / `void p4p_pci_write16(...)` | Odczyt/zapis 16-bitowy do rejestru konfiguracji PCI. |
 | `uint8_t p4p_pci_read8(...)` / `void p4p_pci_write8(...)` | Odczyt/zapis 8-bitowy do rejestru konfiguracji PCI. |
@@ -4455,7 +4455,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | funkcja | opis |
 |---------|------|
 | `int p4p_acpi_available(void)` | Sprawdza dostepnosc ACPI i wlacza SCI (System Control Interrupt). |
-| `void p4p_acpi_sleep(uint8_t state)` | Wprowadza system w stan uśpienia ACPI (S1-S5) przez rejestr PM1A_CNT. |
+| `void p4p_acpi_sleep(uint8_t state)` | Wprowadza system w stan uspienia ACPI (S1-S5) przez rejestr PM1A_CNT. |
 | `void p4p_acpi_reboot(void)` | Restart komputera przez port 0xCF9 i klawiatura. |
 | `void p4p_acpi_shutdown(void)` | Wylaczenie systemu przez ACPI S5 lub fallback. |
 
@@ -4504,7 +4504,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `uint32_t p4p_eth_speed_mbps(void)` | Zwraca predkosc lacza w Mbps (100). |
 | `int p4p_eth_send(const void *frame, uint16_t length)` | Wysyla ramke ethernetowa. |
 | `int p4p_eth_receive(void *frame, uint16_t capacity)` | Odbiera ramke ethernetowa. |
-| `void p4p_eth_stats_get(struct p4p_eth_stats *out)` | Statystyki ethernetu (tx/rx pakiety, bajty, błędy, resety). |
+| `void p4p_eth_stats_get(struct p4p_eth_stats *out)` | Statystyki ethernetu (tx/rx pakiety, bajty, bledy, resety). |
 
 ### IDE (ICH4, PIO + DMA)
 
@@ -4518,7 +4518,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `int p4p_ide_dma_read_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, void *buffer)` | Czytanie sektorow przez DMA bus mastering. |
 | `int p4p_ide_dma_write_sectors(uint8_t channel, uint8_t drive, uint32_t lba, uint8_t count, const void *buffer)` | Zapis sektorow przez DMA bus mastering. |
 | `void p4p_ide_reset(uint8_t channel)` | Reset kontrolera IDE przez port alternativ status. |
-| `void p4p_ide_stats_get(struct p4p_ide_stats *out)` | Statystyki IDE (reads, writes, sektory, DMA transfery, błędy). |
+| `void p4p_ide_stats_get(struct p4p_ide_stats *out)` | Statystyki IDE (reads, writes, sektory, DMA transfery, bledy). |
 
 ### USB (ICH4 UHCI x3 + EHCI)
 
@@ -4532,7 +4532,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `uint32_t p4p_usb_port_status(uint8_t port)` | Zwraca rejestr statusu portu USB. |
 | `int p4p_usb_control_transfer(...)` | Transfer sterowniczy USB (placeholder gotowy do rozszerzenia). |
 | `int p4p_usb_bulk_transfer(...)` | Transfer masowy USB (placeholder gotowy do rozszerzenia). |
-| `void p4p_usb_stats_get(struct p4p_usb_stats *out)` | Statystyki USB (porty, resety, transfery, błędy). |
+| `void p4p_usb_stats_get(struct p4p_usb_stats *out)` | Statystyki USB (porty, resety, transfery, bledy). |
 
 ### Stacja dyskowetek (FDC)
 
@@ -4545,7 +4545,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `int p4p_floppy_read_sectors(uint8_t drive, uint8_t head, uint8_t track, uint8_t sector, uint8_t count, void *buffer)` | Czytanie sektorow z dyskowetki. |
 | `int p4p_floppy_write_sectors(uint8_t drive, uint8_t head, uint8_t track, uint8_t sector, uint8_t count, const void *buffer)` | Zapis sektorow na dyskietke. |
 | `uint8_t p4p_floppy_status(void)` | Zwraca rejestr statusu FDC (Status A). |
-| `void p4p_floppy_stats_get(struct p4p_floppy_stats *out)` | Statystyki FDC (reads, writes, seeks, błędy). |
+| `void p4p_floppy_stats_get(struct p4p_floppy_stats *out)` | Statystyki FDC (reads, writes, seeks, bledy). |
 
 ### RTC / CMOS
 
@@ -4561,7 +4561,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `int p4p_rtc_irq_enable(uint8_t mask, uint8_t enable)` | Wlacza/wylacza przerwania RTC (update, alarm, periodic). |
 | `uint8_t p4p_rtc_irq_status(void)` | Zwraca rejestr statusu C RTC (flagi przerwan). |
 
-### Monitorowanie sprzętowe (HWMON, Super I/O)
+### Monitorowanie sprzetowe (HWMON, Super I/O)
 
 | funkcja | opis |
 |---------|------|
@@ -4570,7 +4570,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `int p4p_hwmon_read_temperature(uint8_t sensor, int32_t *millicelsius)` | Odczyt temperatury z czujnika w milicelcjuszach. |
 | `int p4p_hwmon_read_voltage(uint8_t sensor, int32_t *millivolt)` | Odczyt napiecia (placeholder). |
 | `int p4p_hwmon_read_fan(uint8_t fan, uint32_t *rpm)` | Odczyt obrotow wentylatora (placeholder). |
-| `void p4p_hwmon_stats_get(struct p4p_hwmon_stats *out)` | Statystyki HWMON (temperatury, napiecia, wentylatory, błędy). |
+| `void p4p_hwmon_stats_get(struct p4p_hwmon_stats *out)` | Statystyki HWMON (temperatury, napiecia, wentylatory, bledy). |
 
 ### Obsluga przerwan (IRQ)
 
@@ -4579,7 +4579,7 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 | `void p4p_irq_handler(uint8_t irq)` | Dysponuje przerwanie do zarejestrowanego handlera dla danego IRQ. |
 | `int p4p_irq_register(uint8_t irq, void (*handler)(uint8_t irq))` | Rejestruje handler przerwania dla IRQ 0-15. |
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `intel_uhd_init()`:
 
@@ -4587,7 +4587,7 @@ Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz
 p4p_init();
 ```
 
-Nagłówek `drivers/plyty_glowne/asus_p4p800.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra.
+Naglowek `drivers/plyty_glowne/asus_p4p800.h` jest dolaczany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywolywane z kodu C jadra.
 
 ## sterownik plyty glownej Intel 915 - drivers/plyty_glowne/intel_915.cpp
 
@@ -4627,7 +4627,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `int i915_chipset_probe(void)` | Wykrywa MCH (82915G/915P/915X/915GV/915GL) i ICH6, zapisuje ID, rewizje, adres ACPI i wlacza bus mastering. |
 | `void i915_chipset_configure_memory(void)` | Konfiguruje rejestry sterowania pamieci chipsetu (GGC i DEVEN MCH). |
 
-### Pamieć (PAM, DRAM, AGP)
+### Pamiec (PAM, DRAM, AGP)
 
 | funkcja | opis |
 |---------|------|
@@ -4639,7 +4639,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `int i915_memory_get_timings(uint32_t *tcl, uint32_t *trcd, uint32_t *trp, uint32_t *tras)` | Pobiera aktualne timingi pamieci DRAM. |
 | `int i915_memory_scrub(uint32_t start, uint32_t size)` | Wyzerowanie (scrub) obszaru pamieci fizycznej. |
 | `int i915_memory_interrupt_enable(uint8_t enable)` | Wlacza/wylacza przerwania kontrolera pamieci. |
-| `int i915_gme_enable(uint8_t enable)` | Wlacza/wylacza Graficzną Engine MCH (GME). |
+| `int i915_gme_enable(uint8_t enable)` | Wlacza/wylacza Graficzna Engine MCH (GME). |
 | `uint32_t i915_stolen_memory_size(void)` | Zwraca rozmiar pamieci ukradzionej (stolen memory) dla grafiki. |
 | `int i915_agp_init(void)` | Inicjalizuje aperture AGP i wykrywa jego adres bazowy. |
 | `uint32_t i915_agp_aperture(void)` | Zwraca rozmiar aperture AGP. |
@@ -4650,7 +4650,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 
 | funkcja | opis |
 |---------|------|
-| `int i915_graphics_init(void)` | Inicjalizuje kontroler graficzny: MMIO, DPLL, timingi pipe A, płaszczyzna A, ring buffer blitera, kursor sprzetowy. |
+| `int i915_graphics_init(void)` | Inicjalizuje kontroler graficzny: MMIO, DPLL, timingi pipe A, plaszczyzna A, ring buffer blitera, kursor sprzetowy. |
 | `int i915_graphics_is_ready(void)` | Zwraca 1 gdy sterownik graficzny jest gotowy. |
 | `void i915_graphics_putpixel(uint32_t x, uint32_t y, uint32_t color)` | Rysuje pojedynczy piksel w ramce graficznej na pozycji (x, y) podanym kolorem. |
 | `void i915_graphics_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Wypelnia prostokat o podanym rozmiarze i kolorze (uzywa blitera sprzetowego lub fallback CPU). |
@@ -4661,8 +4661,8 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `void i915_graphics_overlay_enable(uint8_t enable)` | Wlacza/wylacza overlay wideo. |
 | `int i915_graphics_overlay_set_buffer(uint32_t addr, uint32_t width, uint32_t height, uint32_t pitch)` | Ustawia bufor overlay wideo. |
 | `void i915_graphics_display_timings(uint32_t width, uint32_t height, uint32_t refresh)` | Konfiguruje timingi wyswietlania (placeholder). |
-| `void i915_graphics_pipe_config(uint8_t pipe, uint8_t enable)` | Konfiguruje pipe wyświetlania (A lub B). |
-| `void i915_graphics_plane_config(uint8_t plane, uint32_t addr, uint32_t width, uint32_t height, uint32_t stride)` | Konfiguruje płaszczyzne wyswietlania. |
+| `void i915_graphics_pipe_config(uint8_t pipe, uint8_t enable)` | Konfiguruje pipe wyswietlania (A lub B). |
+| `void i915_graphics_plane_config(uint8_t plane, uint32_t addr, uint32_t width, uint32_t height, uint32_t stride)` | Konfiguruje plaszczyzne wyswietlania. |
 | `void i915_graphics_blt_fill(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t color)` | Blitter: wypelnienie prostokatem (XY_FILL_BLT). |
 | `void i915_graphics_blt_copy(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)` | Blitter: kopiowanie bloku pikseli (XY_SRC_COPY_BLT). |
 | `void *i915_graphics_get_fb(void)` | Zwraca wskaznik na ramke graficzna (framebuffer). |
@@ -4672,7 +4672,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `uint16_t i915_graphics_get_device_id(void)` | Zwraca ID urzadzenia graficznego. |
 | `uint8_t i915_graphics_get_revision(void)` | Zwraca rewizje karty graficznej. |
 | `void i915_graphics_info_get(struct i915_graphics_info *out)` | Pobiera pelne informacje o urzadzeniu graficznym. |
-| `void i915_graphics_stats_get(struct i915_graphics_stats *out)` | Pobiera statystyki grafiki (putpixels, fillrects, blts, cursor_moves, overlay_updates, ring_flushes, błędy). |
+| `void i915_graphics_stats_get(struct i915_graphics_stats *out)` | Pobiera statystyki grafiki (putpixels, fillrects, blts, cursor_moves, overlay_updates, ring_flushes, bledy). |
 | `void i915_graphics_vga_enable(uint8_t enable)` | Wlacza/wylacza tryb VGA kompatybilny. |
 | `void i915_graphics_ring_flush(void)` | Wymusza wykonanie polecen w ring bufferze blitera. |
 
@@ -4691,7 +4691,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `void i915_ide_reset(uint8_t channel)` | Reset kontrolera IDE przez port alternativ status. |
 | `int i915_ide_set_dma(uint8_t channel, uint8_t drive, uint8_t mode)` | Ustawia tryb transferu DMA (UDMA mode). |
 | `uint8_t i915_ide_get_udma_mode(uint8_t channel)` | Zwraca aktualny tryb UDMA dla kanalu. |
-| `void i915_ide_stats_get(struct i915_ide_stats *out)` | Statystyki IDE (reads, writes, sektory, DMA transfery, błędy). |
+| `void i915_ide_stats_get(struct i915_ide_stats *out)` | Statystyki IDE (reads, writes, sektory, DMA transfery, bledy). |
 
 ### SATA (ICH6)
 
@@ -4716,7 +4716,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `uint32_t i915_usb_port_status(uint8_t port)` | Zwraca rejestr statusu portu USB. |
 | `int i915_usb_control_transfer(uint8_t addr, uint8_t endpoint, uint8_t direction, uint8_t request_type, uint8_t request, uint16_t value, uint16_t index, uint16_t length, void *data)` | Transfer sterowniczy USB. |
 | `int i915_usb_bulk_transfer(uint8_t addr, uint8_t endpoint, uint8_t direction, uint32_t length, void *data)` | Transfer masowy USB. |
-| `void i915_usb_stats_get(struct i915_usb_stats *out)` | Statystyki USB (porty, resety, transfery, błędy). |
+| `void i915_usb_stats_get(struct i915_usb_stats *out)` | Statystyki USB (porty, resety, transfery, bledy). |
 
 ### Audio AC'97 (ICH6 + kodek)
 
@@ -4811,7 +4811,7 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `int i915_rtc_irq_enable(uint8_t mask, uint8_t enable)` | Wlacza/wylacza przerwania RTC (update, alarm, periodic). |
 | `uint8_t i915_rtc_irq_status(void)` | Zwraca rejestr statusu C RTC (flagi przerwan). |
 
-### Monitorowanie sprzętowe (HWMON, Super I/O)
+### Monitorowanie sprzetowe (HWMON, Super I/O)
 
 | funkcja | opis |
 |---------|------|
@@ -4820,9 +4820,9 @@ Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915
 | `int i915_hwmon_read_temperature(uint8_t sensor, int32_t *millicelsius)` | Odczyt temperatury z czujnika w milicelcjuszach. |
 | `int i915_hwmon_read_voltage(uint8_t sensor, int32_t *millivolt)` | Odczyt napiecia (placeholder). |
 | `int i915_hwmon_read_fan(uint8_t fan, uint32_t *rpm)` | Odczyt obrotow wentylatora (placeholder). |
-| `void i915_hwmon_stats_get(struct i915_hwmon_stats *out)` | Statystyki HWMON (temperatury, napiecia, wentylatory, błędy). |
+| `void i915_hwmon_stats_get(struct i915_hwmon_stats *out)` | Statystyki HWMON (temperatury, napiecia, wentylatory, bledy). |
 
-### Obsługa przerwan (IRQ)
+### Obsluga przerwan (IRQ)
 
 | funkcja | opis |
 |---------|------|
@@ -4885,7 +4885,7 @@ Struktura `i915_stats` zawiera:
 | init_count | liczba wyolan inicjalizacji |
 | errors | liczba bledow sterownika |
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `p4p_init()`:
 
@@ -4893,11 +4893,11 @@ Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz
 i915_init();
 ```
 
-Nagłówek `drivers/plyty_glowne/intel_915.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/plyty_glowne/intel_915.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/plyty_glowne/*.cpp)`).
+Naglowek `drivers/plyty_glowne/intel_915.h` jest dolaczany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywolywane z kodu C jadra. Plik zrodlowy `drivers/plyty_glowne/intel_915.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/plyty_glowne/*.cpp)`).
 
 ## karta graficzna - drivers/karty_graficzne/radeon_rx_9070_xt.cpp
 
-Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16GB GDDR6 (architektura RDNA 4 / Navi 48) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP GFX, CP COMPUTE, CP DMA), ray tracing (RT), mesh shaders, variable rate shading (VRS), delta color compression (DCC), przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami i kompresja (ASTC, DXT), shadery (vertex, pixel, geometry, compute, ray gen, any hit, closest hit, miss, callable, intersection, mesh, amplification), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, HDR, triple buffer). Sterownik zarządza 16 GB pamięci GDDR6 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_rx_9070_xt.h i jest inicjalizowany z kernel/kernel.c przez `rx_9070_xt_init()`.
+Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16GB GDDR6 (architektura RDNA 4 / Navi 48) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP GFX, CP COMPUTE, CP DMA), ray tracing (RT), mesh shaders, variable rate shading (VRS), delta color compression (DCC), przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami i kompresja (ASTC, DXT), shadery (vertex, pixel, geometry, compute, ray gen, any hit, closest hit, miss, callable, intersection, mesh, amplification), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, HDR, triple buffer). Sterownik zarzadza 16 GB pamieci GDDR6 (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez naglowek radeon_rx_9070_xt.h i jest inicjalizowany z kernel/kernel.c przez `rx_9070_xt_init()`.
 
 ### Inicjalizacja i stan
 
@@ -4923,7 +4923,7 @@ Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16G
 | `uint8_t rx_9070_xt_get_revision(void)` | Zwraca rewizje karty graficznej. |
 | `void rx_9070_xt_info_get(struct rx_9070_xt_info *out)` | Pobiera pelne informacje o urzadzeniu (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, architecture, vram_size, vram_used, gfx_clock_mhz, memory_clock_mhz, temperature_c, fan_rpm). |
 
-### Zarządzanie pamięcią VRAM (16 GB GDDR6)
+### Zarzadzanie pamiecia VRAM (16 GB GDDR6)
 
 | funkcja | opis |
 |---------|------|
@@ -4957,7 +4957,7 @@ Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16G
 | `void rx_9070_xt_sampler_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan probki tekstury. |
 | `rx_9070_xt_handle_t rx_9070_xt_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor)` | Tworzy stan blendowania (przezroczystosc alpha, operacje blendowania, staly kolor blendowania). Zwraca handle. |
 | `void rx_9070_xt_blend_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan blendowania. |
-| `rx_9070_xt_handle_t rx_9070_xt_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage, uint8_t vrs)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage, VRS). Zwraca handle. |
+| `rx_9070_xt_handle_t rx_9070_xt_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage, uint8_t vrs)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygladzone, alpha to coverage, VRS). Zwraca handle. |
 | `void rx_9070_xt_rasterizer_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan rasterizera. |
 | `rx_9070_xt_handle_t rx_9070_xt_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)` | Tworzy stan depth-stencil (testy glebi i stencil z przodem i tylem). Zwraca handle. |
 | `void rx_9070_xt_depth_stencil_state_destroy(rx_9070_xt_handle_t handle)` | Niszczy stan depth-stencil. |
@@ -5017,8 +5017,8 @@ Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16G
 
 | funkcja | opis |
 |---------|------|
-| `void rx_9070_xt_clear_render_target(rx_9070_xt_handle_t rt, uint32_t color)` | Czyści render target podanym kolorem. |
-| `void rx_9070_xt_clear_depth_stencil(rx_9070_xt_handle_t ds, float depth, uint8_t stencil)` | Czyści depth-stencil podanymi wartosciami glebi i stencil. |
+| `void rx_9070_xt_clear_render_target(rx_9070_xt_handle_t rt, uint32_t color)` | Czysci render target podanym kolorem. |
+| `void rx_9070_xt_clear_depth_stencil(rx_9070_xt_handle_t ds, float depth, uint8_t stencil)` | Czysci depth-stencil podanymi wartosciami glebi i stencil. |
 | `void rx_9070_xt_draw(uint32_t vertex_count, uint32_t start_vertex)` | Rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. |
 | `void rx_9070_xt_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)` | Rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex. |
 | `void rx_9070_xt_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)` | Rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji poczynajac od start_instance. |
@@ -5039,14 +5039,14 @@ Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16G
 |---------|------|
 | `void rx_9070_xt_fence_create(rx_9070_xt_handle_t *out)` | Tworzy fence (synchronizacja GPU) i zwraca jego handle. |
 | `void rx_9070_xt_fence_signal(rx_9070_xt_handle_t handle, uint32_t value)` | Sygnalizuje fence z podana wartoscia (oznacza zakonczenie pracy GPU). |
-| `int rx_9070_xt_fence_wait(rx_9070_xt_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizację fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
+| `int rx_9070_xt_fence_wait(rx_9070_xt_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizacje fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
 | `void rx_9070_xt_fence_destroy(rx_9070_xt_handle_t handle)` | Niszczy fence o podanym handle. |
 | `void rx_9070_xt_semaphore_create(rx_9070_xt_handle_t *out)` | Tworzy semafor (synchronizacja miedzy etapami potoku) i zwraca jego handle. |
 | `void rx_9070_xt_semaphore_signal(rx_9070_xt_handle_t handle, uint32_t value)` | Sygnalizuje semafor z podana wartoscia. |
-| `void rx_9070_xt_semaphore_wait(rx_9070_xt_handle_t handle, uint32_t value)` | Czeka na sygnalizację semafora do podanej wartosci (blokujace). |
+| `void rx_9070_xt_semaphore_wait(rx_9070_xt_handle_t handle, uint32_t value)` | Czeka na sygnalizacje semafora do podanej wartosci (blokujace). |
 | `void rx_9070_xt_semaphore_destroy(rx_9070_xt_handle_t handle)` | Niszczy semafor o podanym handle. |
 
-### Zarządzanie zasilaniem, zegarami, temperatura, wentylator, RGB
+### Zarzadzanie zasilaniem, zegarami, temperatura, wentylator, RGB
 
 | funkcja | opis |
 |---------|------|
@@ -5107,11 +5107,11 @@ Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16G
 | `RX_9070_XT_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (16 GB GDDR6). |
 | `RX_9070_XT_FB_WIDTH / RX_9070_XT_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1920x1080). |
 | `RX_9070_XT_FB_PITCH` | Pitch ramki graficznej (7680 bajtow). |
-| `RX_9070_XT_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
+| `RX_9070_XT_HANDLE_NULL` | Wartosc nulowa dla handle zasobow (0xFFFFFFFFU). |
 | `rx_9070_xt_handle_t` | Typ handle zasobu (uint32_t). |
 | `RX_9070_XT_*` | Stale dla formatow vertex, indeksow, primitivow, tekstur, shaderow, blendowania, operacji blendowania, porownan glebi, wypelnienia, cullowania, operacji stencil (patrz naglowek radeon_rx_9070_xt.h). |
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `radeon_hd_8370d_init()`:
 
@@ -5119,11 +5119,11 @@ Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz
 rx_9070_xt_init();
 ```
 
-Nagłówek `drivers/karty_graficzne/radeon_rx_9070_xt.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_rx_9070_xt.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+Naglowek `drivers/karty_graficzne/radeon_rx_9070_xt.h` jest dolaczany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywolywane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_rx_9070_xt.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
 ## karta graficzna - drivers/karty_graficzne/radeon_hd_6870.cpp
 
-Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Northern Islands / Cayman, VLIW4) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT), shadery (vertex, pixel, geometry, compute), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync). Sterownik zarządza pamiecia GDDR5 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_hd_6870.h i jest inicjalizowany z kernel/kernel.c przez `radeon_6870_init()`.
+Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Northern Islands / Cayman, VLIW4) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT), shadery (vertex, pixel, geometry, compute), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync). Sterownik zarzadza pamiecia GDDR5 (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez naglowek radeon_hd_6870.h i jest inicjalizowany z kernel/kernel.c przez `radeon_6870_init()`.
 
 ### Inicjalizacja i stan
 
@@ -5149,7 +5149,7 @@ Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Norther
 | `uint8_t radeon_6870_get_revision(void)` | Zwraca rewizje karty graficznej. |
 | `void radeon_6870_info_get(struct radeon_6870_info *out)` | Pobiera pelne informacje o urzadzeniu (vendor_id, device_id, revision_id, mmio_base, fb_addr, fb_width, fb_height, fb_pitch, initialized, architecture, vram_size, vram_used, gfx_clock_mhz, memory_clock_mhz, temperature_c, fan_rpm). |
 
-### Zarządzanie pamięcią VRAM (GDDR5)
+### Zarzadzanie pamiecia VRAM (GDDR5)
 
 | funkcja | opis |
 |---------|------|
@@ -5183,7 +5183,7 @@ Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Norther
 | `void radeon_6870_sampler_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan probki tekstury. |
 | `radeon_6870_handle_t radeon_6870_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor)` | Tworzy stan blendowania (przezroczystosc alpha, operacje blendowania, staly kolor blendowania). Zwraca handle. |
 | `void radeon_6870_blend_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan blendowania. |
-| `radeon_6870_handle_t radeon_6870_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha to coverage). Zwraca handle. |
+| `radeon_6870_handle_t radeon_6870_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygladzone, alpha to coverage). Zwraca handle. |
 | `void radeon_6870_rasterizer_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan rasterizera. |
 | `radeon_6870_handle_t radeon_6870_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)` | Tworzy stan depth-stencil (testy glebi i stencil z przodem i tylem). Zwraca handle. |
 | `void radeon_6870_depth_stencil_state_destroy(radeon_6870_handle_t handle)` | Niszczy stan depth-stencil. |
@@ -5225,8 +5225,8 @@ Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Norther
 
 | funkcja | opis |
 |---------|------|
-| `void radeon_6870_clear_render_target(radeon_6870_handle_t rt, uint32_t color)` | Czyści render target podanym kolorem. |
-| `void radeon_6870_clear_depth_stencil(radeon_6870_handle_t ds, float depth, uint8_t stencil)` | Czyści depth-stencil podanymi wartosciami glebi i stencil. |
+| `void radeon_6870_clear_render_target(radeon_6870_handle_t rt, uint32_t color)` | Czysci render target podanym kolorem. |
+| `void radeon_6870_clear_depth_stencil(radeon_6870_handle_t ds, float depth, uint8_t stencil)` | Czysci depth-stencil podanymi wartosciami glebi i stencil. |
 | `void radeon_6870_draw(uint32_t vertex_count, uint32_t start_vertex)` | Rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. |
 | `void radeon_6870_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)` | Rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex. |
 | `void radeon_6870_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)` | Rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji poczynajac od start_instance. |
@@ -5245,14 +5245,14 @@ Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Norther
 |---------|------|
 | `void radeon_6870_fence_create(radeon_6870_handle_t *out)` | Tworzy fence (synchronizacja GPU) i zwraca jego handle. |
 | `void radeon_6870_fence_signal(radeon_6870_handle_t handle, uint32_t value)` | Sygnalizuje fence z podana wartoscia (oznacza zakonczenie pracy GPU). |
-| `int radeon_6870_fence_wait(radeon_6870_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizację fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
+| `int radeon_6870_fence_wait(radeon_6870_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizacje fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
 | `void radeon_6870_fence_destroy(radeon_6870_handle_t handle)` | Niszczy fence o podanym handle. |
 | `void radeon_6870_semaphore_create(radeon_6870_handle_t *out)` | Tworzy semafor (synchronizacja miedzy etapami potoku) i zwraca jego handle. |
 | `void radeon_6870_semaphore_signal(radeon_6870_handle_t handle, uint32_t value)` | Sygnalizuje semafor z podana wartoscia. |
-| `void radeon_6870_semaphore_wait(radeon_6870_handle_t handle, uint32_t value)` | Czeka na sygnalizację semafora do podanej wartosci (blokujace). |
+| `void radeon_6870_semaphore_wait(radeon_6870_handle_t handle, uint32_t value)` | Czeka na sygnalizacje semafora do podanej wartosci (blokujace). |
 | `void radeon_6870_semaphore_destroy(radeon_6870_handle_t handle)` | Niszczy semafor o podanym handle. |
 
-### Zarządzanie zasilaniem, zegarami, temperatura, wentylator, RGB
+### Zarzadzanie zasilaniem, zegarami, temperatura, wentylator, RGB
 
 | funkcja | opis |
 |---------|------|
@@ -5301,11 +5301,11 @@ Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Norther
 | `RADEON_6870_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (GDDR5). |
 | `RADEON_6870_FB_WIDTH / RADEON_6870_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1920x1080). |
 | `RADEON_6870_FB_PITCH` | Pitch ramki graficznej (7680 bajtow). |
-| `RADEON_6870_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
+| `RADEON_6870_HANDLE_NULL` | Wartosc nulowa dla handle zasobow (0xFFFFFFFFU). |
 | `radeon_6870_handle_t` | Typ handle zasobu (uint32_t). |
 | `RADEON_6870_*` | Stale dla formatow vertex, indeksow, primitivow, tekstur, shaderow, blendowania, operacji blendowania, porownan glebi, wypelnienia, cullowania, operacji stencil (patrz naglowek radeon_hd_6870.h). |
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `rx_9070_xt_init()`:
 
@@ -5313,7 +5313,7 @@ Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz
 radeon_6870_init();
 ```
 
-Nagłówek `drivers/karty_graficzne/radeon_hd_6870.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_hd_6870.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+Naglowek `drivers/karty_graficzne/radeon_hd_6870.h` jest dolaczany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywolywane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_hd_6870.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
 ## konwencja pisania kodu
 
@@ -5343,7 +5343,7 @@ dostepne funkcje:
 
 | funkcja | opis |
 |---------|------|
-| `rtl8111e_init()` | inicjalizuje kartę: PCI, MMIO, reset, MAC, rejestry, bufor, TX/RX. zwraca 1 przy sukcesie, 0 przy porażce. |
+| `rtl8111e_init()` | inicjalizuje karte: PCI, MMIO, reset, MAC, rejestry, bufor, TX/RX. zwraca 1 przy sukcesie, 0 przy porazce. |
 | `rtl8111e_is_ready()` | zwraca 1 gdy sterownik jest zainicjowany i gotowy. |
 | `rtl8111e_get_mac(mac)` | kopiuje 6-bajtowy adres MAC do tablicy `mac`. zwraca 1/0. |
 | `rtl8111e_send(frame, length)` | wysyla ramke ethernet. zwraca 1 po zakonczeniu, 0 gdy deskryptor zajety, -1 przy bledzie argumentow. |
@@ -5357,15 +5357,15 @@ dostepne funkcje:
 | `rtl8111e_set_multicast(addresses, count)` | programuje filtr adresow multicast w rejestrach MAR. |
 | `rtl8111e_stats_get(out)` | wypelnia strukture `rtl8111e_stats` (tx_packets, tx_bytes, tx_errors, rx_packets, rx_bytes, rx_errors, resets, link_changes). |
 
-PHY jest dostępny przez rejestr `REG_PHYAR` (bit 31 = zajęty, bit 30 = zapis, bity 23-16 = adres rejestru, bity 15-0 = dane). Uzywane rejestry PHY: BMCR (0) i BMSR (1).
+PHY jest dostepny przez rejestr `REG_PHYAR` (bit 31 = zajety, bit 30 = zapis, bity 23-16 = adres rejestru, bity 15-0 = dane). Uzywane rejestry PHY: BMCR (0) i BMSR (1).
 
 integracja z przegladarka:
 
-`drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
+`drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w srodowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
 
 ## karta graficzna - drivers/karty_graficzne/radeon_8500.cpp
 
-Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarządza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_8500.h i jest inicjalizowany z kernel/kernel.c przez `radeon_8500_init()`.
+Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarzadza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez naglowek radeon_8500.h i jest inicjalizowany z kernel/kernel.c przez `radeon_8500_init()`.
 
 ### Inicjalizacja i stan
 
@@ -5425,7 +5425,7 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 | `void radeon_8500_sampler_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan probki tekstury. |
 | `radeon_8500_handle_t radeon_8500_blend_state_create(uint8_t blend_enable, uint32_t src_blend, uint32_t dest_blend, uint32_t blend_op, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t blend_op_alpha, uint32_t write_mask, uint32_t blend_factor)` | Tworzy stan blendowania (przezroczystosc alpha, operacje blendowania RGB i alpha, staly kolor blendowania). Zwraca handle. |
 | `void radeon_8500_blend_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan blendowania. |
-| `radeon_8500_handle_t radeon_8500_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygładzone, alpha-to-coverage). Zwraca handle. |
+| `radeon_8500_handle_t radeon_8500_rasterizer_state_create(uint32_t fill_mode, uint32_t cull_mode, uint8_t front_ccw, uint8_t depth_clip, uint8_t scissor, uint8_t multisample, uint8_t aa_line, uint8_t alpha_to_coverage)` | Tworzy stan rasterizera (wypelnienie, cullowanie, scissor, multisample, linie wygladzone, alpha-to-coverage). Zwraca handle. |
 | `void radeon_8500_rasterizer_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan rasterizera. |
 | `radeon_8500_handle_t radeon_8500_depth_stencil_state_create(uint8_t depth_enable, uint32_t depth_write_mask, uint32_t depth_func, uint8_t stencil_enable, uint8_t stencil_read_mask, uint8_t stencil_write_mask, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)` | Tworzy stan depth-stencil (testy glebi i stencil z przodem i tylem). Zwraca handle. |
 | `void radeon_8500_depth_stencil_state_destroy(radeon_8500_handle_t handle)` | Niszczy stan depth-stencil. |
@@ -5463,8 +5463,8 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 
 | funkcja | opis |
 |---------|------|
-| `void radeon_8500_clear_render_target(radeon_8500_handle_t rt, uint32_t color)` | Czyści render target podanym kolorem przez potok CB sprzetowy. |
-| `void radeon_8500_clear_depth_stencil(radeon_8500_handle_t ds, float depth, uint8_t stencil)` | Czyści depth-stencil podanymi wartosciami glebi i stencil. |
+| `void radeon_8500_clear_render_target(radeon_8500_handle_t rt, uint32_t color)` | Czysci render target podanym kolorem przez potok CB sprzetowy. |
+| `void radeon_8500_clear_depth_stencil(radeon_8500_handle_t ds, float depth, uint8_t stencil)` | Czysci depth-stencil podanymi wartosciami glebi i stencil. |
 | `void radeon_8500_draw(uint32_t vertex_count, uint32_t start_vertex)` | Rysuje primitivy z vertex buffera (bez indeksow) - vertex_count wierzcholkow poczynajac od start_vertex. |
 | `void radeon_8500_draw_indexed(uint32_t index_count, uint32_t start_index, int32_t base_vertex)` | Rysuje indeksowane primitivy z index buffera - index_count indeksow poczynajac od start_index z base_vertex. |
 | `void radeon_8500_draw_indexed_instanced(uint32_t index_count, uint32_t start_index, int32_t base_vertex, uint32_t instance_count, uint32_t start_instance)` | Rysuje indeksowane primitivy z instancjami - index_count indeksow, instance_count instancji poczynajac od start_instance. |
@@ -5483,14 +5483,14 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 |---------|------|
 | `void radeon_8500_fence_create(radeon_8500_handle_t *out)` | Tworzy fence (synchronizacja GPU) i zwraca jego handle. |
 | `void radeon_8500_fence_signal(radeon_8500_handle_t handle, uint32_t value)` | Sygnalizuje fence z podana wartoscia (oznacza zakonczenie pracy GPU). |
-| `int radeon_8500_fence_wait(radeon_8500_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizację fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
+| `int radeon_8500_fence_wait(radeon_8500_handle_t handle, uint32_t value, uint32_t timeout_us)` | Czeka na sygnalizacje fence do podanej wartosci z timeoutem w mikrosekundach. Zwraca 1 gdy fence zostal sygnalizowany, 0 przy timeoutcie. |
 | `void radeon_8500_fence_destroy(radeon_8500_handle_t handle)` | Niszczy fence o podanym handle. |
 | `void radeon_8500_semaphore_create(radeon_8500_handle_t *out)` | Tworzy semafor (synchronizacja miedzy etapami potoku) i zwraca jego handle. |
 | `void radeon_8500_semaphore_signal(radeon_8500_handle_t handle, uint32_t value)` | Sygnalizuje semafor z podana wartoscia. |
-| `void radeon_8500_semaphore_wait(radeon_8500_handle_t handle, uint32_t value)` | Czeka na sygnalizację semafora do podanej wartosci (blokujace). |
+| `void radeon_8500_semaphore_wait(radeon_8500_handle_t handle, uint32_t value)` | Czeka na sygnalizacje semafora do podanej wartosci (blokujace). |
 | `void radeon_8500_semaphore_destroy(radeon_8500_handle_t handle)` | Niszczy semafor o podanym handle. |
 
-### Zarządzanie pamięcią VRAM
+### Zarzadzanie pamiecia VRAM
 
 | funkcja | opis |
 |---------|------|
@@ -5499,7 +5499,7 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 | `uint64_t radeon_8500_vram_used(void)` | Zwraca liczbe bajtow VRAM aktualnie uzytych. |
 | `uint64_t radeon_8500_vram_total(void)` | Zwraca calkowita pojemnosc VRAM (64 MB). |
 
-### Zarządzanie zasilaniem, zegarami, temperatura, wentylator, RGB
+### Zarzadzanie zasilaniem, zegarami, temperatura, wentylator, RGB
 
 | funkcja | opis |
 |---------|------|
@@ -5548,11 +5548,11 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 | `RADEON_8500_VRAM_SIZE_BYTES` | Calkowita pojemnosc VRAM (64 MB). |
 | `RADEON_8500_FB_WIDTH / RADEON_8500_FB_HEIGHT` | Rozdzielczosc ramki graficznej (1920x1080). |
 | `RADEON_8500_FB_PITCH` | Pitch ramki graficznej (4096 bajtow). |
-| `RADEON_8500_HANDLE_NULL` | Wartość nulowa dla handle zasobow (0xFFFFFFFFU). |
+| `RADEON_8500_HANDLE_NULL` | Wartosc nulowa dla handle zasobow (0xFFFFFFFFU). |
 | `radeon_8500_handle_t` | Typ handle zasobu (uint32_t). |
 | `RADEON_8500_*` | Stale dla formatow vertex, indeksow, primitivow, tekstur, shaderow, blendowania, operacji blendowania, porownan glebi, wypelnienia, cullowania, operacji stencil (patrz naglowek radeon_8500.h). |
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
 
@@ -5560,7 +5560,7 @@ Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
 radeon_8500_init();
 ```
 
-Nagłówek `drivers/karty_graficzne/radeon_8500.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_8500.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+Naglowek `drivers/karty_graficzne/radeon_8500.h` jest dolaczany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywolywane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_8500.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
 ## sterownik 3dfx Voodoo2 - rust/drivers/karty_graficzne/3dfx/voodoo2.rs
 
@@ -5668,7 +5668,7 @@ void voodoo2_enable_multisampling(bool enabled);
 
 ### voodoo2_enable_antialiasing
 
-wlacza lub wylacza wygładzanie krawedzi (antialiasing).
+wlacza lub wylacza wygladzanie krawedzi (antialiasing).
 
 ```
 void voodoo2_enable_antialiasing(bool enabled);
@@ -5691,7 +5691,7 @@ zwraca aktualny status rejestru karty graficznej.
 uint32_t voodoo2_get_status(void);
 ```
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
 
@@ -5699,11 +5699,11 @@ Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
 voodoo2_init();
 ```
 
-Wszystkie funkcje eksportowane sa jako C (`#[no_mangle] pub extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `rust/drivers/karty_graficzne/3dfx/voodoo2.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/3dfx/*.rs)`).
+Wszystkie funkcje eksportowane sa jako C (`#[no_mangle] pub extern "C"`), wiec moga byc wywolywane z kodu C jadra. Plik zrodlowy `rust/drivers/karty_graficzne/3dfx/voodoo2.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/3dfx/*.rs)`).
 
 ## sterownik plyt optycznych - drivers/plyty.cpp
 
-zaawansowany sterownik napędów płyt optycznych (CD, DVD, Blu-ray, HD DVD, CD-i, Photo CD, MO, WO) napisany w C++. obsluguje interfejs ATAPI (ATA Packet Interface) dla glownej i pomocniczej kanalowe magistrali IDE, wykrycie napedu, identyfikacje urzadzenia, odczyt konfiguracji, pomiar pojemnosci, wykrycie systemu plikow (ISO 9660, UDF, Joliet, Rock Ridge, HFS, CDFS), czytanie sektorow, czytanie plikow, listowanie katalogu glownego, wysiadanie i zamykanie tacki, wykrywanie zmiany plyty. wspiera kazdy rodzaj plyty w tym formaty niszowe. kompilowany przez makefile (wildcard `$(wildcard drivers/*.cpp)`) i linkowany do jadra.
+zaawansowany sterownik napedow plyt optycznych (CD, DVD, Blu-ray, HD DVD, CD-i, Photo CD, MO, WO) napisany w C++. obsluguje interfejs ATAPI (ATA Packet Interface) dla glownej i pomocniczej kanalowe magistrali IDE, wykrycie napedu, identyfikacje urzadzenia, odczyt konfiguracji, pomiar pojemnosci, wykrycie systemu plikow (ISO 9660, UDF, Joliet, Rock Ridge, HFS, CDFS), czytanie sektorow, czytanie plikow, listowanie katalogu glownego, wysiadanie i zamykanie tacki, wykrywanie zmiany plyty. wspiera kazdy rodzaj plyty w tym formaty niszowe. kompilowany przez makefile (wildcard `$(wildcard drivers/*.cpp)`) i linkowany do jadra.
 
 ### plyty_init
 
@@ -5757,7 +5757,7 @@ int plyty_read_sectors(uint64_t sector, uint32_t count, char *buffer);
 
 ### plyty_volume_label / plyty_fs_type
 
-zwraca etykietę woluminu plyty oraz typ systemu plikow (PLITY_FS_ISO9660, PLITY_FS_UDF, PLITY_FS_JOLIET, PLITY_FS_ROCKRIDGE, PLITY_FS_HFS, PLITY_FS_CDFS).
+zwraca etykiete woluminu plyty oraz typ systemu plikow (PLITY_FS_ISO9660, PLITY_FS_UDF, PLITY_FS_JOLIET, PLITY_FS_ROCKRIDGE, PLITY_FS_HFS, PLITY_FS_CDFS).
 
 ```
 const char *plyty_volume_label(void);
@@ -5803,7 +5803,7 @@ Gdy urzadzenie cdrom jest aktywne, funkcje `read_sector`, `read_file`, `fs_list_
 
 Eksplorator plikow (`graficzny/eksplorator_plikow.c`) wyswietla opcje "CD-ROM" / "PLYTA OPTYCZNA" obok "DYSKIETKA" / "DYSK TWARDY" gdy naped plyty jest wykryty. Po wyborze plyty optycznej zostaje ona ustawiona jako aktywne urzadzenie systemu plikow, a zawartosc plyty jest wyswietlana w liscie plikow. Mozna entonces otwierac pliki .TXT, .C, .TSI oraz nawigowac po katalogach.
 
-Nagłówek `drivers/plyty.h` jest dołączany w `kernel/kernel.c`. Plik zrodlowy `drivers/plyty.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/*.cpp)`).
+Naglowek `drivers/plyty.h` jest dolaczany w `kernel/kernel.c`. Plik zrodlowy `drivers/plyty.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/*.cpp)`).
 
 ## karta graficzna - rust/drivers/karty_graficzne/nvidia/gtx_1060.rs
 
@@ -5815,7 +5815,7 @@ zwraca 1 gdy karta GTX 1060 zostanie wykryta (poprawne vendor id, device id i re
 
 rysuje pojedynczy trojkat 3D na karcie graficznej. parametry x1,y1,z1, x2,y2,z2, x3,y3,z3 definiuja wierzcholki trojkata w przestrzeni 3D, color to kolor w formacie ARGB. komenda jest wysylana przez ring buffer Command Processor.
 
-rysuje pojedyncza linie 3D na karcie graficznej. parametry x1,y1,z1, x2,y2,z2 definiuja początek i koniec linii, color to kolor w formacie ARGB.
+rysuje pojedyncza linie 3D na karcie graficznej. parametry x1,y1,z1, x2,y2,z2 definiuja poczatek i koniec linii, color to kolor w formacie ARGB.
 
 czysci caly ekran 3D podanym kolorem. komenda jest wysylana przez Command Processor i oczekuje na zakonczenie operacji.
 
@@ -5841,9 +5841,9 @@ wlacza lub wylacza tryb siatki (wireframe). enabled = 1 rysuje tylko krawedzie w
 
 ustawia liczbe probek dla multisamplingu (MSAA). count to liczba probek na piksel (np. 4 dla 4x MSAA).
 
-wlacza lub wylacza multisampling (MSAA). enabled = 1 wlacza wygładzanie krawedzi, enabled = 0 wylacza.
+wlacza lub wylacza multisampling (MSAA). enabled = 1 wlacza wygladzanie krawedzi, enabled = 0 wylacza.
 
-wlacza lub wylacza antialiasing. enabled = 1 wlacza wygładzanie, enabled = 0 wylacza.
+wlacza lub wylacza antialiasing. enabled = 1 wlacza wygladzanie, enabled = 0 wylacza.
 
 wlacza lub wylacza test depth bounds. enabled = 1 wlacza test zakresu glebokosci, min i max definiuja dolny i gorny zakres glebokosci.
 
@@ -5917,7 +5917,7 @@ przypisuje teksture do framebuffera jako attachment. framebuffer_id to id frameb
 
 przypisuje renderbuffer do framebuffera. framebuffer_id, attachment, renderbuffer_id.
 
-ustawia bufora rysowania (draw buffers). count to liczba attachmenetów, attachments to tablica id attachmenetów.
+ustawia bufora rysowania (draw buffers). count to liczba attachmenetow, attachments to tablica id attachmenetow.
 
 ustawia bufor odczytu (read buffer). attachment to punkt przyczepienia od ktorego bedzie odczyt.
 
@@ -5945,7 +5945,7 @@ zwraca liczbe jednostek raster operacji (ROP) (GP106 ma 48 ROP).
 
 zwraca liczbe jednostek tekstur (GP106 ma 80 jednostek tekstur).
 
-zwraca szerokość magistrali pamieci w bitach (GP106 ma 192-bit).
+zwraca szerokosc magistrali pamieci w bitach (GP106 ma 192-bit).
 
 zwraca rozmiar cache wierzcholkow w bajtach.
 
@@ -6076,7 +6076,7 @@ void gtx_1070_enable_multisampling(bool enabled);
 
 ### gtx_1070_enable_antialiasing
 
-wlacza lub wylacza wygładzanie krawedzi (antialiasing).
+wlacza lub wylacza wygladzanie krawedzi (antialiasing).
 
 ```
 void gtx_1070_enable_antialiasing(bool enabled);
@@ -6099,7 +6099,7 @@ zwraca aktualny status rejestru karty graficznej.
 uint32_t gtx_1070_get_status(void);
 ```
 
-### Integracja z jądrem
+### Integracja z jadrem
 
 Sterownik jest rejestrowany w `kernel/kernel.c` w funkcji `kernel_main`:
 
@@ -6129,7 +6129,7 @@ Algorytm rozmycia gaussowskiego:
 6. Wartosc alpha jest zmienna wzdosupie osi pionowej paska (gradient alpha): na krawedziach paska alpha jest mniejsza (wiecej przezroczystosci), w srodku wieksza (mniej przezroczystosci), co daje naturalny efekt szkla aero.
 7. Wszystkie operacje wykonuje sie na kanale RGB rozdzielczo, z dzieleniem przez 255 na koncu.
 
-Wynikiem jest pasek z zadan ktory rozmywa tapete pod soba i ma przezroczysty, szklany wygląd w stylu aero, z ikonami minimalizowanych okien, zegarem, ikona internetu i ikona bluetooth rysowanymi na wierzchu rozmytego tla.
+Wynikiem jest pasek z zadan ktory rozmywa tapete pod soba i ma przezroczysty, szklany wyglad w stylu aero, z ikonami minimalizowanych okien, zegarem, ikona internetu i ikona bluetooth rysowanymi na wierzchu rozmytego tla.
 
 ## rozmycie wnetrza okien - graficzny/okno.c
 
@@ -6142,7 +6142,7 @@ Dzieki temu przesuwanie okna powoduje dynamiczna zmiane rozmycia w zaleznosci od
 
 ## przycisk menu start - graficzny/menu_start.c
 
-Przycisk otwierajacy menu start rowniez korzysta z tego samego rozmycia gaussa co pasek zadan i ramki okien. Funkcja `menu_start_rysuj_przycisk` wywoluje `rozmyj_prostokat()` na obszarze przycisku przed narysowaniem jego tla (`KOLOR_PRZYCISKU_START`) z alpha=70, co daje spójny efekt szkla aero w calym interfejsie systemu.
+Przycisk otwierajacy menu start rowniez korzysta z tego samego rozmycia gaussa co pasek zadan i ramki okien. Funkcja `menu_start_rysuj_przycisk` wywoluje `rozmyj_prostokat()` na obszarze przycisku przed narysowaniem jego tla (`KOLOR_PRZYCISKU_START`) z alpha=70, co daje spojny efekt szkla aero w calym interfejsie systemu.
 
 ## sterownik nvidia gtx 5090 - rust/drivers/karty_graficzne/nvidia/gtx_5090.rs
 
@@ -6165,15 +6165,15 @@ Sterownik definiuje stale dla:
 - `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i области odciecia.
 - `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
 - `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute, mesh, task, ray generation, miss, closest hit, any hit, intersection oraz offsetami uniformow i deskryptorow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
 - `ShaderModule`, `DescriptorSet`, `CommandBuffer`, `QueryPool`, `SwapChain` - obiekty pipeline Vulkanopodobnego API.
 - `RayTracingPipeline`, `MeshShader` - potoki ray tracing i mesh shader.
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
 
 ### inicjalizacja
 
-- `gtx_5090_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_5090_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
 - `gtx_5090_detected()` -> bool - sprawdza czy karta GTX 5090 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
 - `gtx_5090_driver_init()` / `gtx_5090_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
 
@@ -6210,12 +6210,12 @@ Sterownik definiuje stale dla:
 - `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
 - `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
 - `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
 - `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
 - `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
 
@@ -6239,28 +6239,28 @@ Sterownik definiuje stale dla:
 - `tensor_cores()` / `rt_cores()` / `dlss_units()` - liczba tensor core, RT core i jednostek DLSS.
 - `variable_rate_shading()` / `meshlet_compression()` / `displacement_micro_map()` / `opacity_micro_map()` / `serialized_write()` / `shader_execution_reorder()` / `path_tracing()` - flagi funkcji specyficznych dla Blackwell.
 
-### zarządzanie shaderami i pipeline (Blackwell)
+### zarzadzanie shaderami i pipeline (Blackwell)
 
-- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy moduł cieniujacy z kodu SPIR-V.
-- `destroy_shader_module(id)` - niszczy moduł cieniujacy.
-- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbiór deskryptorow.
+- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy modul cieniujacy z kodu SPIR-V.
+- `destroy_shader_module(id)` - niszczy modul cieniujacy.
+- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbior deskryptorow.
 - `create_command_buffer(addr, size) -> u32` - tworzy bufor komend.
-- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pulę zapytań.
-- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy łańcuch swap (swap chain).
-- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiązań.
+- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pule zapytan.
+- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy lancuch swap (swap chain).
+- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiazan.
 - `create_mesh_shader(task_shader_addr, task_shader_size, mesh_shader_addr, mesh_shader_size, amplification_shader_addr, amplification_shader_size, vertex_attr_count, vertex_attr_addrs) -> u32` - tworzy mesh shader z shaderami task, mesh i amplification.
 
 ### operacje Blackwell specyficzne
 
-- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna śledzenie promieni (ray tracing) dla podanych wymiarów.
-- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyła mesh shader do wykonania z podaną liczbą tasków.
+- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna sledzenie promieni (ray tracing) dla podanych wymiarow.
+- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyla mesh shader do wykonania z podana liczba taskow.
 - `tensor_op(mma_addr, dot_addr, accum_addr, m, n, k)` - operacja macierzowa na tensor core (MMA, DOT, ACCUM).
 - `dlss_upscale(input_addr, output_addr, input_w, input_h, output_w, output_h)` - skalowanie DLSS (super resolution, ray reconstruction, frame generation).
-- `path_trace(pipeline_id, samples, bounces, denoise)` - ścieżkowe renderowanie (path tracing) z podaną liczbą próbek, odbić i opcjonalnym denoisingiem.
+- `path_trace(pipeline_id, samples, bounces, denoise)` - sciezkowe renderowanie (path tracing) z podana liczba probek, odbic i opcjonalnym denoisingiem.
 
 ### globalna instancja
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton).
 
 ## sterownik nvidia gtx 5080 - rust/drivers/karty_graficzne/nvidia/gtx_5080.rs
 
@@ -6283,15 +6283,15 @@ Sterownik definiuje stale dla:
 - `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i области odciecia.
 - `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
 - `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute, mesh, task, ray generation, miss, closest hit, any hit, intersection oraz offsetami uniformow i deskryptorow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
 - `ShaderModule`, `DescriptorSet`, `CommandBuffer`, `QueryPool`, `SwapChain` - obiekty pipeline Vulkanopodobnego API.
 - `RayTracingPipeline`, `MeshShader` - potoki ray tracing i mesh shader.
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
 
 ### inicjalizacja
 
-- `gtx_5080_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_5080_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
 - `gtx_5080_detected()` -> bool - sprawdza czy karta GTX 5080 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
 - `gtx_5080_driver_init()` / `gtx_5080_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
 
@@ -6328,12 +6328,12 @@ Sterownik definiuje stale dla:
 - `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
 - `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
 - `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
 - `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
 - `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
 
@@ -6357,28 +6357,28 @@ Sterownik definiuje stale dla:
 - `tensor_cores()` / `rt_cores()` / `dlss_units()` - liczba tensor core, RT core i jednostek DLSS.
 - `variable_rate_shading()` / `meshlet_compression()` / `displacement_micro_map()` / `opacity_micro_map()` / `serialized_write()` / `shader_execution_reorder()` / `path_tracing()` - flagi funkcji specyficznych dla Blackwell.
 
-### zarządzanie shaderami i pipeline (Blackwell)
+### zarzadzanie shaderami i pipeline (Blackwell)
 
-- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy moduł cieniujacy z kodu SPIR-V.
-- `destroy_shader_module(id)` - niszczy moduł cieniujacy.
-- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbiór deskryptorow.
+- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy modul cieniujacy z kodu SPIR-V.
+- `destroy_shader_module(id)` - niszczy modul cieniujacy.
+- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbior deskryptorow.
 - `create_command_buffer(addr, size) -> u32` - tworzy bufor komend.
-- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pulę zapytań.
-- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy łańcuch swap (swap chain).
-- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiązań.
+- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pule zapytan.
+- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy lancuch swap (swap chain).
+- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiazan.
 - `create_mesh_shader(task_shader_addr, task_shader_size, mesh_shader_addr, mesh_shader_size, amplification_shader_addr, amplification_shader_size, vertex_attr_count, vertex_attr_addrs) -> u32` - tworzy mesh shader z shaderami task, mesh i amplification.
 
 ### operacje Blackwell specyficzne
 
-- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna śledzenie promieni (ray tracing) dla podanych wymiarów.
-- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyła mesh shader do wykonania z podaną liczbą tasków.
+- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna sledzenie promieni (ray tracing) dla podanych wymiarow.
+- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyla mesh shader do wykonania z podana liczba taskow.
 - `tensor_op(mma_addr, dot_addr, accum_addr, m, n, k)` - operacja macierzowa na tensor core (MMA, DOT, ACCUM).
 - `dlss_upscale(input_addr, output_addr, input_w, input_h, output_w, output_h)` - skalowanie DLSS (super resolution, ray reconstruction, frame generation).
-- `path_trace(pipeline_id, samples, bounces, denoise)` - ścieżkowe renderowanie (path tracing) z podaną liczbą próbek, odbić i opcjonalnym denoisingiem.
+- `path_trace(pipeline_id, samples, bounces, denoise)` - sciezkowe renderowanie (path tracing) z podana liczba probek, odbic i opcjonalnym denoisingiem.
 
 ### globalna instancja
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton).
 
 ## sterownik nvidia gtx 5070 - rust/drivers/karty_graficzne/nvidia/gtx_5070.rs
 
@@ -6401,15 +6401,15 @@ Sterownik definiuje stale dla:
 - `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
 - `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
 - `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute, mesh, task, ray generation, miss, closest hit, any hit, intersection oraz offsetami uniformow i deskryptorow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
 - `ShaderModule`, `DescriptorSet`, `CommandBuffer`, `QueryPool`, `SwapChain` - obiekty pipeline Vulkanopodobnego API.
 - `RayTracingPipeline`, `MeshShader` - potoki ray tracing i mesh shader.
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, tensor core, RT core, DLSS, flagami funkcji Blackwell (VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), tablicami shader moduli, deskryptorow, buforow komend, pul zapytan, swap chainow, potokow ray tracing i mesh shader.
 
 ### inicjalizacja
 
-- `gtx_5070_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_5070_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), inicjalizuje ring buffer, wlacza akceleracje 3D.
 - `gtx_5070_detected()` -> bool - sprawdza czy karta GTX 5070 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
 - `gtx_5070_driver_init()` / `gtx_5070_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
 
@@ -6446,12 +6446,12 @@ Sterownik definiuje stale dla:
 - `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
 - `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
 - `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
 - `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
 - `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
 
@@ -6475,28 +6475,28 @@ Sterownik definiuje stale dla:
 - `tensor_cores()` / `rt_cores()` / `dlss_units()` - liczba tensor core, RT core i jednostek DLSS.
 - `variable_rate_shading()` / `meshlet_compression()` / `displacement_micro_map()` / `opacity_micro_map()` / `serialized_write()` / `shader_execution_reorder()` / `path_tracing()` - flagi funkcji specyficznych dla Blackwell.
 
-### zarządzanie shaderami i pipeline (Blackwell)
+### zarzadzanie shaderami i pipeline (Blackwell)
 
-- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy moduł cieniujacy z kodu SPIR-V.
-- `destroy_shader_module(id)` - niszczy moduł cieniujacy.
-- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbiór deskryptorow.
+- `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy modul cieniujacy z kodu SPIR-V.
+- `destroy_shader_module(id)` - niszczy modul cieniujacy.
+- `create_descriptor_set(addr, size, binding_count, bindings) -> u32` - tworzy zbior deskryptorow.
 - `create_command_buffer(addr, size) -> u32` - tworzy bufor komend.
-- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pulę zapytań.
-- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy łańcuch swap (swap chain).
-- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiązań.
+- `create_query_pool(addr, count, query_type, results_addr) -> u32` - tworzy pule zapytan.
+- `create_swap_chain(image_count, image_addr, image_size, image_format) -> u32` - tworzy lancuch swap (swap chain).
+- `create_ray_tracing_pipeline(shader_group_count, shader_group_addrs, shader_group_sizes, max_recursion_depth, traversal_addr, traversal_size, sbt_addr, sbt_size, ray_gen_offset, miss_offset, hit_group_offset) -> u32` - tworzy potok ray tracing z grupami shaderow i tabela wiazan.
 - `create_mesh_shader(task_shader_addr, task_shader_size, mesh_shader_addr, mesh_shader_size, amplification_shader_addr, amplification_shader_size, vertex_attr_count, vertex_attr_addrs) -> u32` - tworzy mesh shader z shaderami task, mesh i amplification.
 
 ### operacje Blackwell specyficzne
 
-- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna śledzenie promieni (ray tracing) dla podanych wymiarów.
-- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyła mesh shader do wykonania z podaną liczbą tasków.
+- `trace_rays(pipeline_id, width, height, depth)` - rozpoczyna sledzenie promieni (ray tracing) dla podanych wymiarow.
+- `dispatch_mesh(mesh_id, task_count_x, task_count_y, task_count_z)` - wysyla mesh shader do wykonania z podana liczba taskow.
 - `tensor_op(mma_addr, dot_addr, accum_addr, m, n, k)` - operacja macierzowa na tensor core (MMA, DOT, ACCUM).
 - `dlss_upscale(input_addr, output_addr, input_w, input_h, output_w, output_h)` - skalowanie DLSS (super resolution, ray reconstruction, frame generation).
-- `path_trace(pipeline_id, samples, bounces, denoise)` - ścieżkowe renderowanie (path tracing) z podaną liczbą próbek, odbić i opcjonalnym denoisingiem.
+- `path_trace(pipeline_id, samples, bounces, denoise)` - sciezkowe renderowanie (path tracing) z podana liczba probek, odbic i opcjonalnym denoisingiem.
 
 ### globalna instancja
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton).
 
 ## sterownik nvidia gtx 1050 - rust/drivers/karty_graficzne/nvidia/gtx_1050.rs
 
@@ -6518,13 +6518,13 @@ Sterownik definiuje stale dla:
 - `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
 - `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
 - `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute oraz offsetami uniformow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tablicami ring bufferow dla tresci komend.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, tablicami ring bufferow dla tresci komend.
 
 ### inicjalizacja
 
-- `gtx_1050_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_1050_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
 - `gtx_1050_detected()` -> bool - sprawdza czy karta GTX 1050 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
 - `gtx_1050_driver_init()` / `gtx_1050_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
 
@@ -6561,12 +6561,12 @@ Sterownik definiuje stale dla:
 - `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
 - `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
 - `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
 - `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
 - `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
 
@@ -6590,7 +6590,7 @@ Sterownik definiuje stale dla:
 
 ### globalna instancja
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton).
 
 ## sterownik nvidia gtx 1040 - rust/drivers/karty_graficzne/nvidia/gtx_1040.rs
 
@@ -6612,13 +6612,13 @@ Sterownik definiuje stale dla:
 - `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
 - `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
 - `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute oraz offsetami uniformow.
-- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - kolejek cyklicznych dla komend GFX, compute i DMA z atomowymi wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
-- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokości magistrali, tablicami ring bufferow dla tresci komend.
+- `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, tablicami ring bufferow dla tresci komend.
 
 ### inicjalizacja
 
-- `gtx_1040_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
+- `gtx_1040_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
 - `gtx_1040_detected()` -> bool - sprawdza czy karta GTX 1040 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
 - `gtx_1040_driver_init()` / `gtx_1040_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
 
@@ -6655,12 +6655,12 @@ Sterownik definiuje stale dla:
 - `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
 - `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
 - `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
 - `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
 - `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
 
@@ -6684,11 +6684,11 @@ Sterownik definiuje stale dla:
 
 ### globalna instancja
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton).
 
 ## sterownik nvidia gtx 1030 - rust/drivers/karty_graficzne/nvidia/gtx_1030.rs
 
-Zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 1030 (architektura Pascal, chip GP108) z obsluga zaawansowanej akceleracji 3D i shaderow. Sterownik napisany w Rust, kompilowany dla trybu freestanding (#[no_std]), wykorzystujacy bezpieczne operacje MMIO (volatile read/write) oraz atomowe struktury do zarządzania zasobami GPU (shader module, descriptor set, command buffer, query pool, swap chain). Karta GTX 1030 to wariant niskiej i sredniej klasy Pascala: 384 rdzenie CUDA, 3 SM, 16 ROP, 20 jednostek tekstur, 2GB VRAM (GDDR5), magistrala pamieci 64-bit, zegar rdzenia 1227 MHz, zegar pamieci 6000 MHz.
+Zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 1030 (architektura Pascal, chip GP108) z obsluga zaawansowanej akceleracji 3D i shaderow. Sterownik napisany w Rust, kompilowany dla trybu freestanding (#[no_std]), wykorzystujacy bezpieczne operacje MMIO (volatile read/write) oraz atomowe struktury do zarzadzania zasobami GPU (shader module, descriptor set, command buffer, query pool, swap chain). Karta GTX 1030 to wariant niskiej i sredniej klasy Pascala: 384 rdzenie CUDA, 3 SM, 16 ROP, 20 jednostek tekstur, 2GB VRAM (GDDR5), magistrala pamieci 64-bit, zegar rdzenia 1227 MHz, zegar pamieci 6000 MHz.
 
 ### stale i i adresy rejestrow
 
@@ -6703,15 +6703,15 @@ Sterownik definiuje stale dla:
 - `ShaderModule` - modul cieniujacy (SPIR-V) z adresem kodu, punktem wejscia, rozmiarami i etapem.
 - `DescriptorSet` - zestaw deskryptorow z adresem, rozmiarem, liczba powiazan i tablica adresow powiazan.
 - `CommandBuffer` - bufor komend z adresem, rozmiarem, atomowym offsetem i flaga wyslania.
-- `QueryPool` - pula zapytań z adresem, liczba, typem i adresem wyników.
+- `QueryPool` - pula zapytan z adresem, liczba, typem i adresem wynikow.
 - `SwapChain` - lancuch zamiany z liczba obrazow, aktualnym obrazem, adresami obrazow, rozmiarem, formatem i flagami acquired/presented.
 - `RayTracingPipeline` - potok ray tracing z grupami shaderow, adresami, rozmiarami, maksymalna rekurencja, adresami traversal/SBT i offsetami.
 - `MeshShader` - shader siatki z adresami i rozmiarami shaderow task, mesh i amplification oraz adresami atrybutow wierzcholkow.
-- `GpuInstance` - glowna instancja GPU z identyfikatorami, zegarami, rozmiarem VRAM, liczba rdzeni CUDA/SM/ROP/jednostek tekstur, szerokosci magistrali, licznikiem bledow i tablicami zasobów (shadery, deskryptory, bufora komend, pule zapytań, lancuchy zamiany, potoki ray tracing, shadery siatki).
+- `GpuInstance` - glowna instancja GPU z identyfikatorami, zegarami, rozmiarem VRAM, liczba rdzeni CUDA/SM/ROP/jednostek tekstur, szerokosci magistrali, licznikiem bledow i tablicami zasobow (shadery, deskryptory, bufora komend, pule zapytan, lancuchy zamiany, potoki ray tracing, shadery siatki).
 
 ### inicjalizacja
 
-- `gtx_1030_init()` -> bool - inicjalizuje sterownik: wykrywa kartę, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), wlacza akceleracje 3D.
+- `gtx_1030_init()` -> bool - inicjalizuje sterownik: wykrywa karte, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU, ray tracing, mesh shader, tensor core, DLSS, VRS, meshlet compression, displacement/opacity micro map, serialized write, shader execution reorder, path tracing), wlacza akceleracje 3D.
 - `gtx_1030_detected()` -> bool - sprawdza czy karta GTX 1030 jest wykrywalna przez odczyt rejestrow vendor/device.
 - `gtx_1030_driver_init()` / `gtx_1030_driver_detected()` - eksportowane funkcje C dla wywolania z jadra (no_mangle, extern "C").
 
@@ -6740,12 +6740,12 @@ Sterownik definiuje stale dla:
 - `set_polygon_offset(enabled,factor,units)` / `set_sample_coverage(value,invert)` - offset polygonu i probkowanie.
 - `set_vertex_array(buffer,stride,offset)` / `set_index_array(buffer,format,offset)` - tablice wierzcholkow i indeksow.
 - `draw_arrays(mode,first,count)` / `draw_elements(mode,count,type,offset)` / `draw_instanced(...)` / `draw_elements_instanced(...)` - rysowanie tablic i elementow, w tym instancjonowane.
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
 - `get_status() -> u32` / `wait_idle_pub()` - status GPU i oczekiwanie na bezczynnosc.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform_1f/2f/3f/4f(location, value...)` - ustawia uniformy skalarnie/wektorowe.
 - `set_uniform_matrix4fv(location, matrix)` - ustawia uniform macierzy 4x4.
 - `create_shader_module(spirv_addr, spirv_size, entry_point_addr, entry_point_size, stage) -> u32` - tworzy modul cieniujacy z kodu SPIR-V i punktu wejscia.
@@ -6788,7 +6788,7 @@ Sterownik definiuje stale dla:
 
 ### globalna instancja
 
-- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton).
+- `gpu_instance() -> &'static mut GpuInstance` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton).
 
 ## sterownik nvidia gtx 1000 - rust/drivers/karty_graficzne/nvidia/gtx_1000.rs
 
@@ -6811,7 +6811,7 @@ Sterownik definiuje stale dla:
 - `Rect`, `Viewport`, `Scissor` - prostokaty, widoki i oblasti odciecia.
 - `BufferDescriptor`, `TextureDescriptor` - deskryptory buforow i tekstur.
 - `ShaderProgram` - program cieniujacy z adresami shaderow vertex, fragment, geometry, tessellation, compute oraz offsetami uniformow.
-- `RingBuffer` - kolejki cykliczne dla komend GFX, compute i DMA z atomowymi wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - kolejki cykliczne dla komend GFX, compute i DMA z atomowymi wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - stan procesora komend (ME, queue, prefetch).
 - `GraphicsPipeline` - potok graficzny z adresami etapow shaderow, wejscia wierzcholkow, zestawiania, rasteryzacji, mieszania kolorow, depth-stencil, viewporta, multisamplingu i stanu dynamicznego.
 - `GpuInstance` - glowna instancja GPU z bazami MMIO/VRAM/GART/doorbell, rozmiarem VRAM, zegarami, liczba rdzeni CUDA, SM, ROP, jednostek tekstur, szerokosci magistrali, rozmiarem cache wierzcholkow i bufora primitivow, tablicami shaderow, deskryptorow, buforow komend, pul zapytan, lancuchow wymiany i potokow graficznych.
@@ -6820,7 +6820,7 @@ Sterownik definiuje stale dla:
 
 - `gtx_1000_init()` -> bool (wewnetrzna, wywolywana przez `gtx_1000_driver_init`) - inicjalizuje sterownik: wykrywa karte na podstawie device ID, wykonuje soft reset, konfiguruje wszystkie rejestry (PMC, PGRAPH, FECS, GPCCS, GPC, TPC, SM, ROP, tekstury, shadery, compute, rasterizer, depth/stencil, blend, kolory, framebuffery, render targety, depth/stencil buffer, multisampling, antialiasing, viewport, scissor, vertex cache, index/primitive buffer, uniform/shader storage/atomic counters, query objects, PCIE, power play, SMU), inicjalizuje ring buffer, wlacza akceleracje 3D.
 - `gtx_1000_detected()` -> bool - sprawdza czy karta z rodziny GTX 1000 jest wykrywalna przez odczyt rejestrow vendor/device/revision.
-- `gtx_1000_driver_init()` -> bool - eksportowana funkcja C (`#[no_mangle]`, `extern "C"`), wywolywana przez `driver_manager_register` w jadrze. Inicjalizuje instancję GPU i wywoluje `init()`.
+- `gtx_1000_driver_init()` -> bool - eksportowana funkcja C (`#[no_mangle]`, `extern "C"`), wywolywana przez `driver_manager_register` w jadrze. Inicjalizuje instancje GPU i wywoluje `init()`.
 - `gtx_1000_driver_detected()` -> bool - eksportowana funkcja C, sprawdza wykrycie karty.
 - `gtx_1000_is_ready()` -> bool - zwraca 1 gdy sterownik jest zainicjowany i gotowy.
 - `driver_manager_register("gtx_1000", gtx_1000_driver_init, 0, 0, 4)` - rejestracja sterownika w `kernel/kernel.c:124`, uruchamiana automatycznie przy starcie systemu.
@@ -6843,10 +6843,10 @@ Sterownik definiuje stale dla:
 
 - `enable_3d_acceleration()` - wlacza akceleracje 3D w rejestrach sterujacych (shader, raster, ROP, depth, blend, tex, compute, PGRAPH, GPC, SM).
 - `gtx_1000_enable_3d_acceleration()` - eksportowana funkcja C.
-- `compile_shader(stage, spirv_addr, spirv_size, entry_point, entry_point_size) -> u32` - kompiluje moduł shaderu (SPIR-V) dla podanego etapu, zwraca ID modułu.
-- `destroy_shader_module(id)` - niszczy moduł shaderu o podanym ID.
+- `compile_shader(stage, spirv_addr, spirv_size, entry_point, entry_point_size) -> u32` - kompiluje modul shaderu (SPIR-V) dla podanego etapu, zwraca ID modulu.
+- `destroy_shader_module(id)` - niszczy modul shaderu o podanym ID.
 - `create_shader_program(...) -> u32` - tworzy program cieniujacy z adresami shaderow vertex/fragment/geometry/tessellation/compute, offsetami uniformow, zestawami deskryptorow i push constantami. Zwraca ID programu.
-- `bind_shader_program(program_id)` - wiaże program cieniujacy do potoku.
+- `bind_shader_program(program_id)` - wiaze program cieniujacy do potoku.
 - `set_uniform(program_id, index, values)` - ustawia wartosci uniform dla danego programu i indeksu.
 - `set_viewport(viewport)` - ustawia viewport renderowania (x, y, szerokosc, wysokosc, min/max depth).
 - `gtx_1000_set_viewport(x, y, width, height, min_depth, max_depth)` - eksportowana funkcja C.
@@ -6856,10 +6856,10 @@ Sterownik definiuje stale dla:
 - `set_stencil_state(enable, func, ref_val, mask, op_fail, op_zfail, op_zpass)` - konfiguracja testu stencila.
 - `set_rasterizer_state(cull, clip, msaa, aa)` - konfiguracja rasteryzatora (wycinanie, przycinanie, MSAA, antialiasing).
 - `create_texture(desc) -> u32` - tworzy teksture na podstawie deskryptora.
-- `bind_texture(unit, address)` - wiąże teksturę pod adresem do jednostki tekstur.
+- `bind_texture(unit, address)` - wiaze teksture pod adresem do jednostki tekstur.
 - `create_framebuffer(width, height, format, address) -> u32` - tworzy framebuffer.
-- `bind_framebuffer(address)` - wiąże framebuffer pod podanym adresem.
-- `clear(color, depth, stencil)` - czyści buffory koloru, glebokosci i stencila.
+- `bind_framebuffer(address)` - wiaze framebuffer pod podanym adresem.
+- `clear(color, depth, stencil)` - czysci buffory koloru, glebokosci i stencila.
 - `gtx_1000_clear(color, depth, stencil)` - eksportowana funkcja C.
 - `draw_arrays(primitive, first, count)` - rysuje z tablicy wierzcholkow (typ prymitywu, poczatek, liczba).
 - `gtx_1000_draw_arrays(primitive, first, count)` - eksportowana funkcja C.
@@ -6873,13 +6873,13 @@ Sterownik definiuje stale dla:
 - `swap_chain_acquire(id) -> u32` - pobiera indeks nastepnego obrazu.
 - `swap_chain_present(id)` - prezentuje obraz na ekranie.
 - `compute_dispatch(group_x, group_y, group_z)` - uruchamia obliczenia compute (dispatch grup watkow).
-- `finish()` / `flush()` - zsynchronizowanie i opróżnienie potoku graficznego.
-- `get_status() -> u32` / `gtx_1000_get_status() -> u32` - zwraca liczbe bledów sterownika.
-- `wait_idle()` - oczekuje na bezczynność GPU.
+- `finish()` / `flush()` - zsynchronizowanie i oproznienie potoku graficznego.
+- `get_status() -> u32` / `gtx_1000_get_status() -> u32` - zwraca liczbe bledow sterownika.
+- `wait_idle()` - oczekuje na bezczynnosc GPU.
 
 ### shadery i uniformy
 
-- `set_shader_program(program_id)` - wiaże program cieniujacy.
+- `set_shader_program(program_id)` - wiaze program cieniujacy.
 - `set_uniform(program_id, index, values)` - ustawia uniformy (tablica floatow).
 
 ### tekstury i framebuffery
@@ -6899,11 +6899,11 @@ Sterownik definiuje stale dla:
 
 ### globalna instancja
 
-- `gpu_instance() -> Option<&'static mut GpuInstance>` - zwraca statyczną, leniwie inicjalizowaną instancję GPU (singleton) lub None gdy nie zainicjowano.
+- `gpu_instance() -> Option<&'static mut GpuInstance>` - zwraca statyczna, leniwie inicjalizowana instancje GPU (singleton) lub None gdy nie zainicjowano.
 
 ## sterownik ekranu dotykowego - rust/drivers/ekrany_dotykowe/
 
-Zaawansowany sterownik ekranów dotykowych napisany w Rust (`#[no_std]`), kompilowany przez makefile (wildcard `$(wildcard rust/drivers/ekrany_dotykowe/*.rs)`) i linkowany do jadra. obsluguje wykrycie urzadzenia na magistrali PCI/MMIO, soft-reset, konfiguracje magistrali, kolejke zdarzen dotykowych, kalibracje affine (macierz 2D), obsluge wielodotykowa (max 10 punktow jednoczesnie), gesty (tap, double tap, swipe, pinch zoom, rotate, long press, edge swipe), tryb polling i przerwania, statystyki zdarzen i bledow. eksponuje pelne API przez strukture `TouchDriverApi` oraz funkcje `#[no_mangle]` dla integracji ze stosem C (`kernel/kernel.c` rejestruje go przez `driver_manager_register`). caly kod jest wolny od komentarzy w zrodle.
+Zaawansowany sterownik ekranow dotykowych napisany w Rust (`#[no_std]`), kompilowany przez makefile (wildcard `$(wildcard rust/drivers/ekrany_dotykowe/*.rs)`) i linkowany do jadra. obsluguje wykrycie urzadzenia na magistrali PCI/MMIO, soft-reset, konfiguracje magistrali, kolejke zdarzen dotykowych, kalibracje affine (macierz 2D), obsluge wielodotykowa (max 10 punktow jednoczesnie), gesty (tap, double tap, swipe, pinch zoom, rotate, long press, edge swipe), tryb polling i przerwania, statystyki zdarzen i bledow. eksponuje pelne API przez strukture `TouchDriverApi` oraz funkcje `#[no_mangle]` dla integracji ze stosem C (`kernel/kernel.c` rejestruje go przez `driver_manager_register`). caly kod jest wolny od komentarzy w zrodle.
 
 ### struktury danych
 
@@ -6918,9 +6918,9 @@ Zaawansowany sterownik ekranów dotykowych napisany w Rust (`#[no_std]`), kompil
 | `CalibrationMatrix` | macierz affine 2D (a, b, c, d, e, f) do mapowania surowych wspolrzednych na ekran |
 | `CalibrationPoint` | punkt kalibracji (raw_x, raw_y, screen_x, screen_y) |
 | `Calibration` | kalibracja (macierz, 5 punkty, flaga skalibrowany, rozmiar ekranu) |
-| `TouchConfig` | konfiguracja (tryb polling/przerwanie, nr IRQ, interwal, rozmiar ekranu, gesty, multi-touch, próg cisnienia) |
+| `TouchConfig` | konfiguracja (tryb polling/przerwanie, nr IRQ, interwal, rozmiar ekranu, gesty, multi-touch, prog cisnienia) |
 | `TouchScreenController` | glowna kontroler sterownika (MMIO, konfiguracja, kalibracja, stan, kolejka, statystyki) |
-| `TouchDriverApi` | eksportowane API C (wszystkie funkcje sterownika jako wskaźniki) |
+| `TouchDriverApi` | eksportowane API C (wszystkie funkcje sterownika jako wskazniki) |
 
 ### stale
 
@@ -7099,7 +7099,7 @@ uint32_t touch_driver_error_count(void);
 
 #### touch_driver_api
 
-zwraca wskaznik na statyczna strukture `TouchDriverApi` zawierajaca wszystkie funkcje sterownika jako wskaźniki C (uzywane przez integracje ze stosem C).
+zwraca wskaznik na statyczna strukture `TouchDriverApi` zawierajaca wszystkie funkcje sterownika jako wskazniki C (uzywane przez integracje ze stosem C).
 
 ```
 const struct TouchDriverApi *touch_driver_api(void);
@@ -7113,7 +7113,7 @@ sterownik jest rejestrowany w `kernel/kernel.c` przez:
 driver_manager_register("ekran_dotykowy", touch_driver_init, 0, 0, 4);
 ```
 
-co oznacza ze jest inicjowany przez `driver_manager_init_all()` i polling jest wywolywany co 4 tiki przez `driver_manager_poll_all()`. funkcje `touch_driver_poll(tick)` i `touch_driver_interrupt()` moga byc wywolywane bezpośrednio z obslugi przerwan lub petli kernela.
+co oznacza ze jest inicjowany przez `driver_manager_init_all()` i polling jest wywolywany co 4 tiki przez `driver_manager_poll_all()`. funkcje `touch_driver_poll(tick)` i `touch_driver_interrupt()` moga byc wywolywane bezposrednio z obslugi przerwan lub petli kernela.
 
 ## sterownik kamery Logitech QuickCam Express - rust/drivers/kamerki/quickcam.rs
 
@@ -7277,7 +7277,7 @@ co oznacza ze jest inicjowany przez `driver_manager_init_all()` i polling (pobie
 
 ## sterownik AMD Radeon HD 5850 - rust/drivers/karty_graficzne/amd/hd_5850.rs
 
-sterownik karty graficznej AMD Radeon HD 5850 (chip Cypress, architektura Evergreen, generacja VCE 3.0) napisany w Rust z `#[no_std]`. obsluguje wykrycie urzadzenia na PCI (vendor 0x1002, urzadzenie 0x6899), mapowanie MMIO, soft-reset chipa (GRBM + SRBM), inicjalizacje procesora komend (CP), potoku wierzchołkowego (VGT), rastrowania (PA/SC), eksportu (SX), bufora glebi (DB), bufora kolorow (CB), shaderow, rastrowania, testu glebi, stencila, blendowania, buforow koloru, ramki graficznej, render targetow, bufora glebi-stencila, probkowania wielokrotnego, wygładzania krawedzi, widoku, nozyca, cache wierzcholkow, bufora indeksow, bufora primitivow, buforow jednostajnych, buforow skladnikow shaderow, licznikow atomowych, obiektow zapytan, PCI Express, zarządzania zasilaniem oraz SMU. nastepnie inicjalizuje bufora pikcieli (graficzny, obliczeniowy, DMA) i wlacza zaawansowana akceleracje 3D. kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/amd/*.rs)`) i linkowany do jadra.
+sterownik karty graficznej AMD Radeon HD 5850 (chip Cypress, architektura Evergreen, generacja VCE 3.0) napisany w Rust z `#[no_std]`. obsluguje wykrycie urzadzenia na PCI (vendor 0x1002, urzadzenie 0x6899), mapowanie MMIO, soft-reset chipa (GRBM + SRBM), inicjalizacje procesora komend (CP), potoku wierzcholkowego (VGT), rastrowania (PA/SC), eksportu (SX), bufora glebi (DB), bufora kolorow (CB), shaderow, rastrowania, testu glebi, stencila, blendowania, buforow koloru, ramki graficznej, render targetow, bufora glebi-stencila, probkowania wielokrotnego, wygladzania krawedzi, widoku, nozyca, cache wierzcholkow, bufora indeksow, bufora primitivow, buforow jednostajnych, buforow skladnikow shaderow, licznikow atomowych, obiektow zapytan, PCI Express, zarzadzania zasilaniem oraz SMU. nastepnie inicjalizuje bufora pikcieli (graficzny, obliczeniowy, DMA) i wlacza zaawansowana akceleracje 3D. kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/amd/*.rs)`) i linkowany do jadra.
 
 ### hd_5850_driver_init
 
@@ -7390,7 +7390,7 @@ void hd_5850_set_multisample_count(uint32_t count);
 
 ### hd_5850_enable_multisampling / hd_5850_enable_antialiasing
 
-wlacza/wylacza probkowanie wielokrotne lub wygładzanie krawedzi.
+wlacza/wylacza probkowanie wielokrotne lub wygladzanie krawedzi.
 
 ```
 void hd_5850_enable_multisampling(uint8_t enabled);
@@ -7426,7 +7426,7 @@ uint32_t hd_5850_vram_size(void);
 
 ### hd_5850_stream_cores / hd_5850_simd_count / hd_5850_rop_count / hd_5850_texture_units / hd_5850_memory_bus_width
 
-zwracaja liczba rdzeni strumieniowych, SIMD, ROP, jednostek teksturowych i szerokość szyny pamieci.
+zwracaja liczba rdzeni strumieniowych, SIMD, ROP, jednostek teksturowych i szerokosc szyny pamieci.
 
 ```
 uint32_t hd_5850_stream_cores(void);
@@ -7438,7 +7438,7 @@ uint32_t hd_5850_memory_bus_width(void);
 
 ### hd_5850_error_count
 
-zwraca liczbe bledów zanotowanych przez sterownik.
+zwraca liczbe bledow zanotowanych przez sterownik.
 
 ```
 uint32_t hd_5850_error_count(void);
@@ -7487,7 +7487,7 @@ uint32_t hd_5850_create_swap_chain(uint32_t image_count, uint64_t image_addr, ui
 
 ### hd_5850_create_shader_pipeline / hd_5850_create_compute_pipeline
 
-tworzy potok graficzny (shader pipeline) z modułami vertex, fragment, geometry oraz tessellation ctrl/eval, lub potok obliczeniowy (compute pipeline) z modułem compute, pod adresem i rozmiarem stanu. zwraca id potoku.
+tworzy potok graficzny (shader pipeline) z modulami vertex, fragment, geometry oraz tessellation ctrl/eval, lub potok obliczeniowy (compute pipeline) z modulem compute, pod adresem i rozmiarem stanu. zwraca id potoku.
 
 ```
 uint32_t hd_5850_create_shader_pipeline(uint32_t vs_module_id, uint32_t fs_module_id, uint32_t gs_module_id, uint32_t tess_ctrl_module_id, uint32_t tess_eval_module_id, uint64_t state_addr, uint32_t state_size);
@@ -7529,7 +7529,7 @@ uint32_t hd_5850_acquire_image(uint32_t swap_chain_id);
 - `bind_texture` — powiazuje teksture z jednostka teksturowa.
 - `create_framebuffer` / `delete_framebuffer` — tworzy/niszy framebuffer.
 - `create_renderbuffer` / `delete_renderbuffer` — tworzy/niszy renderbuffer.
-- `attach_texture_to_framebuffer` / `attach_renderbuffer_to_framebuffer` — dołącza teksture/renderbuffer do punktu zaczepienia framebuffera.
+- `attach_texture_to_framebuffer` / `attach_renderbuffer_to_framebuffer` — dolacza teksture/renderbuffer do punktu zaczepienia framebuffera.
 - `set_draw_buffers` / `set_read_buffer` — ustawia bufora rysowania i odczytu.
 - `blit_framebuffer` — kopiuje obszar miedzy framebufferami.
 - `read_pixels` — odczytuje piksele z framebuffera do bufora.
@@ -7875,7 +7875,7 @@ void radeon_hd_6870_set_primitive_topology(uint32_t topology);
 
 #### radeon_hd_6870_clear_render_target
 
-czyści render target podanym kolorem.
+czysci render target podanym kolorem.
 
 ```
 void radeon_hd_6870_clear_render_target(uint32_t rt, uint32_t color);
@@ -7883,7 +7883,7 @@ void radeon_hd_6870_clear_render_target(uint32_t rt, uint32_t color);
 
 #### radeon_hd_6870_clear_depth_stencil
 
-czyści depth-stencil podanymi wartosciami glebi i stencil.
+czysci depth-stencil podanymi wartosciami glebi i stencil.
 
 ```
 void radeon_hd_6870_clear_depth_stencil(uint32_t ds, float depth, uint8_t stencil);
@@ -7963,7 +7963,7 @@ sterownik karty graficznej AMD Radeon HD 5570 (chip Redwood, rodzina Evergreen, 
 | RADEON_HD5570_SIMD_COUNT | 5 | liczba SIMD |
 | RADEON_HD5570_ROP_COUNT | 8 | liczba ROP |
 | RADEON_HD5570_TEXTURE_UNITS | 20 | liczba jednostek tekstur |
-| RADEON_HD5570_MEMORY_BUS_WIDTH | 128 | szerokość szyny pamieci |
+| RADEON_HD5570_MEMORY_BUS_WIDTH | 128 | szerokosc szyny pamieci |
 
 ### inicjalizacja
 
@@ -8186,7 +8186,7 @@ pub fn init(&mut self) -> bool;
 
 ### hd_2900_xt_detect
 
-sprawdza czy karta ATI Radeon HD 2900 XT jest wykryta na MMIO (porownuje vendor ID, device ID i rewizję). zwraca true gdy wykryta, false gdy nie.
+sprawdza czy karta ATI Radeon HD 2900 XT jest wykryta na MMIO (porownuje vendor ID, device ID i rewizje). zwraca true gdy wykryta, false gdy nie.
 
 ```
 pub fn detect(&self) -> bool;
@@ -8218,7 +8218,7 @@ pub fn init_ring_buffers(&mut self);
 
 ### hd_2900_xt_submit_doorbell
 
-wysyla sygnał doorbell dla danego ringu (0 = grafika, 1 = compute, 2 = DMA) z podana wartoscia.
+wysyla sygnal doorbell dla danego ringu (0 = grafika, 1 = compute, 2 = DMA) z podana wartoscia.
 
 ```
 pub fn submit_doorbell(&mut self, ring_index: u32, value: u32);
@@ -8329,7 +8329,7 @@ pub fn set_cull_mode(&mut self, mode: u32);
 
 ### hd_2900_xt_set_wireframe / hd_2900_xt_enable_multisampling / hd_2900_xt_enable_antialiasing
 
-wlacza/wylacza tryb siatki (wireframe), multisampling lub wygładzanie krawedzi (antialiasing).
+wlacza/wylacza tryb siatki (wireframe), multisampling lub wygladzanie krawedzi (antialiasing).
 
 ```
 pub fn set_wireframe(&mut self, enabled: bool);
@@ -8500,7 +8500,7 @@ pub fn delete_framebuffer(&mut self, framebuffer_id: u32);
 
 ### hd_2900_xt_attach_texture_to_framebuffer / hd_2900_xt_attach_renderbuffer_to_framebuffer
 
-dołącza teksture lub bufor renderowania do ramki graficznej jako danego przyłączenia (attachment).
+dolacza teksture lub bufor renderowania do ramki graficznej jako danego przylaczenia (attachment).
 
 ```
 pub fn attach_texture_to_framebuffer(&mut self, framebuffer_id: u32, attachment: u32, texture_id: u32, mip_level: u32);
@@ -8509,7 +8509,7 @@ pub fn attach_renderbuffer_to_framebuffer(&mut self, framebuffer_id: u32, attach
 
 ### hd_2900_xt_set_draw_buffers / hd_2900_xt_set_read_buffer
 
-ustawia bufora rysowania (liczba, wskaznik na przyłącza) lub bufor odczytu (przyłącze).
+ustawia bufora rysowania (liczba, wskaznik na przylacza) lub bufor odczytu (przylacze).
 
 ```
 pub fn set_draw_buffers(&mut self, count: u32, attachments: *const u32);
@@ -8681,7 +8681,7 @@ sterownik zaawansowanej akceleracji 3D i shaderow dla karty AMD Radeon RX 590 (P
 
 ### typy
 
-- `Matrix4x4` - macierz 4x4 (16 x f32), używana dla macierzy rzutowania, widoku i swiata.
+- `Matrix4x4` - macierz 4x4 (16 x f32), uzywana dla macierzy rzutowania, widoku i swiata.
 - `Vector4` / `Vector3` / `Vector2` - wektory 4-, 3- i 2-elementowe (f32).
 - `Vertex` - wierzcholek: pozycja, kolor, wspolrzedne tekstury, normalna, styczna i po-drugiej stycznej.
 - `Color` - kolor RGBA (f32).
@@ -8696,13 +8696,13 @@ sterownik zaawansowanej akceleracji 3D i shaderow dla karty AMD Radeon RX 590 (P
 - `ShaderModule` - modul shadera (SPIR-V): adres kodu, rozmiar, punkt wejscia, etykiet.
 - `DescriptorSet` - zbior deskryptorow z wiazaniami zasobow.
 - `CommandBuffer` - bufor komend GPU: adres, rozmiar, offset, flaga wyslania.
-- `QueryPool` - pula zapytań (occlusion, timestamp, pipeline statistics).
-- `SwapChain` - łańcuch wymiany obrazow: adresy obrazow, format, stan nabycia/prezentacji.
+- `QueryPool` - pula zapytan (occlusion, timestamp, pipeline statistics).
+- `SwapChain` - lancuch wymiany obrazow: adresy obrazow, format, stan nabycia/prezentacji.
 - `RayTracingPipeline` - potok ray tracingu: grupy shaderow, tabela shaderow, max rekurencja.
 - `MeshShader` - shader siatki: task, mesh, amplification, atrybuty wierzcholkow.
-- `RingBuffer` - ring buffer z wskaźnikami rptr/wptr i strona doorbell.
+- `RingBuffer` - ring buffer z wskaznikami rptr/wptr i strona doorbell.
 - `CommandProcessor` - konfiguracja procesora komend (ME cntl, pfetch, maski przerwan).
-- `GpuInstance` - instancja GPU: bazy MMIO/VRAM/GART/doorbell, rozmiary pamieci, zegary, liczniki CU/SE/RB/backendow/JT, ringi (grafika/compute/DMA), programy shaderowe, stale, zasoby, moduly, zbiory deskryptorow, bufora komend, pule zapytań, lancuchy wymiany, potoki ray tracingu i shadery siatki, flaga inicjalizacji, licznik bledow.
+- `GpuInstance` - instancja GPU: bazy MMIO/VRAM/GART/doorbell, rozmiary pamieci, zegary, liczniki CU/SE/RB/backendow/JT, ringi (grafika/compute/DMA), programy shaderowe, stale, zasoby, moduly, zbiory deskryptorow, bufora komend, pule zapytan, lancuchy wymiany, potoki ray tracingu i shadery siatki, flaga inicjalizacji, licznik bledow.
 
 ### funkcje inicjalizacji
 
@@ -8712,7 +8712,7 @@ tworzy nowa instancje GPU z domyslnymi adresami bazowymi, rozmiarami pamieci RX 
 
 `pub fn init(&mut self) -> bool`
 
-inicjalizuje kartę: sprawdza czy juz zainicjalizowana, wykrywa urzadzenie (`detect`), wykonuje soft reset, konfiguruje moduly SRBM, GRBM, procesor komend, VGT, montaz primitywow, interpolator shaderow, rastrowacz, bufor glebokosci, stencil, mieszanie, bufor koloru, jednostki tekstur, probowniki, cache wierzcholkow, bufor indeksow, bufor primitywow, rejestry shaderow, jednostki shaderow, potok geometrii, teselacje, potok obliczeniowy, ramki, cele renderowania, bufor glebokosci/stencila, probkowanie wielokrotne, wygładzanie krawedzi, granice glebokosci, referencje stencila, stale mieszania, viewport, scissor, PCIe, zarzadzanie zasilaniem, SMU, moduly shaderowe, zbiory deskryptorow, bufora komend, pule zapytań, lancuchy wymiany, ray tracing, shadery siatki, teselacje rozszerzone i cieniowanie zmiennej stawki. na koncu wlacza akceleracje 3D i ustawia flage `initialized`. zwraca `true` przy powodzeniu.
+inicjalizuje karte: sprawdza czy juz zainicjalizowana, wykrywa urzadzenie (`detect`), wykonuje soft reset, konfiguruje moduly SRBM, GRBM, procesor komend, VGT, montaz primitywow, interpolator shaderow, rastrowacz, bufor glebokosci, stencil, mieszanie, bufor koloru, jednostki tekstur, probowniki, cache wierzcholkow, bufor indeksow, bufor primitywow, rejestry shaderow, jednostki shaderow, potok geometrii, teselacje, potok obliczeniowy, ramki, cele renderowania, bufor glebokosci/stencila, probkowanie wielokrotne, wygladzanie krawedzi, granice glebokosci, referencje stencila, stale mieszania, viewport, scissor, PCIe, zarzadzanie zasilaniem, SMU, moduly shaderowe, zbiory deskryptorow, bufora komend, pule zapytan, lancuchy wymiany, ray tracing, shadery siatki, teselacje rozszerzone i cieniowanie zmiennej stawki. na koncu wlacza akceleracje 3D i ustawia flage `initialized`. zwraca `true` przy powodzeniu.
 
 `pub fn detect(&self) -> bool`
 
@@ -8836,7 +8836,7 @@ wlacza/wylacza probkowanie wielokrotne (rejestr 0x160C).
 
 `pub fn enable_antialiasing(&mut self, enabled: bool)`
 
-wlacza/wylacza wygładzanie krawedzi (rejestr 0x1610).
+wlacza/wylacza wygladzanie krawedzi (rejestr 0x1610).
 
 `pub fn set_depth_bounds_test(&mut self, enabled: bool, min: f32, max: f32)`
 
@@ -9030,7 +9030,7 @@ wiazanie zasobow shadera: wiazania, typy, adresy, rozmiary (rejestry 0x2240-0x22
 
 `pub fn set_shader_constant(&mut self, program_id: u32, location: u32, values: &[f32])`
 
-ustawia stala shadera pod daną lokalizacja (do 4 wartosci f32, maksymalnie 512 stalych).
+ustawia stala shadera pod dana lokalizacja (do 4 wartosci f32, maksymalnie 512 stalych).
 
 `pub fn set_vertex_shader(&mut self, program_id: u32)`
 
@@ -9080,11 +9080,11 @@ usuwa zbior deskryptorow (rejestr `DESCRIPTOR_SET_FREE`).
 
 `pub fn update_descriptor_set(&mut self, set_id: u32)`
 
-aktualizuje zbiór deskryptorow w GPU (rejestr `DESCRIPTOR_SET_UPDATE`).
+aktualizuje zbior deskryptorow w GPU (rejestr `DESCRIPTOR_SET_UPDATE`).
 
 `pub fn bind_descriptor_set(&mut self, set_id: u32, slot: u32)`
 
-wiązuje zbiór deskryptorow do gniazda slot (rejestry `DESCRIPTOR_SET_BIND`, `DESCRIPTOR_SET_BIND_ADDR`).
+wiazuje zbior deskryptorow do gniazda slot (rejestry `DESCRIPTOR_SET_BIND`, `DESCRIPTOR_SET_BIND_ADDR`).
 
 `pub fn create_command_buffer(&mut self, addr: u64, size: u32) -> u32`
 
@@ -9110,23 +9110,23 @@ wysyla bufor komend do wykonania (rejestr `COMMAND_BUFFER_SUBMIT`).
 
 resetuje bufor komend: offset i flaga wyslania (rejestr `COMMAND_BUFFER_RESET`).
 
-### funkcje pul zapytań i lancuchow wymiany
+### funkcje pul zapytan i lancuchow wymiany
 
 `pub fn create_query_pool(&mut self, addr: u64, count: u32, query_type: u32, results_addr: u64, results_size: u32) -> u32`
 
-tworzy pule zapytań GPU (occlusion, timestamp, statystyki potoku).
+tworzy pule zapytan GPU (occlusion, timestamp, statystyki potoku).
 
 `pub fn destroy_query_pool(&mut self, pool_id: u32)`
 
-usuwa pule zapytań (rejestr `QUERY_POOL_FREE`).
+usuwa pule zapytan (rejestr `QUERY_POOL_FREE`).
 
 `pub fn reset_query_pool(&mut self, pool_id: u32)`
 
-resetuje pule zapytań (rejestr `QUERY_POOL_RESET`).
+resetuje pule zapytan (rejestr `QUERY_POOL_RESET`).
 
 `pub fn get_query_pool_results(&mut self, pool_id: u32) -> u64`
 
-pobiera wyniki zapytań z pules (rejestr `QUERY_POOL_RESULTS`).
+pobiera wyniki zapytan z pules (rejestr `QUERY_POOL_RESULTS`).
 
 `pub fn create_swap_chain(&mut self, image_count: u32, image_addrs: &[u64], image_size: u32, image_format: u32) -> u32`
 
@@ -9156,7 +9156,7 @@ usuwa potok ray tracingu o danym id.
 
 `pub fn trace_rays(&mut self, rt_id: u32, width: u32, height: u32, depth: u32)`
 
-uruchamia sladowanie promieni dla danego potoku o wymiarach obrazu i glębokosci (rejestry `RAY_TRACING_TRACE`, `RAY_TRACING_BVH_BUILD`).
+uruchamia sladowanie promieni dla danego potoku o wymiarach obrazu i glebokosci (rejestry `RAY_TRACING_TRACE`, `RAY_TRACING_BVH_BUILD`).
 
 `pub fn create_mesh_shader(&mut self, task_addr: u64, task_size: u32, mesh_addr: u64, mesh_size: u32, amp_addr: u64, amp_size: u32, attr_count: u32, attr_addrs: &[u64]) -> u32`
 
@@ -9169,4 +9169,166 @@ usuwa shader siatki o danym id.
 `pub fn dispatch_mesh(&mut self, ms_id: u32, group_x: u32, group_y: u32, group_z: u32)`
 
 uruchamia siatke o zadanej liczbie grup (x, y, z) (rejestry `MESH_SHADER_TASK_CNTL`).
+
+## sterownik AMD Radeon R9 280X - rust/drivers/karty_graficzne/amd/r9_280x.rs
+
+sterownik karty graficznej AMD Radeon R9 280X (chip Tahiti, architektura GCN 1.0) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (vendor 0x1002, urzadzenie 0x6798), mapowanie MMIO, soft-reset chipa (GRBM_SOFT_RESET), inicjalizacje wszystkich blokow potoku graficznego GCN (Command Processor, Vertex Group Transfer, Primitive Assembly, Scanout, Depth Buffer, Color Buffer, Shader Export, Texture Address, Texture Cache, Shader Processor Interpolator, Shader Quad Cache, SDMA, SMU), kolejki pierscieniowe (GFX, compute, DMA), command buffer, lancuch wymiany klatek, kompilacje modulow shaderow (SPIRV), programy shaderowe (vertex, fragment, geometry, tessellation, compute), potoki graficzne, tekstury, ramki graficzne, stany blendowania, glebi, stencli, rastrowania, wywolania rysowania (draw arrays, draw elements), dyspatch compute, viewport, scissor oraz akceleracje 3D. napisany w Rust z `#[no_std]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/amd/*.rs)`) i linkowany do jadra.
+
+### r9_280x_driver_init
+
+inicjalizuje sterownik R9 280X: tworzy instancje GPU, wykrywa urzadzenie na PCI, wykonuje soft-reset, konfiguruje wszystkie bloki potoku, inicjalizuje kolejki pierscieniowe i wlacza akceleracje 3D. zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+```
+bool r9_280x_driver_init(void);
+```
+
+### r9_280x_driver_detected
+
+sprawdzaczy karta R9 280X jest wykrta na PCI (porownuje vendor ID i device ID oraz rewizje). zwraca 1 gdy wykryta, 0 gdy nie.
+
+```
+bool r9_280x_driver_detected(void);
+```
+
+### r9_280x_enable_3d_acceleration
+
+wlacza akceleracje 3D na karcie: aktywuje VGT, PA/SC, depth buffer, color buffer, SX, TA, CP i SPI, nastepnie czeka az karta bedzie w stanie bezczynnym.
+
+```
+void r9_280x_enable_3d_acceleration(void);
+```
+
+### r9_280x_draw_arrays
+
+rysuje primitive z tablicy wierzcholkow bez indeksow. ustawia typ primitive, wlacza potok shaderow i zapisuje komende do kolejki GFX, nastepnie wysyla doorbell i czeka na zakonczenie.
+
+```
+void r9_280x_draw_arrays(uint32_t primitive, uint32_t first, uint32_t count);
+```
+
+### r9_280x_draw_elements
+
+rysuje primitive z indeksami z bfora indeksow. konfiguruje format i adres bufora indeksow, zapisuje komende do kolejki GFX, wysyla doorbell i czeka na zakonczenie.
+
+```
+void r9_280x_draw_elements(uint32_t primitive, uint32_t index_count, uint32_t index_format, uint64_t index_addr);
+```
+
+### r9_280x_clear
+
+czysci kolor, bufor glebi i stencl podanymi wartosciami i aktywuje sterowanie kolorem (CB_COLOR_CONTROL).
+
+```
+void r9_280x_clear(uint32_t color, uint32_t depth, uint32_t stencil);
+```
+
+### r9_280x_set_viewustawia viewport potoku graficznego (skale i przesuniecia X/Y/Z oraz zakres glebi) w rejestrach SC_PRIM_VPORT.
+
+```
+void r9_280x_set_viewport(float x, float y, float width, float height, float min_depth, float max_depth);
+```
+
+### r9_280x_get_status
+
+zwraca liczbe bledow sterownika (licznik error_count).
+
+```
+uint32_t r9_280x_get_status(void);
+```
+
+### r9_280x_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy, 0 w przeciwnym razie.
+
+```
+bool r9_280x_is_ready(void);
+```
+
+struktura `GpuInstance` zawiera:
+
+| pole | typ | opis |
+|------|-----|------|
+| mmio_base | *mut u32 | adres bazowy MMIO karty |
+| vram_base | *mut u32 | adres bazowy pamieci wideo |
+| gart_base | *mut u32 | adres bazowy GART |
+| doorbell_base | *mut u32 | adres bazowy doorbelli |
+| vram_size | u64 | rozmiar pamieci wideo (3 GB) |
+| vram_used | AtomicU64 | zuzyta pamiec wideo |
+| gart_size | u64 | rozmiar GART (4 GB) |
+| engine_clock | u32 | czestotliwosc rdzenia (1 GHz) |
+| memory_clock | u32 | czestotliwosc pamieci (6 GHz) |
+| compute_units | u32 | liczba jednostek obliczeniowych (32) |
+| stream_processors | u32 | liczba procesorow strumieniowych (2048) |
+| rop_count | u32 | liczba jednostek ROP (32) |
+| texture_units | u32 | liczba jednostek tekstur (128) |
+| memory_bus_width | u32 | szerokosc szyny pamieci (384 bit) |
+| vertex_cache_size | u32 | rozmiar cache wierzcholkow |
+| primitive_buffer_size | u32 | rozmiar bufora primitive |
+| command_buffer_size | u32 | rozmiar bufora komend |
+| initialized | AtomicBool | czy sterownik jest zainicjowany |
+| error_count | AtomicU32 | licznik bledow |
+
+stale:
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| AMD_VENDOR_ID | 0x1002 | identyfikator producenta AMD |
+| R9_280X_DEVICE_ID | 0x6798 | identyfikator urzadzenia R9 280X (Tahiti) |
+| CHIP_TAHITI | 0x6798 | kod chipu Tahiti |
+| GCN_ARCH_VERSION | 1 | wersja architektury GCN |
+| REG_MMIO_BASE | 0xF0000000 | adres bazowy MMIO |
+| REG_VRAM_BASE | 0xE0000000 | adres bazowy VRAM |
+| REG_GART_BASE | 0xD0000000 | adres bazowy GART |
+| REG_DOORBELL_BASE | 0xC0000000 | adres bazowy doorbelli |
+| R9_280X_VRAM_SIZE | 3 * 1024^3 | rozmiar pamieci wideo |
+| R9_280X_GART_SIZE | 4 * 1024^3 | rozmiar GART |
+| R9_280X_ENGINE_CLOCK | 1000000 | czestotliwosc rdzenia |
+| R9_280X_MEMORY_CLOCK | 6000000 | czestotliwosc pamieci |
+| R9_280X_COMPUTE_UNITS | 32 | liczba jednostek obliczeniowych |
+| R9_280X_STREAM_PROCESSORS | 2048 | liczba procesorow strumieniowych |
+| R9_280X_ROP_COUNT | 32 | liczba jednostek ROP |
+| R9_280X_TEXTURE_UNITS | 128 | liczba jednostek tekstur |
+| R9_280X_MEMORY_BUS_WIDTH | 384 | szerokosc szyny pamieci |
+| R9_280X_VERTEX_CACHE_SIZE | 32 * 1024 | rozmiar cache wierzcholkow |
+| R9_280X_PRIMITIVE_BUFFER_SIZE | 32 * 1024 | rozmiar bufora primitive |
+
+### rejestry MMIO
+
+| nazwa | offset | opis |
+|-------|--------|------|
+| AMD_GRBM_CNTL | 0x8000 | sterowanie GRBM |
+| AMD_GRBM_STATUS | 0x8004 | status GRBM |
+| AMD_GRBM_SOFT_RESET | 0x8040 | soft-reset GRBM |
+| AMD_GRBM_GFX_INDEX | 0x8400 | indeks GFX GRBM |
+| AMD_GRBM_TIMESTAMP | 0x89C0 | znacznik czasu GRBM |
+| AMD_CP_RB_CNTL | 0x8C00 | sterowanie ring buffer CP |
+| AMD_CP_RB_BASE | 0x8C04 | adres bazowy ring buffer CP |
+| AMD_CP_RB_RPTR | 0x8C08 | wskaznik odczytu ring buffer CP |
+| AMD_CP_RB_WPTR | 0x8C0C | wskaznik zapisu ring buffer CP |
+| AMD_CP_ME_CNTL | 0x8C38 | sterowanie meccanizmem CP |
+| AMD_CP_ME_CNTL2 | 0x8C3C | sterowanie meccanizmem CP 2 |
+| AMD_CP_INT_CNTL | 0x8C70 | sterowanie przerwaniami CP |
+| AMD_CP_INT_STATUS | 0x8C74 | status przerwan CP |
+| AMD_CP_STALL_CTRL | 0x8C94 | sterowanie blokowaniem CP |
+| AMD_VGT_CNTL | 0x8800 | sterowanie VGT |
+| AMD_VGT_PRIMITIVE_TYPE | 0x8804 | typ primitive VGT |
+| AMD_VGT_SHADER_STAGES_EN | 0x8A80 | wlaczenie etapow shaderow VGT |
+| AMD_VGT_CONFIG | 0x8B10 | konfiguracja VGT |
+| AMD_PA_SC_MODE_CNTL_0 | 0x8C94 | tryb PA/SC 0 |
+| AMD_PA_SC_AA_CONFIG | 0x8D2C | konfiguracja AA PA/SC |
+| AMD_DB_DEPTH_CONTROL | 0x2800 | sterowanie glebia DB |
+| AMD_DB_STENCIL_CONTROL | 0x2804 | sterowanie stencl DB |
+| AMD_CB_COLOR_CONTROL | 0x16C8 | sterowanie kolorem CB |
+| AMD_CB_COLOR0_BASE | 0x16CC | adres bazowy koloru 0 CB |
+| AMD_SX_MISC | 0x9C00 | rozne SX |
+| AMD_TA_CNTL | 0xCA04 | sterowanie teksturami TA |
+| AMD_TC_CNTL | 0xCC00 | sterowanie cache tekstur TC |
+| AMD_SPI_CONFIG_CNTL | 0x9C40 | konfiguracja SPI |
+| AMD_SDMA0_RB_CNTL | 0x2E00 | sterowanie ring buffer SDMA0 |
+| AMD_SDMA1_RB_CNTL | 0x2F00 | sterowanie ring buffer SDMA1 |
+| AMD_SMU_CNTL | 0xA000 | sterowanie SMU |
+| AMD_SMU_GFX_CLOCK_CNTL | 0xA010 | zegar grafiki SMU |
+| AMD_SMU_MEM_CLOCK_CNTL | 0xA014 | zegar pamieci SMU |
+| AMD_SMU_POWER_STATE | 0xA018 | stan zasilania SMU |
+
 
