@@ -17,8 +17,8 @@
 #define KOLOR_TEKST_PRZYCISKU_KALKULATORA 0x00FFFFFF
 #define KOLOR_WYNIKU 0x000000FF
 
-static struct okno okno_kalkulator;
-static uint8_t kalkulator_otwarty;
+struct okno okno_kalkulator;
+uint8_t kalkulator_otwarty;
 static char kalkulator_wyswietlacz[32];
 static int kalkulator_dlugosc;
 static double kalkulator_operand1;
@@ -276,9 +276,8 @@ void kalkulator_otworz(void)
     kalkulator_otwarty = 1;
 }
 
-void kalkulator_obsluz_klawiature(void)
+void kalkulator_obsluz_klawiature_znak(char znak)
 {
-    char znak;
     if (!kalkulator_otwarty) return;
     if (!okno_kalkulator.otwarte) {
         kalkulator_otwarty = 0;
@@ -286,6 +285,5 @@ void kalkulator_obsluz_klawiature(void)
     }
     if (!okno_kalkulator.w_polu_tekstowym) return;
     if (!okno_czy_aktywne(&okno_kalkulator)) return;
-    if (!keyboard_try_getchar(&znak)) return;
     kalkulator_pole_tekstowe_znak(&okno_kalkulator, znak, 0);
 }

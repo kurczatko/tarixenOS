@@ -3,6 +3,6 @@
 
 void notatnik_otworz(void);
 void notatnik_otworz_plik(const char *nazwa_pliku);
-void notatnik_obsluz_klawiature(void);
+void notatnik_obsluz_klawiature_znak(char znak);
 
 #endif

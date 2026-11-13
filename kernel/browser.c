@@ -49,7 +49,7 @@ struct browser_field {
     uint32_t page_width;
 };
 
-static struct okno browser_window;
+struct okno browser_window;
 static char address[128] = "http://textfiles.com/";
 static char response[BROWSER_RESPONSE_MAX];
 static char page[BROWSER_PAGE_MAX];
@@ -70,7 +70,7 @@ static int focused_field;
 static uint32_t page_background = 0x00FFFFFF;
 static char status[64] = "Wpisz adres i nacisnij IDZ";
 static uint8_t address_focused = 1;
-static uint8_t browser_opened;
+uint8_t browser_opened;
 static int page_scroll_y;
 static uint8_t browser_use_https;
 static char current_form_action[256];
@@ -1256,11 +1256,9 @@ void browser_open(void)
     okno_ustaw_obsluge_klikniecia(&browser_window, browser_click);
 }
 
-void browser_handle_keyboard(void)
+void browser_handle_keyboard_znak(char character)
 {
-    char character;
-    if (!browser_opened || !browser_window.otwarte || !okno_czy_aktywne(&browser_window) ||
-        !keyboard_try_getchar(&character)) return;
+    if (!browser_opened || !browser_window.otwarte || !okno_czy_aktywne(&browser_window)) return;
 
     if (focused_field >= 0) {
         struct browser_field *f = &fields[focused_field];

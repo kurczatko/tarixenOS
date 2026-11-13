@@ -19,8 +19,8 @@
 #define KOLOR_PRZYCISKU       0x004A5D6E
 #define KOLOR_TEKST_PRZYCISKU 0x00FFFFFF
 
-static struct okno okno_notatnik;
-static uint8_t notatnik_otwarty;
+struct okno okno_notatnik;
+uint8_t notatnik_otwarty;
 static char notatka[NOTATNIK_MAKS + 1];
 static uint8_t notatka_rozmiar[NOTATNIK_MAKS + 1];
 static uint8_t notatka_styl[NOTATNIK_MAKS + 1];
@@ -289,9 +289,8 @@ void notatnik_otworz_plik(const char *nazwa_pliku)
     notatnik_otworz_biezacy_plik();
 }
 
-void notatnik_obsluz_klawiature(void)
+void notatnik_obsluz_klawiature_znak(char znak)
 {
-    char znak;
     if (!notatnik_otwarty) return;
     if (!okno_notatnik.otwarte) {
         notatnik_otwarty = 0;
@@ -299,7 +298,6 @@ void notatnik_obsluz_klawiature(void)
     }
     if (okno_notatnik.w_polu_tekstowym) return;
     if (!okno_czy_aktywne(&okno_notatnik)) return;
-    if (!keyboard_try_getchar(&znak)) return;
     if (znak == '\b') {
         if (notatka_dlugosc > 0) notatka_dlugosc--;
     } else if ((znak == '\n' || znak == '\r') && notatka_dlugosc < NOTATNIK_MAKS) {

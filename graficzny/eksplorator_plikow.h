@@ -2,6 +2,6 @@
 #define EKSPLORATOR_PLIKOW_H
 
 void eksplorator_plikow();
-void eksplorator_plikow_obsluz_klawiature(void);
+void eksplorator_plikow_obsluz_klawiature_znak(char znak);
 
 #endif

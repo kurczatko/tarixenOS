@@ -32,6 +32,10 @@
 #include "../drivers/karty_graficzne/radeon_hd_6870.h"
 #include "../drivers/bluetooth/bluetooth.h"
 #include "zegar.h"
+#include "notatnik.h"
+#include "kalkulator.h"
+#include "malowanie.h"
+#include "browser.h"
 #include <../user_land/konta.h>
 #include "gdt.h"
 #include "idt.h"
@@ -39,6 +43,7 @@
 #include "../user_land/tapeta.h"
 #include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
 #include "../graficzny/podzespoly.h"
+#include "../graficzny/eksplorator_plikow.h"
 #include "panika.h"
 
 bool amd_r7_265_driver_init(void);
@@ -76,6 +81,44 @@ uint8_t quickcam_driver_poll(void);
 extern struct okno *aktywne_okno;
 extern uint32_t __bss_start;
 extern uint32_t __bss_end;
+
+extern uint8_t notatnik_otwarty;
+extern struct okno okno_notatnik;
+extern uint8_t kalkulator_otwarty;
+extern struct okno okno_kalkulator;
+extern uint8_t malowanie_otwarty;
+extern struct okno okno_malowanie;
+extern uint8_t tryb_tworz;
+extern struct okno pliki;
+extern uint8_t browser_opened;
+extern struct okno browser_window;
+
+void klawiatura_obsługa_aktywnego_okna(void)
+{
+    char znak;
+    if (!keyboard_try_getchar(&znak)) return;
+
+    uint8_t ctrl = keyboard_ctrl_pressed();
+    uint8_t alt = keyboard_alt_pressed();
+
+    if (notatnik_otwarty && okno_notatnik.otwarte && okno_czy_aktywne(&okno_notatnik) && !okno_notatnik.w_polu_tekstowym) {
+        notatnik_obsluz_klawiature_znak(znak);
+    } else if (kalkulator_otwarty && okno_kalkulator.otwarte && okno_czy_aktywne(&okno_kalkulator) && okno_kalkulator.w_polu_tekstowym) {
+        kalkulator_obsluz_klawiature_znak(znak);
+    } else if (malowanie_otwarty && okno_malowanie.otwarte && okno_czy_aktywne(&okno_malowanie)) {
+        malowanie_obsluz_klawiature_znak(znak);
+    } else if (tryb_tworz && okno_czy_aktywne(&pliki)) {
+        eksplorator_plikow_obsluz_klawiature_znak(znak);
+    } else if (browser_opened && browser_window.otwarte && okno_czy_aktywne(&browser_window)) {
+        browser_handle_keyboard_znak(znak);
+    } else if (aktywne_okno && aktywne_okno->otwarte && aktywne_okno->pole_tekstowe_znak) {
+        aktywne_okno->pole_tekstowe_znak(aktywne_okno, znak, ctrl);
+    }
+
+    if (ctrl && alt && (znak == 'i' || znak == 'I')) {
+        podzespoly_otworz();
+    }
+}
 
 void proces_uruchom_pierwszy(struct proces *p) {
     struct tss *tss = gdt_tss();
@@ -208,14 +251,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
             menu_start_przelacz();
         }
         if (keyboard_dane_dostepne()) {
-            char znak;
-            if (keyboard_try_getchar(&znak)) {
-                uint8_t ctrl = keyboard_ctrl_pressed();
-                uint8_t alt = keyboard_alt_pressed();
-                if (ctrl && alt && (znak == 'i' || znak == 'I')) {
-                    podzespoly_otworz();
-                }
-            }
+            klawiatura_obsługa_aktywnego_okna();
         }
         if (!aktywne_okno || !aktywne_okno->otwarte) {
             if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();

@@ -15,7 +15,7 @@ struct okno pliki;
 static int wybrany_element = -1;
 static struct fs_entry_info lista_plikow[24];
 static int liczba_plikow;
-static uint8_t tryb_tworz;
+uint8_t tryb_tworz;
 static char nazwa_nowego[9];
 static int dlugosc_nazwy;
 static char status_plikow[24];
@@ -221,10 +221,9 @@ void eksplorator_plikow(void)
     okno_ustaw_obsluge_klikniecia(&pliki, obsluz_klik_plikow);
 }
 
-void eksplorator_plikow_obsluz_klawiature(void)
+void eksplorator_plikow_obsluz_klawiature_znak(char znak)
 {
-    char znak;
-    if (!tryb_tworz || !okno_czy_aktywne(&pliki) || !keyboard_try_getchar(&znak)) return;
+    if (!tryb_tworz || !okno_czy_aktywne(&pliki)) return;
     if (znak == '\b') {
         if (dlugosc_nazwy > 0) nazwa_nowego[--dlugosc_nazwy] = 0;
     } else if (znak == '\n' || znak == '\r') {

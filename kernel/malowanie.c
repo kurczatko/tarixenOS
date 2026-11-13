@@ -39,8 +39,8 @@ static const char *NAZWA_PAL[6] = {
     "CZERW", "ZIEL", "NIEB", "ZOLTY", "CZARNY", "GUMKA"
 };
 
-static struct okno okno_malowanie;
-static uint8_t malowanie_otwarty = 0;
+struct okno okno_malowanie;
+uint8_t malowanie_otwarty = 0;
 static int malowanie_kolor = 0;
 static char malowanie_status[32];
 static char mal_buf[7 + CANVAS_W * CANVAS_H * 4];
@@ -309,16 +309,14 @@ void malowanie_otworz(void)
     okno_ustaw_obsluge_ruchu(&okno_malowanie, malowanie_ruch);
 }
 
-void malowanie_obsluz_klawiature(void)
+void malowanie_obsluz_klawiature_znak(char znak)
 {
-    char znak;
     if (!malowanie_otwarty) return;
     if (!okno_malowanie.otwarte) {
         malowanie_otwarty = 0;
         return;
     }
     if (!okno_czy_aktywne(&okno_malowanie)) return;
-    if (!keyboard_try_getchar(&znak)) return;
     if (znak == 27) {
         okno_zamknij(&okno_malowanie);
         malowanie_otwarty = 0;
