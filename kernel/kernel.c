@@ -1,4 +1,11 @@
 /*
+* prawa autorskie (C) naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
+/*
 * ten plik to najwazniejszy plik systemu 
 * prosze go nie ruszać bez potrzeby
 * polowa includów nic nie robi bo zostaly dodane rok temu 
@@ -7,61 +14,60 @@
 
 /*includy*/
 
-#include <./../drivers/keyboard.h>
-#include <./drivers/plyty_glowne/asus_p4p800.h>
-#include <../drivers/plyty_glowne/intel_915.h>
-#include <../drivers/mouse.h>
-#include <../drivers/usb/core/usb.h>
-#include <../drivers/usb/core/hid.h>
-#include <../drivers/usb/mouse/mouse.h>
-#include <../drivers/usb/keyboard/keyboard.h>
-#include <../system_plikow/system_plikow.h>
-#include <../graficzny/rysowanie.h>
-#include <../graficzny/menu_start.h>
-#include <../graficzny/okno.h>
-#include <../graficzny/pulpit.h>
-
-#include <../drivers/sound/intel_hd.h>
-#include <../drivers/alc650.h>
-#include <../drivers/net.h>
-#include <../drivers/floppy.h>
-#include <../drivers/plyty.h>
-#include <../drivers/nvme.h>
-#include <../drivers/intel_uhd.h>
-#include <../drivers/karty_graficzne/gma_x4500.h>
-#include <../drivers/karty_graficzne/radeon_hd_8370d.h>
-#include <../drivers/karty_graficzne/radeon_rx_9070_xt.h>
-#include <../drivers/karty_graficzne/radeon_hd_6870.h>
-#include <../drivers/bluetooth/bluetooth.h>
-#include <../drivers/baterie/bateria.h>
-#include <../drivers/acpi/acpi.h>
-#include <../drivers/karty_graficzne/amd/r6000.h>
-#include <../drivers/karty_graficzne/nvidia/gtx3070.h>
-#include <../drivers/karty_graficzne/nvidia/gtx3080.h>
+#include <drivers/keyboard.h>
+#include <drivers/plyty_glowne/asus_p4p800.h>
+#include <drivers/plyty_glowne/intel_915.h>
+#include <drivers/mouse.h>
+#include <drivers/usb/core/usb.h>
+#include <drivers/usb/core/hid.h>
+#include <drivers/usb/mouse/mouse.h>
+#include <drivers/usb/keyboard/keyboard.h>
+#include <system_plikow/system_plikow.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/menu_start.h>
+#include <graficzny/okno.h>
+#include <graficzny/pulpit.h>
+#include <drivers/sound/intel_hd.h>
+#include <drivers/alc650.h>
+#include <drivers/net.h>
+#include <drivers/floppy.h>
+#include <drivers/plyty.h>
+#include <drivers/nvme.h>
+#include <drivers/intel_uhd.h>
+#include <drivers/karty_graficzne/gma_x4500.h>
+#include <drivers/karty_graficzne/radeon_hd_8370d.h>
+#include <drivers/karty_graficzne/radeon_rx_9070_xt.h>
+#include <drivers/karty_graficzne/radeon_hd_6870.h>
+#include <drivers/bluetooth/bluetooth.h>
+#include <drivers/baterie/bateria.h>
+#include <drivers/acpi/acpi.h>
+#include <drivers/karty_graficzne/amd/r6000.h>
+#include <drivers/karty_graficzne/nvidia/gtx3070.h>
+#include <drivers/karty_graficzne/nvidia/gtx3080.h>
+#include <drivers/karty_graficzne/nvidia/gtx3010.h>
 #include <zegar.h>
 #include <notatnik.h>
 #include <kalkulator.h>
 #include <malowanie.h>
 #include <browser.h>
-#include <../user_land/konta.h>
+#include <user_land/konta.h>
 #include <gdt.h>
 #include <idt.h>
 #include <syscall.h>
-#include <../user_land/tapeta.h>
-#include <../drivers/karty_graficzne/radeon_rx_9070_xt.h>
-#include <../graficzny/podzespoly.h>
-#include <../graficzny/eksplorator_plikow.h>
+#include <user_land/tapeta.h>
+#include <drivers/karty_graficzne/radeon_rx_9070_xt.h>
+#include <graficzny/podzespoly.h>
+#include <graficzny/eksplorator_plikow.h>
 #include <panika.h>
-
 #include <proces.h>
 #include <driver_manager.h>
 #include <timer.h>
 #include <pik.h>
-#include <../drivers/qemu_vga.h>
-#include <../drivers/internet/rtl8111f.h>
-#include <../drivers/internet/rtl8111e.h>
-#include <../drivers/internet/rtl8168b.h>
-#include <../drivers/internet/rtl8188ce.h>
+#include <drivers/qemu_vga.h>
+#include <drivers/internet/rtl8111f.h>
+#include <drivers/internet/rtl8111e.h>
+#include <drivers/internet/rtl8168b.h>
+#include <drivers/internet/rtl8188ce.h>
 
 /*wykrywanie sprzetu*/
 
@@ -218,6 +224,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("radeon_hd6000", radeon_hd6000_init, 0, 0, 4);
     driver_manager_register("gtx3070", gtx3070_init, 0, 0, 4);
     driver_manager_register("gtx3080", gtx3080_init, 0, 0, 4);
+    driver_manager_register("gtx3010", gtx3010_init, 0, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
