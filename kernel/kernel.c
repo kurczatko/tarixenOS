@@ -35,6 +35,7 @@
 #include "../drivers/acpi/acpi.h"
 #include "../drivers/karty_graficzne/amd/r6000.h"
 #include "../drivers/karty_graficzne/nvidia/gtx3070.h"
+#include "../drivers/karty_graficzne/nvidia/gtx3080.h"
 #include "zegar.h"
 #include "notatnik.h"
 #include "kalkulator.h"
@@ -203,6 +204,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
     driver_manager_register("radeon_hd6000", radeon_hd6000_init, 0, 0, 4);
     driver_manager_register("gtx3070", gtx3070_init, 0, 0, 4);
+    driver_manager_register("gtx3080", gtx3080_init, 0, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);

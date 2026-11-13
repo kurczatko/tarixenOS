@@ -9517,3 +9517,189 @@ driver_manager_register("gtx3070", gtx3070_init, 0, 0, 4);
 
 `gtx3070_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
 
+## sterownik grafiki NVIDIA GeForce GTX 3080 - drivers/karty_graficzne/nvidia/gtx3080
+
+zaawansowany sterownik kart graficznych NVIDIA GeForce GTX 3080 (architektura Ampere, GA102) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa, tekstury, shadery (wierzcholkowe, pikselowe, geometrii, obliczeniowe), render targety, depth-stencil, command buffer, presentation oraz zarzadzanie zasilaniem i chlodzeniem. pliki: `drivers/karty_graficzne/nvidia/gtx3080.h` i `drivers/karty_graficzne/nvidia/gtx3080.cpp`. kompilowany jako C++ i laczony do jadra 32-bitowego.
+
+### wykrywanie urzadzenia
+
+sterownik skanuje szyne PCI w poszukiwaniu urzadzenia klasy 0x03 (grafika) z vendor ID 0x10DE (NVIDIA) i device ID z serii GTX 3080 (GA102). po wykryciu odczytuje BAR0 (adres MMIO), wlacza dostep do pamieci i rejestrów poleceń, inicjalizuje ring buffer PFIFO, pamiec VRAM oraz wyswietlacz (DISP/CRTC).
+
+### klasa Gtx3080
+
+| metoda | opis |
+|--------|------|
+| Gtx3080() | konstruktor, zeruje stan wszystkich buforow, tekstur, shaderow i kontekstu |
+| int inicjalizuj(void) | wykrywa karte PCI, inicjalizuje MMIO, ring buffer, VRAM, wyswietlacz, resetuje potok graficzny |
+| void zamknij(void) | zatrzymuje PFIFO i dezaktywuje sterownik |
+| uint8_t czy_gotowy(void) | 1 gdy sterownik zainicjalizowany |
+| void putpixel(x, y, kolor) | rysuje pojedynczy piksel w framebufferze |
+| void fillrect(x, y, w, h, kolor) | wypelnia prostokat kolorem |
+| void blt(dst_x, dst_y, src_x, src_y, w, h) | kopiuje blok pikseli (bitblt) |
+| void cursor_set(x, y, obraz) | ustawia kursor myszy i jego bitmape |
+| void cursor_hide(void) | ukrywa kursor |
+| void *get_fb(void) | zwraca wskaznik do framebuffera |
+| uint32_t get_szerokosc(void) | szerokosc framebuffera |
+| uint32_t get_wysokosc(void) | wysokosc framebuffera |
+| uint16_t get_device_id(void) | identyfikator urzadzenia PCI |
+| uint8_t get_rewizja(void) | rewizja ukladu |
+| void info_pobierz(struct gtx3080_info *wyjscie) | pelne informacje o urzadzeniu |
+
+### zarzadzanie pamiecia VRAM
+
+| metoda | opis |
+|--------|------|
+| uint64_t vram_alokuj(rozmiar, typ) | alokuje blok w VRAM, zwraca offset lub HANDLE_NULL |
+| void vram_zwolnij(uchwyt) | zwalnia blok VRAM |
+| uint64_t vram_uzyto(void) | uzyta pamiec VRAM |
+| uint64_t vram_calkowicie(void) | calkowita pamiec VRAM |
+
+### obiekty graficzne (bufory, tekstury, shaders, stany)
+
+sterownik obsluguje tworzenie, niszczenie, aktualizacje i wiazanie:
+- buforow wierzcholkow (`bufor_wierzcholkow_stworz/zniszcz/zaktualizuj`)
+- buforow indeksow (`bufor_indeksow_stworz/zniszcz/zaktualizuj`)
+- tekstur z mipmapami (`tekstura_stworz/zniszcz/zaktualizuj/wygeneruj_mipmapy`)
+- celow renderowania (`cel_renderowania_stworz/zniszcz`)
+- buforow glebi-stencil (`bufor_glebii_stworz/zniszcz`)
+- shaderow wierzcholkowych, pikselowych, geometrii i obliczeniowych (`shader_stworz/zniszcz/skompiluj`)
+- stanu probnika (`stan_probnika_stworz/zniszcz`)
+- stanu mieszania alpha (`stan_mieszania_stworz/zniszcz`)
+- stanu rasteryzacji (`stan_rasteryzacji_stworz/zniszcz`)
+- stanu glebi-stencil (`stan_glebii_stencil_stworz/zniszcz`)
+- ukladow wejścia (`uklad_wejsc_stworz/zniszcz`)
+- buforow stalych (`bufor_stale_stworz/zniszcz/zaktualizuj`)
+
+### wiazanie i rysowanie 3D
+
+| metoda | opis |
+|--------|------|
+| powiaz_bufor_wierzcholkow(uchwyt) | wiaze aktywny bufor wierzcholkow |
+| powiaz_shader_wierzcholkow/pikseli/geometrii/obliczeniowy(uchwyt) | wiaze shader danego typu |
+| powiaz_cel_renderowania(uchwyt) | wiaze cel renderowania (framebuffer wyjsciowy) |
+| powiaz_bufor_glebii(uchwyt) | wiaze bufor glebi |
+| powiaz_stan_mieszania/rasteryzacji/glebii_stencil(uchwyt) | wiaze stany potoku |
+| powiaz_probnik_i_teksture(gniazdo, probnik, tekstura) | wiaze probnik i teksture do gniazda |
+| powiaz_bufor_stale(gniazdo, uchwyt) | wiaze bufor stalych |
+| ustaw_viewport(x, y, w, h, min_glebia, max_glebia) | ustawia okno widoku |
+| ustaw_scissor(lewa, gora, prawa, dol) | ustawia region odciecia |
+| ustaw_typ_pierwotnego(typ) | ustawia typ primitive (punkt, linia, trojkat, trojkat_pasek) |
+| ustaw_mieszanie_alpha_globalne(wlacz) | globalne mieszanie alpha |
+| wyczysc_cel_renderowania(cel, kolor) | czyści cel renderowania |
+| wyczysc_bufor_glebii(bufor, glebia, stencil) | czyści bufor glebi-stencil |
+| rysuj(liczba_wierzcholkow, pierwszy) | rysuje geometryczne primitive |
+| rysuj_indeksowane(liczba_indeksow, pierwszy_indeks, baza) | rysuje z indeksami |
+| rysuj_indeksowane_instancjonowane(...) | rysuje instancjonowane |
+| rysuj_po_indirekcie(adres, liczba, krok) | rysowanie po indirekcie |
+
+### compute i synchronizacja
+
+| metoda | opis |
+|--------|------|
+| oblicz_wyslij(grupa_x, grupa_y, grupa_z) | wysyla zadanie compute shader |
+| oblicz_wyslij_po_indirekcie(adres) | compute po indirekcie |
+| ogrodzenie_stworz/sygnalizuj/poczekaj/zniszcz | ogrodzenia (fences) |
+| semafor_stworz/sygnalizuj/poczekaj/zniszcz | semafory |
+| int czekaj_na_bezczynnosc(timeout_us) | czeka na bezczynnosc GPU |
+| uint64_t znacznik_czasu(void) | zwraca znacznik czasu GPU |
+
+### zasilanie, zegary, temperatura, wiatrak, RGB
+
+| metoda | opis |
+|--------|------|
+| ustaw_stan_zasilania(stan) | ustawia stan ACPI D0-D3 |
+| pobierz_stan_zasilania(void) | zwraca aktualny stan zasilania |
+| ustaw_zegar_graficzny(mhz) | ustawia zegar rdzenia GPU |
+| ustaw_zegar_pamieci(mhz) | ustawia zegar pamieci |
+| pobierz_zegar_graficzny(void) | zwraca zegar rdzenia MHz |
+| pobierz_zegar_pamieci(void) | zwraca zegar pamieci MHz |
+| pobierz_temperature(void) | zwraca temperature GPU |
+| ustaw_predkosc_wiatraka(obroty) | ustawia predkosc wiatraka RPM |
+| pobierz_predkosc_wiatraka(void) | zwraca predkosc wiatraka |
+| ustaw_rgb(kolor, tryb) | sterowanie podswietleniem RGB |
+| wylacz_rgb(void) | wylacza RGB |
+
+### swap chain i presentation
+
+| metoda | opis |
+|--------|------|
+| lancuch_stworz(szerokosc, wysokosc, vsync, alpha_premultiplied) | tworzy lancuch zamiany buforow |
+| lancuch_zniszcz(uchwyt) | niszczy lancuch |
+| prezentuj(lancuch) | prezentuje klatke (przelacza front/back buffer) |
+
+### command buffer
+
+| metoda | opis |
+|--------|------|
+| polecenia_rozpocznij() | rozpoczyna nagrywanie do command buffera |
+| polecenia_zakoncz() | konczy i oddaje command buffer do wykonania |
+| kontekst_pobierz(wyjscie) | zwraca aktualny kontekst graficzny |
+| int akceleracja_3d_dostepna(void) | 1 gdy akceleracja 3D aktywna |
+
+### API C
+
+wszystkie funkcje z prefixem `gtx3080_` otaczaja metody klasy `Gtx3080` i maja linkage C (np. `gtx3080_init`, `gtx3080_putpixel`, `gtx3080_shader_stworz`, `gtx3080_rysuj`, `gtx3080_oblicz_wyslij`, `gtx3080_prezentuj` itd.).
+
+### rejestry MMIO (wybrane)
+
+| rejestr | offset | opis |
+|---------|--------|------|
+| PGRAPH_CTX_CONTROL | 0x400800 | sterowanie kontekstem PGRAPH |
+| PFIFO_CACHE_DMA_PUT | 0x100200 | wskaźnik zapisu PFIFO |
+| PFIFO_CACHE_DMA_GET | 0x100204 | wskaźnik odczytu PFIFO |
+| PFIFO_CACHE_DMA_CTRL | 0x100208 | sterowanie PFIFO |
+| PBUS_PWR | 0x000200 | stan zasilania PCI |
+| PCLOCK_GFX | 0x000210 | zegar grafiki |
+| PCLOCK_MEM | 0x000214 | zegar pamięci |
+| PCOUNTER_TEMP | 0x000220 | licznik temperatury |
+| PFAN_PWM | 0x000224 | PWM wiatraka |
+| PFAN_RPM | 0x000228 | obroty wiatraka |
+| PRGB_CONTROL | 0x000230 | sterowanie RGB |
+| PRGB_COLOR | 0x000234 | kolor RGB |
+| DISP_CRTC_CONTROL | 0x600004 | sterowanie wyświetlaczem |
+| DISP_CRTC_H_TOTAL | 0x600008 | całkowita szerokość linii |
+| DISP_CRTC_V_TOTAL | 0x60000C | całkowita liczba linii |
+| DISP_CRTC_SURFACE | 0x600010 | adres powierzchni wyświetlania |
+| DISP_CRTC_PITCH | 0x600014 | krok pikseli powierzchni |
+| CURSOR_CONTROL | 0x600100 | sterowanie kursorem |
+| CURSOR_POSITION | 0x600104 | pozycja kursora |
+| CURSOR_BASE | 0x600108 | adres bitmapy kursora |
+| RT_CONTROL | 0x800000 | sterowanie celem renderowania |
+| RT_BASE0 | 0x800004 | adres celu renderowania 0 |
+| RT_PITCH0 | 0x800008 | krok celu renderowania 0 |
+| RT_FORMAT0 | 0x80000C | format celu renderowania 0 |
+| DS_CONTROL | 0x800010 | sterowanie depth-stencil |
+| DS_BASE | 0x800014 | adres depth-stencil |
+| DS_FORMAT | 0x800018 | format depth-stencil |
+| BLEND_CONTROL | 0x800020 | sterowanie mieszaniem |
+| BLEND_SRC | 0x800024 | źródło mieszania |
+| BLEND_DST | 0x800028 | cel mieszania |
+| BLEND_OP | 0x80002C | operacja mieszania |
+| RASTER_CONTROL | 0x800030 | sterowanie rasteryzacją |
+| RASTER_CULL | 0x800034 | odcinanie culling |
+| RASTER_FILL | 0x800038 | tryb wypełnienia |
+| ZS_CONTROL | 0x800040 | sterowanie głębokością |
+| ZS_FUNC | 0x800044 | funkcja porównania głębokości |
+| SHADER_PROGRAM | 0x900000 | aktywny program shader |
+| SHADER_CONSTANT | 0x900004 | bufor stałych shader |
+| SHADER_VTX_BASE | 0x900008 | bazowy bufor wierzchołków |
+| SHADER_VTX_STRIDE | 0x90000C | krok wierzchołków |
+| TEX_BASE | 0xA00000 | baza tekstur |
+| TEX_SAMPLER | 0xA00004 | probniki tekstur |
+| COMPUTE_PROGRAM | 0xB00000 | program compute shader |
+| COMPUTE_DIM | 0xB00004 | wymiary grup compute |
+| TIMESTAMP_LO | 0xC00000 | znacznik czasu niskie |
+| TIMESTAMP_HI | 0xC00004 | znacznik czasu wysokie |
+| VRAM_USAGE | 0xC00008 | użycie VRAM |
+| VRAM_TOTAL | 0xC0000C | całkowity VRAM |
+
+### integracja z driver managerem
+
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+
+```
+driver_manager_register("gtx3080", gtx3080_init, 0, 0, 4);
+```
+
+`gtx3080_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
+
