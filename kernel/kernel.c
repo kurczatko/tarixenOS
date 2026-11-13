@@ -5,51 +5,65 @@
 * ale najwazniejsze jest ze sie kompiluje
 */
 
-#include "../../drivers/keyboard.h"
-#include "../drivers/plyty_glowne/asus_p4p800.h"
-#include "../drivers/plyty_glowne/intel_915.h"
-#include "../drivers/mouse.h"
-#include "../drivers/usb/core/usb.h"
-#include "../drivers/usb/core/hid.h"
-#include "../drivers/usb/mouse/mouse.h"
-#include "../drivers/usb/keyboard/keyboard.h"
-#include "../system_plikow/system_plikow.h"
-#include "../graficzny/rysowanie.h"
-#include "../graficzny/menu_start.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/pulpit.h"
+/*includy*/
 
-#include "../drivers/sound/intel_hd.h"
-#include "../drivers/alc650.h"
-#include "../drivers/net.h"
-#include "../drivers/floppy.h"
-#include "../drivers/plyty.h"
-#include "../drivers/nvme.h"
-#include "../drivers/intel_uhd.h"
-#include "../drivers/karty_graficzne/gma_x4500.h"
-#include "../drivers/karty_graficzne/radeon_hd_8370d.h"
-#include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
-#include "../drivers/karty_graficzne/radeon_hd_6870.h"
-#include "../drivers/bluetooth/bluetooth.h"
-#include "../drivers/baterie/bateria.h"
-#include "../drivers/acpi/acpi.h"
-#include "../drivers/karty_graficzne/amd/r6000.h"
-#include "../drivers/karty_graficzne/nvidia/gtx3070.h"
-#include "../drivers/karty_graficzne/nvidia/gtx3080.h"
-#include "zegar.h"
-#include "notatnik.h"
-#include "kalkulator.h"
-#include "malowanie.h"
-#include "browser.h"
+#include <./../drivers/keyboard.h>
+#include <./drivers/plyty_glowne/asus_p4p800.h>
+#include <../drivers/plyty_glowne/intel_915.h>
+#include <../drivers/mouse.h>
+#include <../drivers/usb/core/usb.h>
+#include <../drivers/usb/core/hid.h>
+#include <../drivers/usb/mouse/mouse.h>
+#include <../drivers/usb/keyboard/keyboard.h>
+#include <../system_plikow/system_plikow.h>
+#include <../graficzny/rysowanie.h>
+#include <../graficzny/menu_start.h>
+#include <../graficzny/okno.h>
+#include <../graficzny/pulpit.h>
+
+#include <../drivers/sound/intel_hd.h>
+#include <../drivers/alc650.h>
+#include <../drivers/net.h>
+#include <../drivers/floppy.h>
+#include <../drivers/plyty.h>
+#include <../drivers/nvme.h>
+#include <../drivers/intel_uhd.h>
+#include <../drivers/karty_graficzne/gma_x4500.h>
+#include <../drivers/karty_graficzne/radeon_hd_8370d.h>
+#include <../drivers/karty_graficzne/radeon_rx_9070_xt.h>
+#include <../drivers/karty_graficzne/radeon_hd_6870.h>
+#include <../drivers/bluetooth/bluetooth.h>
+#include <../drivers/baterie/bateria.h>
+#include <../drivers/acpi/acpi.h>
+#include <../drivers/karty_graficzne/amd/r6000.h>
+#include <../drivers/karty_graficzne/nvidia/gtx3070.h>
+#include <../drivers/karty_graficzne/nvidia/gtx3080.h>
+#include <zegar.h>
+#include <notatnik.h>
+#include <kalkulator.h>
+#include <malowanie.h>
+#include <browser.h>
 #include <../user_land/konta.h>
-#include "gdt.h"
-#include "idt.h"
-#include "syscall.h"
-#include "../user_land/tapeta.h"
-#include "../drivers/karty_graficzne/radeon_rx_9070_xt.h"
-#include "../graficzny/podzespoly.h"
-#include "../graficzny/eksplorator_plikow.h"
-#include "panika.h"
+#include <gdt.h>
+#include <idt.h>
+#include <syscall.h>
+#include <../user_land/tapeta.h>
+#include <../drivers/karty_graficzne/radeon_rx_9070_xt.h>
+#include <../graficzny/podzespoly.h>
+#include <../graficzny/eksplorator_plikow.h>
+#include <panika.h>
+
+#include <proces.h>
+#include <driver_manager.h>
+#include <timer.h>
+#include <pik.h>
+#include <../drivers/qemu_vga.h>
+#include <../drivers/internet/rtl8111f.h>
+#include <../drivers/internet/rtl8111e.h>
+#include <../drivers/internet/rtl8168b.h>
+#include <../drivers/internet/rtl8188ce.h>
+
+/*wykrywanie sprzetu*/
 
 bool amd_r7_265_driver_init(void);
 bool amd_r7_265_driver_detected(void);
@@ -73,15 +87,6 @@ bool quickcam_driver_init(void);
 uint8_t quickcam_driver_detected(void);
 void quickcam_driver_shutdown(void);
 uint8_t quickcam_driver_poll(void);
-#include "proces.h"
-#include "driver_manager.h"
-#include "timer.h"
-#include "pik.h"
-#include "../drivers/qemu_vga.h"
-#include "../drivers/internet/rtl8111f.h"
-#include "../drivers/internet/rtl8111e.h"
-#include "../drivers/internet/rtl8168b.h"
-#include "../drivers/internet/rtl8188ce.h"
 
 extern struct okno *aktywne_okno;
 extern uint32_t __bss_start;
@@ -97,6 +102,8 @@ extern uint8_t tryb_tworz;
 extern struct okno pliki;
 extern uint8_t browser_opened;
 extern struct okno browser_window;
+
+/*obsluga wpisywania tekstu do okna*/
 
 void klawiatura_obsługa_aktywnego_okna(void)
 {
@@ -125,6 +132,8 @@ void klawiatura_obsługa_aktywnego_okna(void)
     }
 }
 
+/*uruchamianie piersszego procesu*/
+
 void proces_uruchom_pierwszy(struct proces *p) {
     struct tss *tss = gdt_tss();
     tss->esp0 = p->kernel_stack;
@@ -136,6 +145,8 @@ void proces_uruchom_pierwszy(struct proces *p) {
     uint32_t esp = p->regs.esp;
     userspace_uruchom(eip, esp);
 }
+
+/*glowna funkcja kernela*/
 
 void __attribute__((section(".text.entry"))) kernel_main(void)
 {
@@ -173,6 +184,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     * dlatego kazdy sterownik jest wywolywany w petli kernela
     * wiec prosze sie nie spłakiwać ze zżera 400 terabajtów ramu
     */
+
+    /*rejestracja sterownikow*/
     init_fs();
     driver_manager_register("floppy", floppy_init, 0, 0, 4);
     driver_manager_register("plyty", plyty_init, 0, 0, 4);
@@ -242,6 +255,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         net_init();
     }
     ustaw_status_internetu(net_ready());
+
+    /*glowna petla kernela*/
 
     while(1) {
         char tekst_czasu[9];
