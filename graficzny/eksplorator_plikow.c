@@ -10,6 +10,7 @@
 #include "../drivers/floppy.h"
 #include "../drivers/plyty.h"
 #include "../kernel/proces.h"
+#include "../kernel/loader.h"
 
 struct okno pliki;
 static int wybrany_element = -1;
@@ -196,6 +197,8 @@ static void obsluz_klik_plikow(int x, int y)
                 notatnik_otworz_plik(lista_plikow[klikniety_index].name);
             } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".TSI")) {
                 zainstaluj_pakiet_tsi(lista_plikow[klikniety_index].name);
+            } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".ELF")) {
+                proces_zaladuj_elf(lista_plikow[klikniety_index].name);
             }
         } else {
             wybrany_element = klikniety_index;

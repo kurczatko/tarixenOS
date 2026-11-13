@@ -9331,4 +9331,151 @@ stale:
 | AMD_SMU_MEM_CLOCK_CNTL | 0xA014 | zegar pamieci SMU |
 | AMD_SMU_POWER_STATE | 0xA018 | stan zasilania SMU |
 
+## sterownik baterii - drivers/baterie
+
+sterownik obsluguje baterie laptopowe przez kontroler EC (Embedded Controller) i protokole SBS (Smart Battery System). pliki: `drivers/baterie/bateria.h` i `drivers/baterie/bateria.cpp`. kompilowany jako C++ (`g++`, bez wyjatkow i RTTI) i laczony do jadra 32-bitowego.
+
+### architektura
+
+sterownik probuje dwie sciezki odczytu:
+
+1. SBS przez EC - polecenia SBS przesylane poczta EC (porty 0x66 komenda, 0x62 dane), odczyt napiecia, pradu, temperatury, pojemnosci, cykli i identyfikatorow.
+2. EC directamente - odczyty surowych rejestrow EC dla baterii bez obslugi SBS.
+
+wykrycie baterii: odczyt `SBS_PROJEKTOWA_POJEMNOSC` (0x11). jesli wartosc rozna od 0 i 0xFFFF, bateria jest uznana za inteligentna. w przeciwnym razie probowany jest rejestr EC 0x00.
+
+### enum stan_baterii
+
+| wartosc | nazwa | znaczenie |
+|---------|-------|-----------|
+| 0 | BATERIA_NIEZNANA | stan nie zostal określony |
+| 1 | BATERIA_ROZLADOWYWUJE_SIE | rozladowanie |
+| 2 | BATERIA_LADUJE_SIE | ladowanie |
+| 3 | BATERIA_PENA | pelne naladowanie |
+| 4 | BATERIA_KRYTYCZNA | poziom krytyczny |
+| 5 | BATERIA_BRAK_BATERII | bateria nieobecna |
+
+### struct bateria_info
+
+| pole | typ | opis |
+|------|-----|------|
+| procent | uint8_t | poziom naladowania 0-100 |
+| pojemnosc_aktualna_mah | uint32_t | aktualna pojemnosc mAh |
+| pojemnosc_projektowa_mah | uint32_t | pojemnosc projektowa mAh |
+| pojemnosc_pelna_mah | uint32_t | aktualna pelna pojemnosc mAh |
+| napiecie_mv | uint32_t | napiecie mV |
+| prad_ma | int32_t | prad mA (dodatni ladowanie) |
+| temperatura_c | int32_t | temperatura stopni C |
+| cykle_ladowania | uint16_t | liczba cykli |
+| zuzycie_procent | uint8_t | zuzycie baterii 0-100 |
+| czas_do_pelnego_min | uint32_t | szacowany czas do pelna |
+| czas_do_rozladowania_min | uint32_t | szacowany czas do rozladunku |
+| stan | enum stan_baterii | aktualny stan |
+| producent | char[32] | nazwa producenta |
+| model | char[32] | model baterii |
+| numer_seryjny | char[32] | numer seryjny |
+| chemia | char[16] | chemia ogniw |
+| dostepna | uint8_t | flaga obecnosci baterii |
+| ladowarka_podlaczone | uint8_t | flaga podlaczonej ladowarki |
+| inteligentna | uint8_t | flaga obslugi SBS |
+
+### klasa Bateria
+
+| metoda | opis |
+|--------|------|
+| Bateria() | konstruktor, zeruje stan |
+| int inicjalizuj(void) | wykrywa baterie, czytuje identyfikatory, inicjalizuje pomiary, zwraca 0 przy sukcesie |
+| void odswiez(void) | odczytuje pomiary, aktualizuje stan, wywoluje callback przy zmianie |
+| uint8_t czy_dostepna(void) | zwraca 1 jesli bateria wykryta |
+| void pobierz_info(struct bateria_info *info) | kopelnia pelnej struktury informacji |
+| uint8_t pobierz_procent(void) | poziom naladowania 0-100 |
+| uint32_t pobierz_pojemnosc_mah(void) | aktualna pojemnosc mAh |
+| uint32_t pobierz_napiecie_mv(void) | napiecie mV |
+| int32_t pobierz_prad_ma(void) | prad mA |
+| int32_t pobierz_temperature_c(void) | temperatura stopni C |
+| enum stan_baterii pobierz_stan(void) | aktualny stan baterii |
+| uint16_t pobierz_cykle(void) | liczba cykli ladowania |
+| uint8_t pobierz_zuzycie(void) | zuzycie w procentach |
+| uint32_t pobierz_czas_do_pelnego_min(void) | szacowany czas do pelnego naladowania |
+| uint32_t pobierz_czas_do_rozladowania_min(void) | szacowany czas do rozladunku |
+| uint8_t czy_ladowarka_podlaczone(void) | 1 gdy ladowarka podlaczone |
+| void ustaw_prog_krytyczny(uint8_t procent) | ustawia próg krytyczny (domyslnie 10) |
+| uint8_t pobierz_prog_krytyczny(void) | zwraca ustawiony próg |
+| uint8_t czy_krytyczny(void) | 1 gdy procent <= prog krytyczny |
+| void zarejestruj_callback(void (*)(enum stan_baterii)) | rejestruje funkcja wywolywana przy zmianie stanu |
+| void usun_callback(void) | usuwa zarejestrowany callback |
+
+### API C (dla kodu C)
+
+wszystkie funkcje z prefixes `bateria_` otaczaja metode klasy `Bateria` i maja linkage C: `bateria_init`, `bateria_odswiez`, `bateria_czy_dostepna`, `bateria_pobierz_info`, `bateria_pobierz_procent`, `bateria_pobierz_pojemnosc_mah`, `bateria_pobierz_napiecie_mv`, `bateria_pobierz_prad_ma`, `bateria_pobierz_temperature_c`, `bateria_pobierz_stan`, `bateria_pobierz_cykle`, `bateria_pobierz_zuzycie`, `bateria_pobierz_czas_do_pelnego_min`, `bateria_pobierz_czas_do_rozladowania_min`, `bateria_czy_ladowarka_podlaczone`, `bateria_ustaw_prog_krytyczny`, `bateria_pobierz_prog_krytyczny`, `bateria_czy_krytyczny`, `bateria_zarejestruj_callback`, `bateria_usun_callback`.
+
+### rejestry SBS (mapa sterownika)
+
+| polecenie | nazwa | opis |
+|-----------|-------|------|
+| 0x08 | SBS_TEMPERATURA | temperatura 0.1 K |
+| 0x09 | SBS_NAPIECIE | napiecie mV |
+| 0x0a | SBS_PRAD | prad mA |
+| 0x0d | SBS_STATUS | status baterii (flagi) |
+| 0x0e | SBS_CYKLE | liczba cykli ladowania |
+| 0x0f | SBS_POZOSTALA_POJEMNOSC | pozostal pojemnosc mAh |
+| 0x10 | SBS_PELNA_POJEMNOSC | pelna pojemnosc mAh |
+| 0x11 | SBS_PROJEKTOWA_POJEMNOSC | pojemnosc projektowa mAh |
+| 0x12 | SBS_NAPIECIE_PROJEKTOWE | napiecie projektowe mWh |
+| 0x13 | SBS_NUMER_SERYJNY | numer seryjny (lanuch) |
+| 0x14 | SBS_PRODUCENT | producent (lanuch) |
+| 0x15 | SBS_MODEL | model (lanuch) |
+| 0x16 | SBS_CHEMIA | chemia (lanuch) |
+
+flagi SBS_STATUS: 0x0001 rozladowanie, 0x0002 ladowanie, 0x0004 krytyczna, 0x0008 pelna, 0x0010 brak baterii, 0x0020 ladowarka podlaczone.
+
+### protokół EC
+
+porty: 0x66 komenda EC, 0x62 dane EC. komendy sterownika: 0x81 dostep do rejestru EC, 0x82 transakcja SBS. status EC: bit 0 OBF (output buffer full), bit 1 IBF (input buffer full). odblokowanie IBF przed zapisem, oczekiwanie na OBF przed odczytem, timeout 10000 iteracji.
+
+### obliczenia
+
+- procent = pojemnosc_aktualna * 100 / pojemnosc_pelna
+- zuzycie = 100 - (pojemnosc_pelna * 100 / pojemnosc_projektowa)
+- czas do pelna = (pojemnosc_pelna - pojemnosc_aktualna) * 60 / prad (przy ladowaniu)
+- czas do rozladunku = pojemnosc_aktualna * 60 / |prad| (przy rozladowaniu)
+- przy pradzie 0 czasy sa 0xFFFFFFFF (brak szacunku)
+
+### przyklad uzycia
+
+```c
+struct bateria_info info;
+bateria_init();
+bateria_odswiez();
+if (bateria_czy_dostepna()) {
+    bateria_pobierz_info(&info);
+    // info.procent, info.stan, info.napiecie_mv itd.
+}
+if (bateria_czy_krytyczny()) {
+    /* dzialanie awaryjne */
+}
+bateria_zarejestruj_callback(moja_funkcja_stanu);
+```
+
+### ikona baterii na pasku zadań
+
+jesli bateria zostanie wykryta, na pasku zadan (prawy dolny rog, przed ikona kamery i bluetooth) rysowana jest ikona baterii z aktualnym procentem naladowania:
+
+- obudowa baterii z wtyczka (gora) i wypełnieniem proporcjonalnym do poziomu naladowania
+- kolor wypełnienia: czerwony ponizej 15% lub w stanie krytycznym, zolty ponizej 40%, zielony powyzej, niebieski gdy ladowarka podlaczone
+- obok ikony wyswietlany jest tekst procentu, np. `78%`
+- ikona jest odswiezana przy kazdym wyolaniu `narysuj_pasek_zadan()` i znikaja gdy brak wykrytej baterii
+
+pozycja: `BATERIA_IKONA_X = EKRAN_SZEROKOSC - 106`, `BATERIA_IKONA_Y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 4`, rozmiar 24x22 pikseli.
+
+### integracja z driver managerem
+
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+
+```
+driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);
+```
+
+`bateria_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. `bateria_poll` wywoluje `bateria_odswiez()` w kazdej iteracji petli kernela (przez `driver_manager_poll_all()`), wiec ikona i procent na pasku sa stale aktualizowane. Nie ma potrzeby wywolywania `bateria_init` ani `bateria_odswiez` recznie z kodu kernela.
+
 

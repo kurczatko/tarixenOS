@@ -3,6 +3,7 @@
 #include "okno.h"
 #include "../system_plikow/system_plikow.h"
 #include "../../drivers/bluetooth/bluetooth.h"
+#include "../../drivers/baterie/bateria.h"
 #include "menu_start.h"
 
 #define CURSOR_W 12
@@ -490,6 +491,7 @@ void narysuj_pasek_zadan(void)
     narysuj_ikone_internetu();
     bluetooth_ui_rysuj_pasek();
     quickcam_ui_rysuj_pasek();
+    bateria_ui_rysuj_pasek();
     odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
 }
 
