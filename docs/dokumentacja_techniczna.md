@@ -9478,4 +9478,78 @@ driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);
 
 `bateria_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. `bateria_poll` wywoluje `bateria_odswiez()` w kazdej iteracji petli kernela (przez `driver_manager_poll_all()`), wiec ikona i procent na pasku sa stale aktualizowane. Nie ma potrzeby wywolywania `bateria_init` ani `bateria_odswiez` recznie z kodu kernela.
 
+## sterownik ACPI - drivers/acpi
+
+sterownik ACPI (Advanced Configuration and Power Interface) obsluguje wykrywanie tabel ACPI, stany uśpienia procesora (C-staty), stany wydajnosci (P-staty), czestotliwosc CPU, temperatura, wiatraki oraz zapne/reboot przez ACPI. pliki: `drivers/acpi/acpi.h` i `drivers/acpi/acpi.cpp`. kompilowany jako C++ i laczony do jadra 32-bitowego.
+
+### wykrywanie ACPI
+
+sterownik skanuje pamiec w zakresie 0xE0000-0xFFFF0 w poszukiwaniu sygnatury "RSD PTR " (tabela RSDP). nastepnie okresla czy uzywac XSDT (ACPI 2.0+) czy RSDT. z lokalizacji XSDT/RSDT wyszukiwana jest tabela FADT (Fixed ACPI Description Table), z ktorej pobierane sa adresy blokow sterowania zasilaniem PM1A/PM1B, latencje C-stat oraz inne informacje platformy.
+
+### struct acpi_platform_info
+
+| pole | typ | opis |
+|------|-----|------|
+| available | uint8_t | ACPI wykryte i dostepne |
+| pm1_available | uint8_t | bloki PM1 dostepne |
+| pm1a_cnt / pm1b_cnt | uint32_t | adresy rejestrow sterowania PM1 |
+| pm1a_evt / pm1b_evt | uint16_t | adresy rejestrow zdarzen PM1 |
+| c1_available / c2_available / c3_available | uint8_t | dostepnosc stanu C1/C2/C3 |
+| c2_latency / c3_latency | uint16_t | latencja wejscia w C2/C3 (mikrosekundy) |
+| pstate_available | uint8_t | czy dostepne P-staty (zmiana czestotliwosci) |
+| cpu_current_freq_mhz | uint32_t | aktualna czestotliwosc CPU MHz |
+| cpu_max_freq_mhz | uint32_t | maksymalna czestotliwosc CPU MHz |
+| cpu_min_freq_mhz | uint32_t | minimalna czestotliwosc CPU MHz |
+| thermal_available | uint8_t | czy dostepny odczyt temperatury |
+| cpu_temperature_c | int32_t | temperatura CPU w stopniach C |
+| fan_available | uint8_t | czy wiatrak jest wykryty |
+| fan_running | uint8_t | czy wiatrak pracuje |
+| fan_rpm | uint32_t | obroty wiatraka na minute |
+| throttling_available | uint8_t | czy dostepne ograniczenie wydajnosci |
+| throttling_active | uint8_t | czy ograniczenie jest aktywne |
+
+### klasa Acpi
+
+| metoda | opis |
+|--------|------|
+| Acpi() | konstruktor, zeruje stan |
+| int inicjalizuj(void) | skanuje RSDP/XSDT/RSDT, wczytuje FADT, inicjalizuje SCI, zwraca 0 przy sukcesie |
+| void odswiez(void) | odswieza dane termiczne i wiatraka |
+| uint8_t czy_dostepny(void) | 1 gdy ACPI wykryte |
+| struct acpi_platform_info *pobierz_info(void) | zwraca pelna struktura informacji platformy |
+| void wlacz_sci(void) | wlacza przerwania SCI (System Control Interrupt) w PM1A_CNT |
+| void wylacz_sci(void) | wylacza przerwania SCI |
+| uint16_t czytaj_pm1a_cnt(void) | odczytuje rejestr PM1A_CNT |
+| void zapisz_pm1a_cnt(uint16_t wartosc) | zapisuje do rejestru PM1A_CNT |
+| void wejdz_w_sleep(uint8_t stan) | wprowadza system w stan uśpienia ACPI (S1-S5) |
+| void zamknij(void) | wlacza stan S5 (zapne systemu) |
+| void zrestartuj(void) | resetuje komputer przez port 0xCF9 / ACPI reset |
+| int cpu_wejdz_w_cstate(int stan) | wprowadza CPU w stan C1 (hlt), C2 lub C3 |
+| int cpu_ustaw_pstate(uint8_t pstate) | ustawia P-state CPU (zmiana czestotliwosci) |
+| uint32_t cpu_pobierz_czestotliwosc_mhz(void) | zwraca aktualna czestotliwosc CPU w MHz |
+| int cpu_ogranicz(uint8_t procent) | ogranicza czestotliwosc CPU do podanego procentu (1-100) |
+| int wiatrak_pobierz_stan(void) | zwraca 1 gdy wiatrak wlaczony, -1 gdy niedostepny |
+| int wiatrak_ustaw_stan(uint8_t wlaczony) | wlacza/wylacza wiatrak |
+| uint32_t wiatrak_pobierz_obroty(void) | zwraca obroty wiatraka RPM |
+
+### API C (dla kodu C)
+
+wszystkie funkcje z prefixes `acpi_` otaczaja metode klasy `Acpi` i maja linkage C: `acpi_init`, `acpi_odswiez`, `acpi_czy_dostepny`, `acpi_info`, `acpi_wlacz_sci`, `acpi_wylacz_sci`, `acpi_czytaj_pm1a_cnt`, `acpi_zapisz_pm1a_cnt`, `acpi_wejdz_w_sleep`, `acpi_zamknij`, `acpi_zrestartuj`, `acpi_cpu_wejdz_w_cstate`, `acpi_cpu_ustaw_pstate`, `acpi_cpu_pobierz_czestotliwosc_mhz`, `acpi_cpu_ogranicz`, `acpi_wiatrak_pobierz_stan`, `acpi_wiatrak_ustaw_stan`, `acpi_wiatrak_pobierz_obroty`.
+
+### integracja z driver managerem
+
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+
+```
+driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
+```
+
+`acpi_init` wywoluje sie raz przy starcie systemu. `acpi_odswiez` wywoluje sie w kazdej iteracji petli kernela przez `driver_manager_poll_all()`, stale aktualizujac temperatura, obroty wiatraka i stan ograniczenia wydajnosci.
+
+### oszczedzanie energii
+
+- C-staty: `cpu_wejdz_w_cstate(1)` wywoluje `hlt` (C1), C2/C3 wywolują `hlt` z wyłączonymi przerwaniami (cli/sti) gdy są dostępne.
+- P-staty: `cpu_ogranicz(procent)` obniża czestotliwosc CPU proporcjonalnie, co zmniejsza pobor mocy i ciepło.
+- wiatrak: `wiatrak_ustaw_stan(1/0)` pozwala recznie sterowac chlodzeniem; przy temperaturze powyżej 80°C włączane jest automatyczne throttling.
+
 

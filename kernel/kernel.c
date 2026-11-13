@@ -32,6 +32,7 @@
 #include "../drivers/karty_graficzne/radeon_hd_6870.h"
 #include "../drivers/bluetooth/bluetooth.h"
 #include "../drivers/baterie/bateria.h"
+#include "../drivers/acpi/acpi.h"
 #include "zegar.h"
 #include "notatnik.h"
 #include "kalkulator.h"
@@ -197,6 +198,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("bluetooth", bluetooth_init, 0, bluetooth_poll, 2);
     driver_manager_register("mouse", mouse_init, 0, mouse_poll, 2);
     driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);
+    driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
