@@ -1,7 +1,7 @@
 #ifndef HDA_CODEC_H
 #define HDA_CODEC_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define HDA_CODEC_VENDOR_ID 0x8086
 #define HDA_CODEC_DEVICE_ID 0x9DC8

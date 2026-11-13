@@ -1,6 +1,6 @@
 #ifndef LIBC_SYSCALL_H
 #define LIBC_SYSCALL_H
-#include "types.h"
+#include <libc/types.h>
 
 #define SYSCALL_TAPETA_ZMIEN 0
 #define SYSCALL_TAPETA_POBIERZ 1
@@ -97,10 +97,6 @@ static inline char klawiatura_getchar(int *ctrl) {
     return (char)(ret & 0xFF);
 }
 
-static inline int proces_stworz(void (*entry)(void), const char *name, void *arg) {
-    return (int)syscall4(SYSCALL_PROCES_STWORZ, (uint32_t)entry, (uint32_t)name, (uint32_t)arg, 0);
-}
-
 static inline int proces_uruchom_elf(const char *path) {
     return (int)syscall1(SYSCALL_PROCES_URUCHOM_ELF, (uint32_t)path);
 }
@@ -109,16 +105,8 @@ static inline int proces_zaladuj_elf(const char *path) {
     return (int)syscall1(SYSCALL_PROCES_URUCHOM_ELF, (uint32_t)path);
 }
 
-static inline void proces_zakoncz(int pid) {
-    syscall1(SYSCALL_PROCES_ZAKONCZ, pid);
-}
-
 static inline void proces_yield(void) {
     syscall0(SYSCALL_PROCES_YIELD);
-}
-
-static inline int proces_pobierz_pid(void) {
-    return (int)syscall0(SYSCALL_PROCES_POBIERZ_PID);
 }
 
 #endif

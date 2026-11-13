@@ -1,8 +1,8 @@
-#include "konfiguracja.h"
-#include "../include/printf/printf.h"
-#include "../include/printf/vga.h"
-#include "../../drivers/keyboard.h"
-#include "../include/blue.h"
+#include <kernel/konfiguracja.h>
+#include <include/printf/printf.h>
+#include <include/printf/vga.h>
+#include <drivers/keyboard.h>
+#include <include/blue.h>
 
 void konfiguracja() { /* nie dotykać jeśli nie trzeba bo to raczej ważne co pierwsze widzi uzytkownik */
     keyboard_init();

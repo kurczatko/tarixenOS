@@ -1,7 +1,7 @@
 #ifndef BATERIA_H
 #define BATERIA_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 enum stan_baterii {
     BATERIA_NIEZNANA = 0,

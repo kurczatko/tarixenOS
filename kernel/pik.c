@@ -1,5 +1,5 @@
-#include "pik.h"
-#include "timer.h"
+#include <kernel/pik.h>
+#include <kernel/timer.h>
 
 void pik_init(void) {
     __asm__ volatile (

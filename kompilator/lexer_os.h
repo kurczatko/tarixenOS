@@ -1,6 +1,6 @@
 #ifndef CC_OS_LEXER_H
 #define CC_OS_LEXER_H
-#include "types.h"
+#include <kompilator/types.h>
 
 typedef enum {
     TOK_EOF, TOK_INT, TOK_RETURN, TOK_IF, TOK_ELSE, TOK_WHILE, TOK_PRINTF,

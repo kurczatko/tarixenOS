@@ -1,7 +1,7 @@
 #ifndef RADEON_RX_9070_XT_H
 #define RADEON_RX_9070_XT_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

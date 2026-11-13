@@ -1,6 +1,6 @@
 #ifndef LIBC_STRING_H
 #define LIBC_STRING_H
-#include "types.h"
+#include <libc/types.h>
 size_t strlen(const char *s);
 int strcmp(const char *a, const char *b);
 char *strcpy(char *d, const char *s);

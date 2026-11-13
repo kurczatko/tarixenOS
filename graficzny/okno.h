@@ -1,7 +1,7 @@
 #ifndef OKNO_H
 #define OKNO_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 typedef void (*okno_rysuj_zawartosc)(int x, int y, int szerokosc, int wysokosc);
 typedef void (*okno_obsluz_klik)(int x, int y);

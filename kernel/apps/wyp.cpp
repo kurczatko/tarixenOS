@@ -1,7 +1,7 @@
-#include "wyp.hpp"
-#include "../include/printf/printf.h"
-#include "../include/printf/vga.h"
-#include "../../drivers/keyboard.h"
+#include <kernel/apps/wyp.hpp>
+#include <include/printf/printf.h>
+#include <include/printf/vga.h>
+#include <drivers/keyboard.h>
 
 void wyp() { // funkcja wypisywania tekstu
     vga_init();

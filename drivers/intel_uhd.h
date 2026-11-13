@@ -1,7 +1,7 @@
 #ifndef INTEL_UHD_H
 #define INTEL_UHD_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define INTEL_UHD_VENDOR_ID 0x8086
 #define INTEL_UHD_FB_ADDR 0xFD000000U

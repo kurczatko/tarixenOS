@@ -1,4 +1,4 @@
-#include "codegen.h"
+#include <kompilator/codegen.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

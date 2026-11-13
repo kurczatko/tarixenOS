@@ -1,4 +1,4 @@
-#include "acpi.h"
+#include <drivers/acpi/acpi.h>
 
 static inline uint8_t inb(uint16_t port)
 {

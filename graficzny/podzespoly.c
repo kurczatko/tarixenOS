@@ -1,9 +1,9 @@
-#include "podzespoly.h"
-#include "czcionka.h"
-#include "okno.h"
-#include "rysowanie.h"
-#include "../kernel/driver_manager.h"
-#include "../include/printf/types.h"
+#include <graficzny/podzespoly.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <kernel/driver_manager.h>
+#include <include/printf/types.h>
 
 #define PODZESPOLY_SZEROKOSC 560
 #define PODZESPOLY_WYSOKOSC 420
@@ -65,7 +65,7 @@ static void podzespoly_rysuj(int x, int y, int szerokosc, int wysokosc)
     rysuj_tekst_chicago(x + 4, y, "PODZESPOLY SYSTEMU", 0x00334155);
     rysuj_tekst_chicago(x + 4, wy, "System:        TarixenOS", 0x00334155);
     rysuj_tekst_chicago(x + 4, wy + 20, "Architektura:    x86 (i386)", 0x00334155);
-    rysuj_tekst_chicago(x + 4, wy + 40, "Ekran:          1920 x 1080", 0x00334155);
+    rysuj_tekst_chicago(x + 4, wy + 40, "Ekran:          1024 x 768", 0x00334155);
     rysuj_tekst_chicago(x + 4, wy + 60, "Pamiec RAM:", 0x00334155);
     u32_do_tekstu(total_kb, buf);
     rysuj_tekst_chicago(x + 100, wy + 60, buf, 0x00334155);

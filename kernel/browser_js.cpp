@@ -1,4 +1,4 @@
-#include "browser_js.h"
+#include <kernel/browser_js.h>
 
 namespace {
 

@@ -1,11 +1,11 @@
-#include "gra.h"
-#include "../drivers/keyboard.h"
-#include "../drivers/mouse.h"
-#include "../graficzny/rysowanie.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/czcionka.h"
-#include "../include/printf/types.h"
-#include "../proces.h"
+#include <kernel/apps/gra.h>
+#include <drivers/keyboard.h>
+#include <drivers/mouse.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/okno.h>
+#include <graficzny/czcionka.h>
+#include <include/printf/types.h>
+#include <kernel/proces.h>
 
 extern uint32_t *obraz;
 

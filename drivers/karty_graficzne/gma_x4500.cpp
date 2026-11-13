@@ -1,4 +1,4 @@
-#include "gma_x4500.h"
+#include <drivers/karty_graficzne/gma_x4500.h>
 
 /*funkcje we/wy portow*/
 

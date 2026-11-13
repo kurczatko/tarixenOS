@@ -1,5 +1,5 @@
-#include "timer.h"
-#include "proces.h"
+#include <kernel/timer.h>
+#include <kernel/proces.h>
 
 void timer_handler(void) {
     proces_tick();

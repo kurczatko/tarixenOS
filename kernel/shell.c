@@ -1,22 +1,22 @@
-#include "shell.h"
-#include "../include/printf/printf.h"
-#include "../include/printf/vga.h"
-#include "../../drivers/keyboard.h"
-#include "../../drivers/mouse.h"
-#include "../graficzny/menu_start.h"
-#include "../kernel/apps/kaka.h"
-#include "../kernel/apps/pakiet.h"
-#include "../kernel/apps/calc.h"
-#include "../kernel/apps/appdownload/appdownload.h"
-#include "../kernel/apps/wyp.hpp"
-#include "../kernel/apps/kalendarz.h"
-#include "panika.h"
-#include "../scripts/mem.h"
-#include "../include/blue.h"
-#include "../user_land/konta.h"
-#include "../system_plikow/system_plikow.h"
-#include "syscals/random.h"
-#include "shutdown.h"
+#include <kernel/shell.h>
+#include <include/printf/printf.h>
+#include <include/printf/vga.h>
+#include <drivers/keyboard.h>
+#include <drivers/mouse.h>
+#include <graficzny/menu_start.h>
+#include <kernel/apps/kaka.h>
+#include <kernel/apps/pakiet.h>
+#include <kernel/apps/calc.h>
+#include <kernel/apps/appdownload/appdownload.h>
+#include <kernel/apps/wyp.hpp>
+#include <kernel/apps/kalendarz.h>
+#include <kernel/panika.h>
+#include <scripts/mem.h>
+#include <include/blue.h>
+#include <user_land/konta.h>
+#include <system_plikow/system_plikow.h>
+#include <kernel/syscals/random.h>
+#include <kernel/shutdown.h>
 
 void shell() {
     vga_init();

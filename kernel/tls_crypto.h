@@ -1,7 +1,7 @@
 #ifndef TLS_CRYPTO_H
 #define TLS_CRYPTO_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 struct sha256_context {
     uint32_t state[8];

@@ -1,6 +1,6 @@
-#include "../graficzny/okno.h"
-#include "../graficzny/rysowanie.h"
-#include "tapeta.h"
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <user_land/tapeta.h>
 
 static struct okno okno;
 

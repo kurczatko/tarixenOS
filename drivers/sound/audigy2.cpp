@@ -1,5 +1,5 @@
-#include "audigy2.h"
-#include "../../include/printf/vga.h"
+#include <drivers/sound/audigy2.h>
+#include <include/printf/vga.h>
 
 #define AUDIGY2_VENDOR_ID 0x1102
 #define AUDIGY2_DEVICE_ID 0x0004

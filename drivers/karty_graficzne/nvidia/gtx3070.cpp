@@ -1,4 +1,4 @@
-#include "gtx3070.h"
+#include <drivers/karty_graficzne/nvidia/gtx3070.h>
 
 static inline uint8_t inb(uint16_t port)
 {

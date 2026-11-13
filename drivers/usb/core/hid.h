@@ -1,7 +1,7 @@
 #ifndef HID_H
 #define HID_H
 
-#include "../core/usb.h"
+#include <drivers/usb/core/usb.h>
 
 typedef void (*hid_keyboard_callback)(uint8_t keycode, uint8_t pressed);
 typedef void (*hid_mouse_callback)(int8_t dx, int8_t dy, int8_t dz, uint8_t buttons);

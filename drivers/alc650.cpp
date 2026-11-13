@@ -1,4 +1,4 @@
-#include "alc650.h"
+#include <drivers/alc650.h>
 
 static inline uint8_t inb(uint16_t port)
 {

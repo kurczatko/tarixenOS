@@ -1,6 +1,6 @@
-#include "../okno_user.h"
-#include "syscall.h"
-#include "../libc/string.h"
+#include <user_land/okno_user.h>
+#include <kernel/syscall.h>
+#include <libc/string.h>
 
 #define BROWSER_SZEROKOSC 760
 #define BROWSER_WYSOKOSC 570

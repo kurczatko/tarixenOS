@@ -1,5 +1,5 @@
-#include "codegen.h"
-#include "lexer.h"
+#include <kompilator/codegen.h>
+#include <kompilator/lexer.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

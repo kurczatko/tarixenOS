@@ -1,6 +1,6 @@
-#include "keyboard.h"
-#include "mouse.h"
-#include "../include/printf/types.h"
+#include <drivers/keyboard.h>
+#include <drivers/mouse.h>
+#include <include/printf/types.h>
 
 uint8_t inb(uint16_t port) {
     uint8_t ret;

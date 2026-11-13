@@ -1,7 +1,7 @@
 #ifndef CC_OS_CODEGEN_H
 #define CC_OS_CODEGEN_H
-#include "types.h"
-#include "lexer_os.h"
+#include <kompilator/types.h>
+#include <kompilator/lexer_os.h>
 
 typedef struct {
     char name[64];

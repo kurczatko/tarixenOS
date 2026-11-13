@@ -1,7 +1,7 @@
 #ifndef QEMU_VGA_H
 #define QEMU_VGA_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define QEMU_VGA_VENDOR_ID 0x1AB8
 #define QEMU_STD_VGA_VENDOR_ID 0x8086

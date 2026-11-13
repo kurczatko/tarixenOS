@@ -1,7 +1,7 @@
-#include "kaka.h"
-#include "../include/printf/printf.h"
-#include "../include/printf/vga.h"
-#include "../../drivers/keyboard.h"
+#include <kernel/apps/kaka.h>
+#include <include/printf/printf.h>
+#include <include/printf/vga.h>
+#include <drivers/keyboard.h>
 
 void kaka() {
     keyboard_init();

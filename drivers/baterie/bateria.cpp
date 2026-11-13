@@ -1,4 +1,4 @@
-#include "bateria.h"
+#include <drivers/baterie/bateria.h>
 
 #define PORT_EC_KOMENDA 0x66
 #define PORT_EC_DANE 0x62
@@ -652,8 +652,8 @@ void bateria_poll(void)
 }
 
 extern "C" {
-#include "../graficzny/rysowanie.h"
-#include "../graficzny/czcionka.h"
+#include <graficzny/rysowanie.h>
+#include <graficzny/czcionka.h>
 }
 
 #define BATERIA_IKONA_X (EKRAN_SZEROKOSC - 106)

@@ -1,7 +1,7 @@
 #ifndef GTX3010_H
 #define GTX3010_H
 
-#include <printf/types.h>
+#include <include/printf/types.h>
 
 #define GTX3010_VENDOR_ID 0x10DEU
 #define GTX3010_DEVICE_ID_GA106_3010 0x2560U

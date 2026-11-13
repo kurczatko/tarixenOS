@@ -1,7 +1,7 @@
 #ifndef OKNO_USER_H
 #define OKNO_USER_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define SYSCALL_EKRAN_PIKSEL 3
 #define SYSCALL_EKRAN_PROSTOKAT 4

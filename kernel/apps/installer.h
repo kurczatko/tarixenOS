@@ -1,7 +1,7 @@
 #ifndef INSTALLER_H
 #define INSTALLER_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define TSI_MAGIC 0x49534954
 

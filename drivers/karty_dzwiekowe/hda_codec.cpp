@@ -1,5 +1,5 @@
-#include "hda_codec.h"
-#include "../../include/printf/vga.h"
+#include <drivers/karty_dzwiekowe/hda_codec.h>
+#include <include/printf/vga.h>
 
 static inline uint8_t inb(uint16_t port)
 {

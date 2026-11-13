@@ -45,6 +45,8 @@
 #include <drivers/karty_graficzne/nvidia/gtx3070.h>
 #include <drivers/karty_graficzne/nvidia/gtx3080.h>
 #include <drivers/karty_graficzne/nvidia/gtx3010.h>
+#include <drivers/karty_graficzne/nvidia/gtx2010.h>
+#include <drivers/karty_graficzne/nvidia/gtx2010.h>
 #include <zegar.h>
 #include <notatnik.h>
 #include <kalkulator.h>
@@ -108,6 +110,9 @@ extern uint8_t tryb_tworz;
 extern struct okno pliki;
 extern uint8_t browser_opened;
 extern struct okno browser_window;
+
+void userspace_uruchom(uint32_t eip, uint32_t esp);
+void syscall_install(void);
 
 /*obsluga wpisywania tekstu do okna*/
 
@@ -225,6 +230,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("gtx3070", gtx3070_init, 0, 0, 4);
     driver_manager_register("gtx3080", gtx3080_init, 0, 0, 4);
     driver_manager_register("gtx3010", gtx3010_init, 0, 0, 4);
+    driver_manager_register("gtx2010", gtx2010_init, 0, 0, 4);
+    driver_manager_register("gtx2010", gtx2010_init, 0, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);

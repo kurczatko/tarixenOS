@@ -1,11 +1,11 @@
-#include "../graficzny/rysowanie.h"
-#include "../graficzny/czcionka.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/pulpit.h"
-#include "../drivers/keyboard.h"
-#include "../system_plikow/system_plikow.h"
-#include "../kernel/tls_crypto.h"
-#include "konta.h"
+#include <graficzny/rysowanie.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <graficzny/pulpit.h>
+#include <drivers/keyboard.h>
+#include <system_plikow/system_plikow.h>
+#include <kernel/tls_crypto.h>
+#include <user_land/konta.h>
 
 static int konto_strlen(const char *s)
 {

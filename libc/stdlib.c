@@ -1,5 +1,5 @@
-#include "stdlib.h"
-#include "syscall.h"
+#include <libc/stdlib.h>
+#include <libc/syscall.h>
 static uint32_t heap_ptr = 0;
 static uint32_t rand_state = 1;
 void *malloc(size_t size) {

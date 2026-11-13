@@ -1,7 +1,7 @@
 #ifndef RADEON_HD6000_H
 #define RADEON_HD6000_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define RADEON_HD6000_VENDOR_ID 0x1002U
 

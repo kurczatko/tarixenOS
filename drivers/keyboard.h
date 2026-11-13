@@ -1,7 +1,7 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 // porty
 #define KEYBOARD_DATA_PORT 0x60

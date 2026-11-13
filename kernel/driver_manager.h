@@ -1,7 +1,7 @@
 #ifndef DRIVER_MANAGER_H
 #define DRIVER_MANAGER_H
 
-#include "../kernel/proces.h"
+#include <kernel/proces.h>
 
 #define MAX_DRIVERS 64
 

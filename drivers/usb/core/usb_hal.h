@@ -1,7 +1,7 @@
 #ifndef USB_HAL_H
 #define USB_HAL_H
 
-#include "../../../include/printf/types.h"
+#include <include/printf/types.h>
 
 
 uint8_t usb_hal_inb(uint16_t port);

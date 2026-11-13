@@ -1,7 +1,7 @@
 #ifndef ALC1150_H
 #define ALC1150_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define ALC1150_VENDOR_ID 0x10EC
 #define ALC1150_DEVICE_ID 0x1150

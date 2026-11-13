@@ -1,5 +1,5 @@
-#include "keyboard.h"
-#include "../core/hid.h"
+#include <drivers/usb/keyboard/keyboard.h>
+#include <drivers/usb/core/hid.h>
 
 static uint8_t shift_pressed = 0;
 static uint8_t caps_lock = 0;

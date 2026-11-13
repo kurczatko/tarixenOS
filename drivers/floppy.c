@@ -1,4 +1,4 @@
-#include "floppy.h"
+#include <drivers/floppy.h>
 
 #define FLOPPY_DOR  0x3F2
 #define FLOPPY_MSR  0x3F4

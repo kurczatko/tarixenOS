@@ -1,6 +1,6 @@
-#include "rysowanie.h"
-#include "okno.h"
-#include "czcionka.h"
+#include <graficzny/rysowanie.h>
+#include <graficzny/okno.h>
+#include <graficzny/czcionka.h>
 
 #define KAMERA_OKNO_SZEROKOSC 320
 #define KAMERA_OKNO_WYSOKOSC 240

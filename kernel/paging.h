@@ -1,7 +1,7 @@
 #ifndef PAGING_H
 #define PAGING_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define PAGE_SIZE       4096
 #define PAGE_PRESENT    0x00000001

@@ -1,10 +1,10 @@
-#include "notatnik.h"
-#include "../drivers/keyboard.h"
-#include "../graficzny/czcionka.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/rysowanie.h"
-#include "../system_plikow/system_plikow.h"
-#include "proces.h"
+#include <kernel/notatnik.h>
+#include <drivers/keyboard.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <system_plikow/system_plikow.h>
+#include <kernel/proces.h>
 
 #define NOTATNIK_PLIK "NOTATKA.NTF"
 #define NOTATNIK_MAKS 512

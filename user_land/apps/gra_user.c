@@ -1,5 +1,5 @@
-#include "../okno_user.h"
-#include "syscall.h"
+#include <user_land/okno_user.h>
+#include <kernel/syscall.h>
 
 #define GRA_MAP_W 16
 #define GRA_MAP_H 16

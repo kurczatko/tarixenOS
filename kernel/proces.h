@@ -1,15 +1,15 @@
 #ifndef PROCES_H
 #define PROCES_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "paging.h"
-#include "gdt.h"
-#include "graficzny/okno.h"
+#include <kernel/paging.h>
+#include <kernel/gdt.h>
+#include <graficzny/okno.h>
 
 #define MAX_PROCESSES 64
 #define MAX_OKNA_PROCESU 8

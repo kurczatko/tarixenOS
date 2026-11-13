@@ -1,6 +1,6 @@
-#include "idt.h"
-#include "gdt.h"
-#include "wyjatki.h"
+#include <kernel/idt.h>
+#include <kernel/gdt.h>
+#include <kernel/wyjatki.h>
 
 static struct idt_entry idt[256];
 static struct idt_ptr idtp;

@@ -1,7 +1,7 @@
 #ifndef GTX3070_H
 #define GTX3070_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define GTX3070_VENDOR_ID 0x10DEU
 #define GTX3070_DEVICE_ID_GA104_3070 0x648CU

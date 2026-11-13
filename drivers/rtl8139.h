@@ -1,7 +1,7 @@
 #ifndef RTL8139_H
 #define RTL8139_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 int rtl8139_init(void);
 int rtl8139_is_ready(void);

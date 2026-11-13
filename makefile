@@ -131,10 +131,10 @@ $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	$(CC32) $(CFLAGS32) -c $< -o $@
 
 $(TAPETA_RAW): tapety/IMG_0449.JPEG | $(BUILD_DIR)
-	magick $< -auto-orient -resize 1920x1080! -depth 8 BGRA:$@
+	magick $< -auto-orient -resize 1024x768! -depth 8 BGRA:$@
 
 $(TAPETA_JASNA_RAW): tapety/IMG_0395.JPEG | $(BUILD_DIR)
-	magick $< -auto-orient -resize 1920x1080! -depth 8 BGRA:$@
+	magick $< -auto-orient -resize 1024x768! -depth 8 BGRA:$@
 
 $(BUILD_DIR)/%64.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)

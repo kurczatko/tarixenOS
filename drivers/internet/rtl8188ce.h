@@ -1,7 +1,7 @@
 #ifndef RTL8188CE_H
 #define RTL8188CE_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,4 +1,4 @@
-#include "radeon_hd_6870.h"
+#include <drivers/karty_graficzne/radeon_hd_6870.h>
 
 static inline uint8_t inb(uint16_t port)
 {

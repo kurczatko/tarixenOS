@@ -1,7 +1,7 @@
 #ifndef VGA_H
 #define VGA_H
 
-#include "types.h"
+#include <include/printf/types.h>
 
 void vga_init();
 void vga_draw_top_bar(void);

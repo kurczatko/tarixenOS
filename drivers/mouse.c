@@ -1,12 +1,12 @@
-#include "mouse.h"
-#include "../include/printf/types.h"
-#include "../include/printf/vga.h"
-#include "../graficzny/rysowanie.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/menu_start.h"
-#include "../graficzny/pulpit.h"
-#include "../kernel/browser.h"
-#include "bluetooth/bluetooth.h"
+#include <drivers/mouse.h>
+#include <include/printf/types.h>
+#include <include/printf/vga.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/okno.h>
+#include <graficzny/menu_start.h>
+#include <graficzny/pulpit.h>
+#include <kernel/browser.h>
+#include <drivers/bluetooth/bluetooth.h>
 
 #define MOUSE_DATA_PORT 0x60
 #define MOUSE_STATUS_PORT 0x64

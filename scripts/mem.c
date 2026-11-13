@@ -1,7 +1,7 @@
-#include "mem.h"
-#include "../include/printf/printf.h"
-#include "../include/printf/vga.h"
-#include "../include/printf/types.h"
+#include <scripts/mem.h>
+#include <include/printf/printf.h>
+#include <include/printf/vga.h>
+#include <include/printf/types.h>
 
 static inline void outb(uint16_t port, uint8_t val) {
     asm volatile("outb %0, %1" : : "a"(val), "Nd"(port));

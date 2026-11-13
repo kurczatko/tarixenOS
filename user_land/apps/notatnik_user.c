@@ -1,6 +1,6 @@
-#include "../okno_user.h"
-#include "syscall.h"
-#include "syscall.h"
+#include <user_land/okno_user.h>
+#include <kernel/syscall.h>
+#include <kernel/syscall.h>
 
 #define NOTATNIK_PLIK "NOTATKA.NTF"
 #define NOTATNIK_MAKS 512

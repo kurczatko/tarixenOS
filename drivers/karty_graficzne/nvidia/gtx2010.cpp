@@ -1,4 +1,4 @@
-#include <gtx2010.h>
+#include <drivers/karty_graficzne/nvidia/gtx2010.h>
 
 static inline uint8_t inb(uint16_t port)
 {

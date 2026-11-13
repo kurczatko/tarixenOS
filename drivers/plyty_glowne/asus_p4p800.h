@@ -1,7 +1,7 @@
 #ifndef ASUS_P4P800_H
 #define ASUS_P4P800_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

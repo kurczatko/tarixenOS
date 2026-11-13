@@ -1,8 +1,8 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
-#include "../include/printf/types.h"
-#include "userspace.h"
+#include <include/printf/types.h>
+#include <kernel/userspace.h>
 
 #define SYSCALL_TAPETA_ZMIEŃ 0
 #define SYSCALL_TAPETA_POBIERZ 1

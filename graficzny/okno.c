@@ -1,8 +1,8 @@
-#include "okno.h"
-#include "czcionka.h"
-#include "rysowanie.h"
-#include "pulpit.h"
-#include "menu_start.h"
+#include <graficzny/okno.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/pulpit.h>
+#include <graficzny/menu_start.h>
 
 #define KOLOR_RAMKI 0x00787C82
 #define KOLOR_PASKA 0x00787C82

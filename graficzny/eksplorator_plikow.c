@@ -1,16 +1,16 @@
-#include "eksplorator_plikow.h"
-#include "okno.h"
-#include "rysowanie.h"
-#include "czcionka.h"
-#include "../system_plikow/system_plikow.h"
-#include "../kernel/apps/installer.h"
-#include "../kernel/notatnik.h"
-#include "../drivers/keyboard.h"
-#include "../kompilator/cc_os.h"
-#include "../drivers/floppy.h"
-#include "../drivers/plyty.h"
-#include "../kernel/proces.h"
-#include "../kernel/loader.h"
+#include <graficzny/eksplorator_plikow.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/czcionka.h>
+#include <system_plikow/system_plikow.h>
+#include <kernel/apps/installer.h>
+#include <kernel/notatnik.h>
+#include <drivers/keyboard.h>
+#include <kompilator/cc_os.h>
+#include <drivers/floppy.h>
+#include <drivers/plyty.h>
+#include <kernel/proces.h>
+#include <kernel/loader.h>
 
 struct okno pliki;
 static int wybrany_element = -1;

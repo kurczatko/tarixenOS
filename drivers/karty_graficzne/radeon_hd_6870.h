@@ -1,7 +1,7 @@
 #ifndef RADEON_HD_6870_H
 #define RADEON_HD_6870_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

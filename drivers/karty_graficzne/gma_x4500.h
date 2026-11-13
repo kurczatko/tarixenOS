@@ -1,7 +1,7 @@
 #ifndef GMA_X4500_H
 #define GMA_X4500_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

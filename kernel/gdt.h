@@ -1,7 +1,7 @@
 #ifndef GDT_H
 #define GDT_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 /* Selektory segmentow GDT (indeks << 3). */
 #define GDT_NULL          0x00

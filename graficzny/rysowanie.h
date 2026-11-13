@@ -1,14 +1,14 @@
 #ifndef RYSOWANIE_H
 #define RYSOWANIE_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 struct okno;
 
 #define PASEK_ICON_START_X 80
+#define EKRAN_SZEROKOSC 1024
 
-#define EKRAN_SZEROKOSC 1920
-#define EKRAN_WYSOKOSC 1080
+#define EKRAN_WYSOKOSC 768
 #define PASEK_ZADAN_WYSOKOSC 30
 
 #define KOLOR_CZARNY    0x00000000

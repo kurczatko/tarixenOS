@@ -1,11 +1,11 @@
-#include "pulpit.h"
-#include "okno.h"
-#include "rysowanie.h"
-#include "czcionka.h"
-#include "../system_plikow/system_plikow.h"
-#include "../drivers/keyboard.h"
-#include "../kernel/notatnik.h"
-#include "../kernel/loader.h"
+#include <graficzny/pulpit.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/czcionka.h>
+#include <system_plikow/system_plikow.h>
+#include <drivers/keyboard.h>
+#include <kernel/notatnik.h>
+#include <kernel/loader.h>
 
 extern void zainstaluj_pakiet_tsi(const char *nazwa_pliku);
 

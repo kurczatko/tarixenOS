@@ -1,4 +1,4 @@
-#include "lexer.h"
+#include <kompilator/lexer.h>
 #include <string.h>
 
 static int iskw(const char *s, const char *kw) { return strcmp(s, kw) == 0; }

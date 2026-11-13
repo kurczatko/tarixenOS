@@ -1,4 +1,4 @@
-#include <gtx3010.h>
+#include <drivers/karty_graficzne/nvidia/gtx3010.h>
 
 static inline uint8_t inb(uint16_t port)
 {

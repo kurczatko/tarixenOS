@@ -1,6 +1,6 @@
-#include "plyty.h"
-#include "../include/printf/printf.h"
-#include "../system_plikow/system_plikow.h"
+#include <drivers/plyty.h>
+#include <include/printf/printf.h>
+#include <system_plikow/system_plikow.h>
 
 static inline void ply_outb(uint16_t port, uint8_t value) {
     __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));

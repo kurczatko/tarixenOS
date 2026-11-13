@@ -1,6 +1,6 @@
-#include "codegen_os.h"
-#include "../include/printf/types.h"
-#include "../system_plikow/system_plikow.h"
+#include <kompilator/codegen_os.h>
+#include <include/printf/types.h>
+#include <system_plikow/system_plikow.h>
 
 static uint8_t cg_heap[131072];
 static int cg_heap_pos = 0;

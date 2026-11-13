@@ -1,7 +1,7 @@
 #ifndef ACPI_H
 #define ACPI_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 struct acpi_rsdp {
     char signature[8];

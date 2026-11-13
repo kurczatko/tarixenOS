@@ -1,4 +1,4 @@
-#include "r6000.h"
+#include <drivers/karty_graficzne/amd/r6000.h>
 
 static inline uint8_t inb(uint16_t port)
 {

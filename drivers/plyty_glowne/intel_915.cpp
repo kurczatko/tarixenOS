@@ -1,4 +1,4 @@
-#include "intel_915.h"
+#include <drivers/plyty_glowne/intel_915.h>
 
 static inline void i915_outb(uint16_t port, uint8_t value)
 {

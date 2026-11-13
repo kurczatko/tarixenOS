@@ -1,13 +1,13 @@
-#include "browser.h"
-#include "tls_client.h"
-#include "../drivers/net.h"
-#include "../drivers/keyboard.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/rysowanie.h"
-#include "../graficzny/czcionka.h"
-#include "browser_css.h"
-#include "browser_js.h"
-#include "proces.h"
+#include <kernel/browser.h>
+#include <kernel/tls_client.h>
+#include <drivers/net.h>
+#include <drivers/keyboard.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/czcionka.h>
+#include <kernel/browser_css.h>
+#include <kernel/browser_js.h>
+#include <kernel/proces.h>
 
 #define BROWSER_WIDTH 760
 #define BROWSER_HEIGHT 570

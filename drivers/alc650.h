@@ -1,7 +1,7 @@
 #ifndef ALC650_H
 #define ALC650_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

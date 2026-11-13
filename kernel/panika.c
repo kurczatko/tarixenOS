@@ -1,5 +1,5 @@
-#include "panika.h"
-#include "../include/printf/printf.h"
+#include <kernel/panika.h>
+#include <include/printf/printf.h>
 
 void panika(const char *powod)
 {

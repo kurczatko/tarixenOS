@@ -1,6 +1,6 @@
-#include "mouse.h"
-#include "../core/hid.h"
-#include "../../../graficzny/rysowanie.h"
+#include <drivers/usb/mouse/mouse.h>
+#include <drivers/usb/core/hid.h>
+#include <graficzny/rysowanie.h>
 
 static int usb_mouse_x = 0;
 static int usb_mouse_y = 0;

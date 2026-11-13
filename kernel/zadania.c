@@ -1,9 +1,9 @@
-#include "zadania.h"
-#include "../graficzny/czcionka.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/rysowanie.h"
-#include "../kernel/proces.h"
-#include "../kernel/driver_manager.h"
+#include <kernel/zadania.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <kernel/proces.h>
+#include <kernel/driver_manager.h>
 
 #define ZADANIA_SZEROKOSC 560
 #define ZADANIA_WYSOKOSC 420

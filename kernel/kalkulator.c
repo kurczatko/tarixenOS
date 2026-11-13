@@ -1,9 +1,9 @@
-#include "kalkulator.h"
-#include "../drivers/keyboard.h"
-#include "../graficzny/czcionka.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/rysowanie.h"
-#include "proces.h"
+#include <kernel/kalkulator.h>
+#include <drivers/keyboard.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <kernel/proces.h>
 
 #define KALKULATOR_SZEROKOSC 320
 #define KALKULATOR_WYSOKOSC 420

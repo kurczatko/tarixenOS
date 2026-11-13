@@ -1,6 +1,6 @@
-#include "driver_manager.h"
-#include "proces.h"
-#include "../include/printf/printf.h"
+#include <kernel/driver_manager.h>
+#include <kernel/proces.h>
+#include <include/printf/printf.h>
 
 static void driver_idle_poll(void)
 {

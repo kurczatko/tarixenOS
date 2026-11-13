@@ -1,10 +1,10 @@
-#include "rysowanie.h"
-#include "czcionka.h"
-#include "okno.h"
-#include "../system_plikow/system_plikow.h"
-#include "../../drivers/bluetooth/bluetooth.h"
-#include "../../drivers/baterie/bateria.h"
-#include "menu_start.h"
+#include <graficzny/rysowanie.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <system_plikow/system_plikow.h>
+#include <drivers/bluetooth/bluetooth.h>
+#include <drivers/baterie/bateria.h>
+#include <graficzny/menu_start.h>
 
 #define CURSOR_W 12
 #define CURSOR_H 18

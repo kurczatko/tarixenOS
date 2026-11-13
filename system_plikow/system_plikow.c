@@ -1,7 +1,7 @@
-#include "system_plikow.h"
-#include "../include/printf/printf.h"
-#include "../drivers/floppy.h"
-#include "../drivers/plyty.h"
+#include <system_plikow/system_plikow.h>
+#include <include/printf/printf.h>
+#include <drivers/floppy.h>
+#include <drivers/plyty.h>
 
 #define FAT32_EOC 0x0FFFFFF8
 #define FAT32_FREE 0

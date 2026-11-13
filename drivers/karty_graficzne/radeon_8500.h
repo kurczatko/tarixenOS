@@ -1,7 +1,7 @@
 #ifndef RADEON_8500_H
 #define RADEON_8500_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

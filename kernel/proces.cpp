@@ -1,7 +1,7 @@
-#include "proces.h"
-#include "timer.h"
-#include "idt.h"
-#include "../include/printf/printf.h"
+#include <kernel/proces.h>
+#include <kernel/timer.h>
+#include <kernel/idt.h>
+#include <include/printf/printf.h>
 
 struct proces process_table[MAX_PROCESSES];
 struct proces *current_cpu[SMP_MAX_CPUS] = {0};

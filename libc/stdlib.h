@@ -1,6 +1,6 @@
 #ifndef LIBC_STDLIB_H
 #define LIBC_STDLIB_H
-#include "types.h"
+#include <libc/types.h>
 void *malloc(size_t size);
 void free(void *p);
 void exit(int code);

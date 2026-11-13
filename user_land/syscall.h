@@ -1,7 +1,7 @@
 #ifndef USERLAND_SYSCALL_H
 #define USERLAND_SYSCALL_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define SYSCALL_TAPETA_ZMIEN 0
 #define SYSCALL_TAPETA_POBIERZ 1

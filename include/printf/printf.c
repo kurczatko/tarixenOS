@@ -5,10 +5,10 @@
 * tekstu vga.
 */
 
-#include "printf.h"
-#include "serial.h"
-#include "types.h"
-#include "stdarg.h"
+#include <include/printf/printf.h>
+#include <include/printf/serial.h>
+#include <include/printf/types.h>
+#include <include/printf/stdarg.h>
 
 
 static void print_int(int value) {

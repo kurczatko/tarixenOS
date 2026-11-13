@@ -1,5 +1,5 @@
-#include "../okno_user.h"
-#include "syscall.h"
+#include <user_land/okno_user.h>
+#include <kernel/syscall.h>
 
 #define KALKULATOR_SZEROKOSC 320
 #define KALKULATOR_WYSOKOSC 420

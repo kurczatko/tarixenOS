@@ -1,7 +1,7 @@
 #ifndef GTX2010_H
 #define GTX2010_H
 
-#include <printf/types.h>
+#include <include/printf/types.h>
 
 #define GTX2010_VENDOR_ID 0x10DEU
 #define GTX2010_DEVICE_ID_GA106_2010 0x1F00U

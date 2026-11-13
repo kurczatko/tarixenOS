@@ -1,4 +1,4 @@
-#include "radeon_8500.h"
+#include <drivers/karty_graficzne/radeon_8500.h>
 
 static inline uint8_t inb8500(uint16_t port)
 {

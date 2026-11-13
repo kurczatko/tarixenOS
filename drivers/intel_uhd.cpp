@@ -1,4 +1,4 @@
-#include "intel_uhd.h"
+#include <drivers/intel_uhd.h>
 
 static inline uint8_t inb(uint16_t port)
 {

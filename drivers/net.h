@@ -1,7 +1,7 @@
 #ifndef NET_H
 #define NET_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 int net_init(void);
 int net_ready(void);

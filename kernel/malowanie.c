@@ -1,11 +1,11 @@
-#include "malowanie.h"
-#include "../graficzny/czcionka.h"
-#include "../graficzny/okno.h"
-#include "../graficzny/rysowanie.h"
-#include "../system_plikow/system_plikow.h"
-#include "../drivers/keyboard.h"
-#include "../include/printf/types.h"
-#include "proces.h"
+#include <kernel/malowanie.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/okno.h>
+#include <graficzny/rysowanie.h>
+#include <system_plikow/system_plikow.h>
+#include <drivers/keyboard.h>
+#include <include/printf/types.h>
+#include <kernel/proces.h>
 
 extern uint32_t *obraz;
 

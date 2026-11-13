@@ -4,7 +4,7 @@
 * a nie w ring 0
 */
 
-#include "gdt.h"
+#include <kernel/gdt.h>
 
 static struct gdt_entry gdt[GDT_ENTRIES];
 static struct gdt_ptr gp;

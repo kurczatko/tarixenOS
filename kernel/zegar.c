@@ -1,4 +1,4 @@
-#include "zegar.h"
+#include <kernel/zegar.h>
 
 #define CMOS_INDEX 0x70
 #define CMOS_DATA 0x71

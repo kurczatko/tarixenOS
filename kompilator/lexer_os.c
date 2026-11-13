@@ -1,4 +1,4 @@
-#include "lexer_os.h"
+#include <kompilator/lexer_os.h>
 
 static int os_strcmp(const char *s, const char *kw) {
     while (*s && *s == *kw) { s++; kw++; }

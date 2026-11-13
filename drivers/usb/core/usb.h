@@ -1,8 +1,8 @@
 #ifndef USB_H
 #define USB_H
 
-#include "../../../include/printf/types.h"
-#include "usb_hal.h"
+#include <include/printf/types.h>
+#include <drivers/usb/core/usb_hal.h>
 
 #define USB_CLASS_HID          0x03
 #define USB_CLASS_MASS_STORAGE 0x08

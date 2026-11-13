@@ -1,5 +1,5 @@
-#include "installer.h"
-#include "../../system_plikow/system_plikow.h"
+#include <kernel/apps/installer.h>
+#include <system_plikow/system_plikow.h>
 
 #define ELF_MAGIC 0x464C457F
 

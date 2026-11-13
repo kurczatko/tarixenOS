@@ -1,10 +1,10 @@
-#include "net.h"
-#include "e1000.h"
-#include "rtl8139.h"
-#include "internet/rtl8168b.h"
-#include "internet/rtl8188ce.h"
-#include "internet/rtl8111e.h"
-#include "internet/rtl8111f.h"
+#include <drivers/net.h>
+#include <drivers/e1000.h>
+#include <drivers/rtl8139.h>
+#include <drivers/internet/rtl8168b.h>
+#include <drivers/internet/rtl8188ce.h>
+#include <drivers/internet/rtl8111e.h>
+#include <drivers/internet/rtl8111f.h>
 
 extern int intel_82578dc_driver_init(void);
 extern int intel_82578dc_driver_detected(void);

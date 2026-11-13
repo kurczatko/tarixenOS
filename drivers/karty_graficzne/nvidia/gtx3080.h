@@ -1,7 +1,7 @@
 #ifndef GTX3080_H
 #define GTX3080_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define GTX3080_VENDOR_ID 0x10DEU
 #define GTX3080_DEVICE_ID_GA102_3080 0x2204U

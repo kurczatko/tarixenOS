@@ -1,10 +1,10 @@
-#include "../system_plikow/system_plikow.h"
-#include "../include/printf/types.h"
-#include "paging.h"
-#include "syscall.h"
-#include "userspace.h"
-#include "../include/printf/vga.h"
-#include "proces.h"
+#include <system_plikow/system_plikow.h>
+#include <include/printf/types.h>
+#include <kernel/paging.h>
+#include <kernel/syscall.h>
+#include <kernel/userspace.h>
+#include <include/printf/vga.h>
+#include <kernel/proces.h>
 
 #define ELF_MAGIC 0x464C457F
 #define PT_LOAD 1

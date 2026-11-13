@@ -1,9 +1,9 @@
-#include "lexer_os.h"
-#include "codegen_os.h"
-#include "../include/printf/printf.h"
-#include "../system_plikow/system_plikow.h"
-#include "../kernel/loader.h"
-#include "../include/printf/types.h"
+#include <kompilator/lexer_os.h>
+#include <kompilator/codegen_os.h>
+#include <include/printf/printf.h>
+#include <system_plikow/system_plikow.h>
+#include <kernel/loader.h>
+#include <include/printf/types.h>
 
 #define BASE_ADDR 0x00100000
 #define SYSCALL_OKNO_STWORZ 6

@@ -1,6 +1,6 @@
-#include "czcionka.h"
-#include "rysowanie.h"
-#include "chicago_font_data.h"
+#include <graficzny/czcionka.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/chicago_font_data.h>
 
 void rysuj_znak_chicago(int x, int y, char znak, unsigned int kolor)
 {

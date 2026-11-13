@@ -1,7 +1,7 @@
 #ifndef VT1611_H
 #define VT1611_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define VT1611_VENDOR_ID 0x1106
 #define VT1611_DEVICE_ID 0x3182

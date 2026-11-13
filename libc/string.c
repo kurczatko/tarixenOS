@@ -1,4 +1,4 @@
-#include "string.h"
+#include <libc/string.h>
 size_t strlen(const char *s) { size_t n = 0; while (s[n]) n++; return n; }
 int strcmp(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; } return (unsigned char)*a - (unsigned char)*b; }
 char *strcpy(char *d, const char *s) { char *o = d; while (*s) { *d++ = *s++; } *d = 0; return o; }

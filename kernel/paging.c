@@ -1,4 +1,4 @@
-#include "paging.h"
+#include <kernel/paging.h>
 
 __attribute__((aligned(4096))) static uint32_t page_directory[1024];
 __attribute__((aligned(4096))) static uint32_t page_table_low[1024];

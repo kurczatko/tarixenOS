@@ -1,7 +1,7 @@
 #ifndef NVME_H
 #define NVME_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 struct nvme_id_controller {
     uint16_t vid;

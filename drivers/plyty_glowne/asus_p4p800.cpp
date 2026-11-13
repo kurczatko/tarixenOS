@@ -1,4 +1,4 @@
-#include "asus_p4p800.h"
+#include <drivers/plyty_glowne/asus_p4p800.h>
 
 static inline void p4p_outb(uint16_t port, uint8_t value)
 {

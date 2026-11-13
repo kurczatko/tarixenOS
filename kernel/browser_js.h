@@ -1,7 +1,7 @@
 #ifndef BROWSER_JS_H
 #define BROWSER_JS_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

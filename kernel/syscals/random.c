@@ -1,4 +1,4 @@
-#include "random.h"
+#include <kernel/syscals/random.h>
 
 static uint64_t rng_state = 0xACE123456789ULL;
 static int rdrand_supported = -1;

@@ -1,7 +1,7 @@
 #ifndef CZCIONKA_H
 #define CZCIONKA_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 extern const unsigned char font_olivetti_8x8[128][8][8];
 extern const unsigned char font_olivetti_12x16[128][16][12];

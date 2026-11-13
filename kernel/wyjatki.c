@@ -1,6 +1,6 @@
-#include "wyjatki.h"
-#include "panika.h"
-#include "../include/printf/printf.h"
+#include <kernel/wyjatki.h>
+#include <kernel/panika.h>
+#include <include/printf/printf.h>
 
 static const char *wyjatek_nazwa(uint32_t numer)
 {

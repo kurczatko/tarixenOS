@@ -1,4 +1,4 @@
-#include "radeon_rx_9070_xt.h"
+#include <drivers/karty_graficzne/radeon_rx_9070_xt.h>
 
 static inline uint8_t inb(uint16_t port)
 {

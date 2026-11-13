@@ -1,4 +1,4 @@
-#include "qemu_vga.h"
+#include <drivers/qemu_vga.h>
 
 static inline uint8_t inb(uint16_t port)
 {

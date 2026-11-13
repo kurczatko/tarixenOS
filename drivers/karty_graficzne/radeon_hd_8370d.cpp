@@ -1,4 +1,4 @@
-#include "radeon_hd_8370d.h"
+#include <drivers/karty_graficzne/radeon_hd_8370d.h>
 
 /*funkcje io portow*/
 

@@ -1,7 +1,7 @@
 #ifndef USERSPACE_H
 #define USERSPACE_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 void userspace_uruchom(uint32_t wejscie, uint32_t stos);
 

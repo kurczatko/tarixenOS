@@ -1,7 +1,7 @@
 #ifndef PLITY_H
 #define PLITY_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

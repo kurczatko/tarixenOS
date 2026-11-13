@@ -1,7 +1,7 @@
 #ifndef INTEL_915_H
 #define INTEL_915_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,5 +1,5 @@
-#include "hid.h"
-#include "usb.h"
+#include <drivers/usb/core/hid.h>
+#include <drivers/usb/core/usb.h>
 
 #define HID_MAX_DEVICES 4
 #define HID_REQ_GET_REPORT       0x01

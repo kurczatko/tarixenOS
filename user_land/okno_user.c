@@ -1,5 +1,5 @@
-#include "okno_user.h"
-#include "libc/syscall.h"
+#include <user_land/okno_user.h>
+#include <libc/syscall.h>
 
 okno_user_t *obecne_okno = 0;
 okno_user_t *aktywne_okno = 0;

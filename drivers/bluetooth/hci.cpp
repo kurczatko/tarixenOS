@@ -1,7 +1,7 @@
-#include "bluetooth.h"
+#include <drivers/bluetooth/bluetooth.h>
 
 extern "C" {
-#include "../usb/core/usb.h"
+#include <drivers/usb/core/usb.h>
 }
 
 /*funkcje we/wy portow*/

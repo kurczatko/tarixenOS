@@ -1,7 +1,7 @@
 #ifndef KONTA_H
 #define KONTA_H
 
-#include "../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define KONTA_MAKS_UZYTKOWNIKOW 32
 #define KONTA_MAX_NAZWA 32

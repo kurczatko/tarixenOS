@@ -1,16 +1,16 @@
-#include "menu_start.h"
-#include "czcionka.h"
-#include "rysowanie.h"
-#include "okno.h"
-#include "../drivers/mouse.h"
-#include "../kernel/shutdown.h"
-#include "../kernel/notatnik.h"
-#include "eksplorator_plikow.h"
-#include "../kernel/browser.h"
-#include "../kernel/kalkulator.h"
-#include "../kernel/apps/gra.h"
-#include "../kernel/malowanie.h"
-#include "../kernel/zadania.h"
+#include <graficzny/menu_start.h>
+#include <graficzny/czcionka.h>
+#include <graficzny/rysowanie.h>
+#include <graficzny/okno.h>
+#include <drivers/mouse.h>
+#include <kernel/shutdown.h>
+#include <kernel/notatnik.h>
+#include <graficzny/eksplorator_plikow.h>
+#include <kernel/browser.h>
+#include <kernel/kalkulator.h>
+#include <kernel/apps/gra.h>
+#include <kernel/malowanie.h>
+#include <kernel/zadania.h>
 
 #define START_X 0
 #define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)

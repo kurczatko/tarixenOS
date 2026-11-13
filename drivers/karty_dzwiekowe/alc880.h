@@ -1,7 +1,7 @@
 #ifndef ALC880_H
 #define ALC880_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 #define ALC880_VENDOR_ID 0x10EC
 #define ALC880_DEVICE_ID 0x0880

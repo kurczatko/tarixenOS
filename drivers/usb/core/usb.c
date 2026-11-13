@@ -1,5 +1,5 @@
-#include "../../../include/printf/types.h"
-#include "usb.h"
+#include <include/printf/types.h>
+#include <drivers/usb/core/usb.h>
 
 #define PCI_CONFIG_ADDRESS 0xCF8
 #define PCI_CONFIG_DATA    0xCFC

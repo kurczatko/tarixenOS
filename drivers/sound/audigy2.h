@@ -1,7 +1,7 @@
 #ifndef AUDIGY2_H
 #define AUDIGY2_H
 
-#include "../../include/printf/types.h"
+#include <include/printf/types.h>
 
 class Audigy2 {
 public:

@@ -1,7 +1,7 @@
 #ifndef USB_STORAGE_H
 #define USB_STORAGE_H
 
-#include "../core/usb.h"
+#include <drivers/usb/core/usb.h>
 
 void usb_storage_init(void);
 void usb_storage_poll(void);

@@ -1,6 +1,6 @@
-#include "stdio.h"
-#include "syscall.h"
-#include "stdarg.h"
+#include <libc/stdio.h>
+#include <libc/syscall.h>
+#include <include/printf/stdarg.h>
 static void write_char(char c) {
     libc_syscall(SYSCALL_WRITE_CONSOLE, (uint32_t)&c, 1, 0);
 }

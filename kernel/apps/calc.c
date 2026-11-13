@@ -1,7 +1,7 @@
-#include "calc.h"
-#include "../include/printf/printf.h"
-#include "../include/printf/vga.h"
-#include "../../drivers/keyboard.h"
+#include <kernel/apps/calc.h>
+#include <include/printf/printf.h>
+#include <include/printf/vga.h>
+#include <drivers/keyboard.h>
 
 void calc() {
         keyboard_init();

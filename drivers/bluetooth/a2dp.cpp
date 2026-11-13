@@ -1,5 +1,5 @@
-#include "bluetooth.h"
-#include "../usb/core/usb.h"
+#include <drivers/bluetooth/bluetooth.h>
+#include <drivers/usb/core/usb.h>
 
 /*warstwa a2dp - dystrybucja dzwieku zaawansowana dla sluchawek bluetooth pelna implementacja*/
 
