@@ -9552,4 +9552,158 @@ driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
 - P-staty: `cpu_ogranicz(procent)` obniża czestotliwosc CPU proporcjonalnie, co zmniejsza pobor mocy i ciepło.
 - wiatrak: `wiatrak_ustaw_stan(1/0)` pozwala recznie sterowac chlodzeniem; przy temperaturze powyżej 80°C włączane jest automatyczne throttling.
 
+## sterownik grafiki AMD Radeon HD 6000 - drivers/karty_graficzne/amd/r6000
+
+zaawansowany sterownik kart graficznych AMD Radeon HD 6000 (Barts, Cayman, Turks) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa, tekstury, shadery (wierzcholkowe, pikselowe, geometrii, obliczeniowe), render targety, depth-stencil, command buffer, presentation oraz zarzadzanie zasilaniem i chlodzeniem. pliki: `drivers/karty_graficzne/amd/r6000.h` i `drivers/karty_graficzne/amd/r6000.cpp`. kompilowany jako C++ i laczony do jadra 32-bitowego.
+
+### wykrywanie urzadzenia
+
+sterownik skanuje szyne PCI w poszukiwaniu urzadzenia klasy 0x03 (grafika) z vendor ID 0x1002 (AMD) i device ID z serii HD 6000 (Barts, Cayman, Turks). po wykryciu odczytuje BAR0 (adres MMIO), wlacza dostep do pamieci i rejestrów poleceń, inicjalizuje ring buffer Command Processor (CP), pamiec VRAM oraz wyswietlacz (CRTC/DCN).
+
+### klasa RadeonHD6000
+
+| metoda | opis |
+|--------|------|
+| RadeonHD6000() | konstruktor, zeruje stan wszystkich buforow, tekstur, shaderow i kontekstu |
+| int inicjalizuj(void) | wykrywa karte PCI, inicjalizuje MMIO, ring buffer, VRAM, wyswietlacz, resetuje potok graficzny |
+| void zamknij(void) | zatrzymuje CP i dezaktywuje sterownik |
+| uint8_t czy_gotowy(void) | 1 gdy sterownik zainicjalizowany |
+| void putpixel(x, y, kolor) | rysuje pojedynczy piksel w framebufferze |
+| void fillrect(x, y, w, h, kolor) | wypelnia prostokat kolorem |
+| void blt(dst_x, dst_y, src_x, src_y, w, h) | kopiuje blok pikseli (bitblt) |
+| void cursor_set(x, y, obraz) | ustawia kursor myszy i jego bitmape |
+| void cursor_hide(void) | ukrywa kursor |
+| void *get_fb(void) | zwraca wskaznik do framebuffera |
+| uint32_t get_szerokosc(void) | szerokosc framebuffera |
+| uint32_t get_wysokosc(void) | wysokosc framebuffera |
+| uint16_t get_device_id(void) | identyfikator urzadzenia PCI |
+| uint8_t get_rewizja(void) | rewizja ukladu |
+| void info_pobierz(struct radeon_hd6000_info *wyjscie) | pelne informacje o urzadzeniu |
+
+### zarzadzanie pamiecia VRAM
+
+| metoda | opis |
+|--------|------|
+| uint64_t vram_alokuj(rozmiar, typ) | alokuje blok w VRAM, zwraca offset lub HANDLE_NULL |
+| void vram_zwolnij(uchwyt) | zwalnia blok VRAM |
+| uint64_t vram_uzyto(void) | uzyta pamiec VRAM |
+| uint64_t vram_calkowicie(void) | calkowita pamiec VRAM |
+
+### obiekty graficzne (bufory, tekstury, shaders, stany)
+
+sterownik obsluguje tworzenie, niszczenie, aktualizacje i wiazanie:
+- buforow wierzcholkow (`bufor_wierzcholkow_stworz/zniszcz/zaktualizuj`)
+- buforow indeksow (`bufor_indeksow_stworz/zniszcz/zaktualizuj`)
+- tekstur z mipmapami (`tekstura_stworz/zniszcz/zaktualizuj/wygeneruj_mipmapy`)
+- celow renderowania (`cel_renderowania_stworz/zniszcz`)
+- buforow glebi-stencil (`bufor_glebii_stworz/zniszcz`)
+- shaderow wierzcholkowych, pikselowych, geometrii i obliczeniowych (`shader_stworz/zniszcz/skompiluj`)
+- stanu probnika (`stan_probnika_stworz/zniszcz`)
+- stanu mieszania alpha (`stan_mieszania_stworz/zniszcz`)
+- stanu rasteryzacji (`stan_rasteryzacji_stworz/zniszcz`)
+- stanu glebi-stencil (`stan_glebii_stencil_stworz/zniszcz`)
+- ukladow wejścia (`uklad_wejsc_stworz/zniszcz`)
+- buforow stalych (`bufor_stale_stworz/zniszcz/zaktualizuj`)
+
+### wiazanie i rysowanie 3D
+
+| metoda | opis |
+|--------|------|
+| powiaz_bufor_wierzcholkow(uchwyt) | wiaze aktywny bufor wierzcholkow |
+| powiaz_shader_wierzcholkow/pikseli/geometrii/obliczeniowy(uchwyt) | wiaze shader danego typu |
+| powiaz_cel_renderowania(uchwyt) | wiaze cel renderowania (framebuffer wyjsciowy) |
+| powiaz_bufor_glebii(uchwyt) | wiaze bufor glebi |
+| powiaz_stan_mieszania/rasteryzacji/glebii_stencil(uchwyt) | wiaze stany potoku |
+| powiaz_probnik_i_teksture(gniazdo, probnik, tekstura) | wiaze probnik i teksture do gniazda |
+| powiaz_bufor_stale(gniazdo, uchwyt) | wiaze bufor stalych |
+| ustaw_viewport(x, y, w, h, min_glebia, max_glebia) | ustawia okno widoku |
+| ustaw_scissor(lewa, gora, prawa, dol) | ustawia region odciecia |
+| ustaw_typ_pierwotnego(typ) | ustawia typ primitive (punkt, linia, trojkat, kwad) |
+| ustaw_mieszanie_alpha_globalne(wlacz) | globalne mieszanie alpha |
+| wyczysc_cel_renderowania(cel, kolor) | czyści cel renderowania |
+| wyczysc_bufor_glebii(bufor, glebia, stencil) | czyści bufor glebi-stencil |
+| rysuj(liczba_wierzcholkow, pierwszy) | rysuje geometryczne primitive |
+| rysuj_indeksowane(liczba_indeksow, pierwszy_indeks, baza) | rysuje z indeksami |
+| rysuj_indeksowane_instancjonowane(...) | rysuje instancjonowane |
+| rysuj_po_indirekcie(adres, liczba, krok) | rysowanie po indirekcie |
+
+### compute i synchronizacja
+
+| metoda | opis |
+|--------|------|
+| oblicz_wyslij(grupa_x, grupa_y, grupa_z) | wysyla zadanie compute shader |
+| oblicz_wyslij_po_indirekcie(adres) | compute po indirekcie |
+| ogrodzenie_stworz/sygnalizuj/poczekaj/zniszcz | ogrodzenia (fences) |
+| semafor_stworz/sygnalizuj/poczekaj/zniszcz | semafory |
+| int czekaj_na_bezczynnosc(timeout_us) | czeka na bezczynnosc GPU |
+| uint64_t znacznik_czasu(void) | zwraca znacznik czasu GPU |
+
+### zasilanie, zegary, temperatura, wiatrak, RGB
+
+| metoda | opis |
+|--------|------|
+| ustaw_stan_zasilania(stan) | ustawia stan ACPI D0-D3 |
+| pobierz_stan_zasilania(void) | zwraca aktualny stan zasilania |
+| ustaw_zegar_graficzny(mhz) | ustawia zegar rdzenia GPU |
+| ustaw_zegar_pamieci(mhz) | ustawia zegar pamieci |
+| pobierz_zegar_graficzny(void) | zwraca zegar rdzenia MHz |
+| pobierz_zegar_pamieci(void) | zwraca zegar pamieci MHz |
+| pobierz_temperature(void) | zwraca temperature GPU |
+| ustaw_predkosc_wiatraka(obroty) | ustawia predkosc wiatraka RPM |
+| pobierz_predkosc_wiatraka(void) | zwraca predkosc wiatraka |
+| ustaw_rgb(kolor, tryb) | sterowanie podswietleniem RGB |
+| wylacz_rgb(void) | wylacza RGB |
+
+### swap chain i presentation
+
+| metoda | opis |
+|--------|------|
+| lancuch_stworz(szerokosc, wysokosc, vsync, alpha_premultiplied) | tworzy lancuch zamiany buforow |
+| lancuch_zniszcz(uchwyt) | niszczy lancuch |
+| prezentuj(lancuch) | prezentuje klatke (przelacza front/back buffer) |
+
+### command buffer
+
+| metoda | opis |
+|--------|------|
+| polecenia_rozpocznij() | rozpoczyna nagrywanie do command buffera |
+| polecenia_zakoncz() | konczy i oddaje command buffer do wykonania |
+| kontekst_pobierz(wyjscie) | zwraca aktualny kontekst graficzny |
+| int akceleracja_3d_dostepna(void) | 1 gdy akceleracja 3D aktywna |
+
+### API C
+
+wszystkie funkcje z prefixem `radeon_hd6000_` otaczaja metody klasy `RadeonHD6000` i maja linkage C (np. `radeon_hd6000_init`, `radeon_hd6000_putpixel`, `radeon_hd6000_shader_stworz`, `radeon_hd6000_rysuj`, `radeon_hd6000_oblicz_wyslij`, `radeon_hd6000_prezentuj` itd.).
+
+### rejestry MMIO (wybrane)
+
+| rejestr | offset | opis |
+|---------|--------|------|
+| CP_ME_CNTL | 0x08BC | sterowanie Command Processor |
+| CP_ME_RB_ADDR | 0x08C4 | adres ring buffer |
+| CP_ME_RB_SIZE | 0x08C8 | rozmiar ring buffer |
+| CP_ME_RB_WPTR | 0x08CC | wskaznik zapisu ring buffer |
+| CP_ME_RB_RPTR | 0x08D0 | wskaznik odczytu ring buffer |
+| INT_STAT | 0x0100 | status przerwan |
+| GFX_CLOCK_CNTL | 0x1000 | zegar grafiki |
+| MEMORY_CLOCK_CNTL | 0x1004 | zegar pamieci |
+| POWER_STATE | 0x1010 | stan zasilania |
+| THERMAL_TEMP | 0x1014 | temperatura GPU |
+| FAN_PWM | 0x1018 | PWM wiatraka |
+| FAN_RPM | 0x101C | obroty wiatraka |
+| CB_TARGET0_BASE | 0x8800 | adres celu renderowania 0 |
+| DB_Z_INFO | 0x8A00 | format bufora glebi |
+| SQ_CONFIG | 0x9800 | konfiguracja shaderow |
+| SQ_PROGRAM | 0x9860 | aktywny program shader |
+| DCN_CRTC_CONTROL | 0x2004 | sterowanie wyswietlaczem |
+
+### integracja z driver managerem
+
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+
+```
+driver_manager_register("radeon_hd6000", radeon_hd6000_init, 0, 0, 4);
+```
+
+`radeon_hd6000_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
 
