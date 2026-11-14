@@ -401,6 +401,43 @@ void rysuj_kwadrat(int x, int y, int bok, uint32_t kolor)
     rysuj_prostokat(x, y, bok, bok, kolor);
 }
 
+void rysuj_okrag(int x0, int y0, int promien, uint32_t kolor)
+{
+    int x = promien;
+    int y = 0;
+    int blad = 1 - promien;
+
+    while (x >= y) {
+        rysuj_piksel(x0 + x, y0 + y, kolor);
+        rysuj_piksel(x0 - x, y0 + y, kolor);
+        rysuj_piksel(x0 + x, y0 - y, kolor);
+        rysuj_piksel(x0 - x, y0 - y, kolor);
+        rysuj_piksel(x0 + y, y0 + x, kolor);
+        rysuj_piksel(x0 - y, y0 + x, kolor);
+        rysuj_piksel(x0 + y, y0 - x, kolor);
+        rysuj_piksel(x0 - y, y0 - x, kolor);
+        y++;
+        if (blad < 0) {
+            blad += 2 * y + 1;
+        } else {
+            x--;
+            blad += 2 * (y - x + 1);
+        }
+    }
+}
+
+void wypelnij_okrag(int x0, int y0, int promien, uint32_t kolor)
+{
+    int r2 = promien * promien;
+    for (int y = -promien; y <= promien; y++) {
+        int dx = promien;
+        while (dx > 0 && dx * dx + y * y > r2) {
+            dx--;
+        }
+        rysuj_prostokat(x0 - dx, y0 + y, 2 * dx, 1, kolor);
+    }
+}
+
 static void narysuj_kursor_bitmapa(int x, int y)
 {
     for (int cy = 0; cy < CURSOR_H; cy++) {
