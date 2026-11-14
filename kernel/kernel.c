@@ -232,7 +232,6 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("gtx3080", gtx3080_init, 0, 0, 4);
     driver_manager_register("gtx3010", gtx3010_init, 0, 0, 4);
     driver_manager_register("gtx2010", gtx2010_init, 0, 0, 4);
-    driver_manager_register("gtx2010", gtx2010_init, 0, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
