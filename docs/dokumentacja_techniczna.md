@@ -5264,6 +5264,274 @@ przetwarza przerwania i aktualizuje stan sterownika.
 void poll(void);
 ```
 
+## sterownik kontrolera Thunderbolt 4 / USB 3.2 - drivers/kontrolery/thunderbolt4.cpp
+
+zaawansowany sterownik kontrolera Thunderbolt 4 i USB 3.2 napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenia 0x15D8/0x43ED/0x1579), mapowanie MMIO, inicjalizacje kontrolera Thunderbolt 4, skanowanie portow (USB-C, Thunderbolt 4, DisplayPort, PCIe), wykrywanie i konfiguracje urzadzen podlaczanych do portow, tworzenie i zarzadzanie domenami Thunderbolt, autoryzacje urzadzen, zarzadzanie zasilaniem (power management), monitorowanie temperatury, ustawianie poziomu bezpieczenstwa (security level), resetowanie kontrolera, przetwarzanie przerwan (hot-plug, zmiana lacza, usuniecie urzadzenia, zmiana domeny, bledy) oraz statystyki sterownika (transfery USB 3.2 i Thunderbolt 4). klasa Thunderbolt4 jest singletonem dostepna przez `Thunderbolt4::instance()`. integracja przez driver manager z funkcjami C `thunderbolt4_init`, `thunderbolt4_shutdown`, `thunderbolt4_poll`.
+
+### thunderbolt4_init
+
+inicjalizuje sterownik Thunderbolt 4 / USB 3.2: skanuje magistrale PCI wyszukujac kontrolery Thunderbolt, mapuje adresy MMIO, odczytuje rejestry mozliwosci (obsluga USB 3.2, Thunderbolt 4, tryb alternatywny DisplayPort, tunelowanie PCIe), wlacza kontrolery, konfiguruje porty, skanuje podlaczone urzadzenia i tworzy domeny.
+
+```
+int thunderbolt4_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy zadny kontroler Thunderbolt nie zostanie znaleziony lub inicjalizacja nie powiedzie sie.
+
+### thunderbolt4_shutdown
+
+wylacza wszystkie kontrolery Thunderbolt, dezaktywuje sterownik i zwalnia zasoby.
+
+```
+void thunderbolt4_shutdown(void)
+```
+
+### thunderbolt4_poll
+
+wykonuje okreslne odswiezenie sterownika: przetwarza przerwania kontrolera Thunderbolt (zdarzenia hot-plug, zmiany lacza portow, usuniecie urzadzen, zmiany domen, bledy), aktualizuje odczyty temperatury i skanuje nowe urzadzenia. wywolywane przez driver manager w petli kernela.
+
+```
+void thunderbolt4_poll(void)
+```
+
+### thunderbolt4_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int thunderbolt4_is_ready(void)
+```
+
+### thunderbolt4_controller_count
+
+zwraca liczbe wykrytych kontrolerow Thunderbolt 4.
+
+```
+int thunderbolt4_controller_count(void)
+```
+
+### thunderbolt4_controller_info
+
+pobiera informacje o kontrolerze Thunderbolt o podanym indeksie: adres PCI, vendor/device ID, adres BAR0, wskaznik MMIO, stan inicjalizacji, liczbe portow, obsluge USB 3.2/Thunderbolt 4/DisplayPort/PCIe, stan zasilania, poziom bezpieczenstwa, wersje oprogramowania i temperature.
+
+```
+int thunderbolt4_controller_info(uint8_t index, struct tb4_controller *out)
+```
+
+zwraca 1 przy sukcesie, 0 gdy indeks jest poza zakresem.
+
+### thunderbolt4_port_count
+
+zwraca liczbe skonfigurowanych portow dla danego kontrolera.
+
+```
+int thunderbolt4_port_count(uint8_t controller_index)
+```
+
+### thunderbolt4_port_info
+
+pobiera informacje o porcie o podanym indeksie: typ portu (USB-C/Thunderbolt 4/DisplayPort/PCIe), stan portu, podlaczenie, lacze, obsluge USB 3.2/Thunderbolt 4, predkosc w Mbps i czy jest podlaczone urzadzenie.
+
+```
+int thunderbolt4_port_info(uint8_t controller_index, uint8_t port_index, struct tb4_port *out)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_device_count
+
+zwraca liczbe wykrytych urzadzen Thunderbolt dla danego kontrolera.
+
+```
+int thunderbolt4_device_count(uint8_t controller_index)
+```
+
+### thunderbolt4_device_info
+
+pobiera informacje o urzadzeniu o podanym indeksie: vendor/device ID, typ urzadzenia (magazyn/wyswietlacz/siec/dock/host), stan podlaczenia, konfiguracje, autoryzacje, przepustowosc, tunelowanie NVMe i DisplayPort.
+
+```
+int thunderbolt4_device_info(uint8_t controller_index, uint8_t device_index, struct tb4_device *out)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_domain_count
+
+zwraca liczbe domen Thunderbolt dla danego kontrolera.
+
+```
+int thunderbolt4_domain_count(uint8_t controller_index)
+```
+
+### thunderbolt4_domain_info
+
+pobiera informacje o domenie o podanym indeksie: ID domeny, stan domeny, liczbe czlonkow, porty czlonkowskie i master domeny.
+
+```
+int thunderbolt4_domain_info(uint8_t controller_index, uint8_t domain_index, struct tb4_domain *out)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_port_enable / thunderbolt4_port_disable
+
+wlacza lub wylacza port Thunderbolt o podanym indeksie dla danego kontrolera.
+
+```
+int thunderbolt4_port_enable(uint8_t controller_index, uint8_t port_index);
+int thunderbolt4_port_disable(uint8_t controller_index, uint8_t port_index);
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_port_rescan
+
+ponownie skanuje porty kontrolera Thunderbolt w poszukiwaniu nowych urzadzen (obsługa hot-plug).
+
+```
+int thunderbolt4_port_rescan(uint8_t controller_index)
+```
+
+zwraca 1 przy sucesso, 0 przy blednych argumentach.
+
+### thunderbolt4_device_authorize / thunderbolt4_device_deauthorize
+
+autoryzuje lub deautoryzuje urzadzenie Thunderbolt o podanym indeksie dla danego kontrolera.
+
+```
+int thunderbolt4_device_authorize(uint8_t controller_index, uint8_t device_index);
+int thunderbolt4_device_deauthorize(uint8_t controller_index, uint8_t device_index);
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_device_config
+
+konfiguruje urzadzenie Thunderbolt o podanym indeksie.
+
+```
+int thunderbolt4_device_config(uint8_t controller_index, uint8_t device_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_domain_create / thunderbolt4_domain_delete
+
+tworzy nowa domene Thunderbolt z podanymi portami czlonkowskimi lub usuwa domene o podanym ID.
+
+```
+int thunderbolt4_domain_create(uint8_t controller_index, uint8_t *member_ports, uint8_t member_count);
+int thunderbolt4_domain_delete(uint8_t controller_index, uint8_t domain_id);
+```
+
+### thunderbolt4_power_set_state / thunderbolt4_power_get_state
+
+ustawia lub pobiera stan zasilania kontrolera Thunderbolt (D0-D3).
+
+```
+int thunderbolt4_power_set_state(uint8_t controller_index, uint8_t power_state);
+int thunderbolt4_power_get_state(uint8_t controller_index, uint8_t *power_state);
+```
+
+### thunderbolt4_temperature_read
+
+odczytuje temperature kontrolera Thunderbolt w stopniach Celsjusza.
+
+```
+int thunderbolt4_temperature_read(uint8_t controller_index, int32_t *temperature_c)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_security_set_level / thunderbolt4_security_get_level
+
+ustawia lub pobiera poziom bezpieczenstwa kontrolera Thunderbolt (brak, uzytkownik, bezpieczny, tylko DisplayPort).
+
+```
+int thunderbolt4_security_set_level(uint8_t controller_index, uint8_t level);
+int thunderbolt4_security_get_level(uint8_t controller_index, uint8_t *level);
+```
+
+### thunderbolt4_reset
+
+resetuje kontroler Thunderbolt (zatrzymanie, wlaczenie ponownie, ponowne skanowanie portow, urzadzen i domen).
+
+```
+int thunderbolt4_reset(uint8_t controller_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### thunderbolt4_stats_get
+
+pobiera statystyki sterownika do struktury `tb4_stats` (liczba wykrytych/zainicjowanych kontrolerow, skonfigurowanych portow, wyliczonych/autoryzowanych urzadzen, zdarzen hot-plug, zmian domen, zmian zasilania, ostrzezen temperatury, temperatur krytycznych, bledow, resetow, transferow USB 3.2 i Thunderbolt 4).
+
+```
+void thunderbolt4_stats_get(struct tb4_stats *out);
+```
+
+struktura `tb4_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| controllers_found | liczba wykrytych kontrolerow Thunderbolt |
+| controllers_init | liczba zainicjowanych kontrolerow |
+| ports_configured | liczba skonfigurowanych portow |
+| devices_enumerated | liczba wyliczonych urzadzen |
+| devices_authorized | liczba autoryzowanych urzadzen |
+| hot_plug_events | liczba zdarzen hot-plug |
+| domain_changes | liczba zmian domen |
+| power_changes | liczba zmian stanu zasilania |
+| temp_warnings | liczba ostrzezen temperatury |
+| temp_critical | liczba krytycznych temperatur |
+| errors | liczba bledow sterownika |
+| resets | liczba resetow kontrolera |
+| usb32_transfers | liczba transferow USB 3.2 |
+| tbt4_transfers | liczba transferow Thunderbolt 4 |
+
+### Thunderbolt4::instance
+
+zwraca singleton sterownika.
+
+```
+static Thunderbolt4* instance();
+```
+
+### Thunderbolt4::probe
+
+sprawdza czy urzadzenie to kontroler Thunderbolt 4 (porownuje vendor ID i device ID).
+
+```
+uint8_t probe(uint16_t vendor, uint16_t device);
+```
+
+zwraca 1 gdy urzadzenie zostalo rozpoznane, 0 gdy nie.
+
+### Thunderbolt4::init
+
+inicjalizuje sterownik: skanuje kontrolery na PCI, inicjalizuje kazdy z nich, skanuje porty, urzadzenia i domeny.
+
+```
+void init(void);
+```
+
+### Thunderbolt4::deinit
+
+wylacza wszystkie kontrolery, dezaktywuje sterownik.
+
+```
+void deinit(void);
+```
+
+### Thunderbolt4::poll
+
+przetwarza przerwania i aktualizuje stan sterownika.
+
+```
+void poll(void);
+```
+
 ## sterownik plyty glownej ASUS P4P800 - drivers/plyty_glowne/asus_p4p800.cpp
 
 Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.
