@@ -975,6 +975,182 @@ zwraca pozycje myszy.
 void mouse_pozycja(int *x, int *y)
 ```
 
+## sterownik touchpada PixArt PIXA3848 - drivers/hid/touchpady/pixa3848.cpp
+
+zaawansowany sterownik touchpada PixArt PIXA3848 napisany w C++. obsluguje wykrycie urzadzenia, komunikacje I2C, obsługa wielodotykowa (max 10 palcow jednoczesnie), pozycjonowanie absolutne, cisnienie, szrokosc i wysokosc palca, odrzucanie dłoni (palm rejection), wykrywanie gestow: klikniecie (tap), podwojne klikniecie (double-tap), przewijanie dwoma palcami (two-finger scroll), powiekszanie/pomniejszanie (pinch-to-zoom), gest trecioma palcami (three-finger swipe) oraz gesty krawedziowe (edge swipe) z wykryciem krawedzi lewej, prawej, gornej i dolnej. integracja z kursorem graficznym, oknami i pulpitem (klikniecia, przeciąganie, przewijanie) oraz rejestracja przez driver manager.
+
+### pixa3848_init
+
+inicjalizuje sterownik PIXA3848: wykrywa urzadzenie (vendor 0x14E4, urzadzenie 0x3848), konfiguruje maske przerwan, konfiguracje palm rejection, tap, scroll, pinch, swipe3 i edge, ustawia czułość, resetuje urzadzenie, inicjalizuje stan palcow i kursor.
+
+```
+int pixa3848_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo wykryte lub inicjalizacja nie powiodla sie.
+
+### pixa3848_poll
+
+wykonuje okreslne odswiezenie danych dotykowych: odczytuje rejestr syatusu, potwierdza przerwania, pobiera dane palcow, wykrywa gesty i obsluguje wprowadzanie (kursor, klikniecia, przeciąganie, pulpit). wywolywane przez driver manager w petli kernela.
+
+```
+int pixa3848_poll(void)
+```
+
+zwraca 1 gdy przetworzono dane, 0 gdy brak nowych danych.
+
+### pixa3848_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int pixa3848_is_ready(void)
+```
+
+### pixa3848_shutdown
+
+wylacza urzadzenie (zeruje rejestr sterowania) i oznacza sterownik jako niegotowy.
+
+```
+int pixa3848_shutdown(void)
+```
+
+### pixa3848_enable
+
+wlacza touchpad (wlacza sterowanie i przerwania).
+
+```
+int pixa3848_enable(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### pixa3848_disable
+
+wylacza touchpad (zeruje sterowanie).
+
+```
+int pixa3848_disable(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### pixa3848_get_touch_count
+
+zwraca aktualna liczbe wykrytych palcow na touchpadzie.
+
+```
+int pixa3848_get_touch_count(void)
+```
+
+### pixa3848_get_finger
+
+pobiera dane o palcu o podanym indeksie: pozycja X/Y, cisnienie, szerokosc, wysokosc, identyfikator palca i stan (nacisniety, puszczony, ruch, dlonie).
+
+```
+int pixa3848_get_finger(int index, int *x, int *y, int *pressure, int *width, int *height, int *touch_id, int *state)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gtowy lub indeks poza zakresem.
+
+### pixa3848_get_cursor
+
+pobiera aktualna pozycje kursora myszy na ekranie.
+
+```
+int pixa3848_get_cursor(int *x, int *y)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### pixa3848_gesture_tap
+
+wykrywa gest klikniecia (jednym palcem). zwraca 1 gdy wykryto klikniecie i resetuje stan.
+
+```
+int pixa3848_gesture_tap(void)
+```
+
+### pixa3848_gesture_double_tap
+
+wykrywa gest podwojnego klikniecia. zwraca 1 gdy wykryto podwojne klikniecie.
+
+```
+int pixa3848_gesture_double_tap(void)
+```
+
+### pixa3848_gesture_scroll
+
+wykrywa gest przewijania dwoma palcami. zwraca 1 gdy dostepne sa dane przewijania.
+
+```
+int pixa3848_gesture_scroll(int *dx, int *dy)
+```
+
+### pixa3848_gesture_pinch
+
+wykrywa gest powiększania/pomniejszania (pinch-to-zoom). zwraca 1 gdy wykryto gest.
+
+```
+int pixa3848_gesture_pinch(int *scale)
+```
+
+### pixa3848_gesture_swipe3
+
+wykrywa gestprzesuniecia trecioma palcami. zwraca 1 gdy wykryto gest.
+
+```
+int pixa3848_gesture_swipe3(int *dx, int *dy)
+```
+
+### pixa3848_gesture_edge
+
+wykrywa gest krawedziowy (dotkniecie krawedzi ekranu: lewa, prawa, gorna, dolna). zwraca 1 gdy wykryto gest krawedziowy.
+
+```
+int pixa3848_gesture_edge(int *edge)
+```
+
+### pixa3848_set_sensitivity
+
+ustawia poziom czułości touchpada (0-10).
+
+```
+int pixa3848_set_sensitivity(uint8_t level)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### pixa3848_stats_get
+
+pobiera statystyki sterownika do struktury `pixa3848_stats` (liczniki dotykow, klikniec, podwojnych klikniec, przewijan, powieczen, gestow trecioma palcami, gestow krawedziowych, odrzucen dloni i bledow).
+
+```
+int pixa3848_stats_get(struct pixa3848_stats *out)
+```
+
+struktura `pixa3848_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| touches_detected | liczba wykrytych dotykow |
+| taps | liczba klikniec |
+| double_taps | liczba podwojnych klikniec |
+| scrolls | liczba zdarzen przewijania |
+| pinches | liczba gestow powiększania/pomniejszania |
+| swipes3 | liczba gestow tresim palcami |
+| edge_gestures | liczba gestow krawedziowych |
+| palm_rejections | liczba odrzuconych dotykow dloni |
+| errors | liczba bledow sterownika |
+
+### pixa3848_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void pixa3848_stats_reset(void)
+```
+
 ## dyskietka - drivers/floppy.c
 
 ### floppy_init

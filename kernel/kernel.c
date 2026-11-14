@@ -18,6 +18,7 @@
 #include <drivers/plyty_glowne/asus_p4p800.h>
 #include <drivers/plyty_glowne/intel_915.h>
 #include <drivers/mouse.h>
+#include <drivers/hid/touchpady/pixa3848.h>
 #include <drivers/usb/core/usb.h>
 #include <drivers/usb/core/hid.h>
 #include <drivers/usb/mouse/mouse.h>
@@ -225,6 +226,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("mt7921_wifi", mt7921_init, mt7921_shutdown, mt7921_poll, 2);
     driver_manager_register("bluetooth", bluetooth_init, 0, bluetooth_poll, 2);
     driver_manager_register("mouse", mouse_init, 0, mouse_poll, 2);
+    driver_manager_register("pixa3848_touchpad", pixa3848_init, pixa3848_shutdown, pixa3848_poll, 2);
     driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);
     driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
     driver_manager_register("radeon_hd6000", radeon_hd6000_init, 0, 0, 4);
