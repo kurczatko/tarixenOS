@@ -120,7 +120,7 @@ int e1000_init(void)
     if (!e1000_find_device()) return 0;
 
     e1000_write(0x0000, e1000_read(0x0000) | (1U << 26));
-    for (volatile uint32_t wait = 0; wait < 100000; wait++);
+    for (uint32_t wait = 0; wait < 100000; wait++);
     e1000_write(0x0000, e1000_read(0x0000) & ~(1U << 26));
     e1000_write(0x00D0, 0xFFFFFFFF);
 

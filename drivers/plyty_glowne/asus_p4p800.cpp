@@ -118,8 +118,8 @@ static uint8_t p4p_pci_find_bus_slot_func(uint16_t vendor, uint16_t device, uint
     return 0;
 }
 
-static volatile uint8_t p4p_ready;
-static volatile uint32_t p4p_init_counter;
+static uint8_t p4p_ready;
+static uint32_t p4p_init_counter;
 static struct p4p_info p4p_dev;
 static struct p4p_stats p4p_stats;
 static void (*p4p_irq_handlers[16])(uint8_t irq) = {0};
@@ -288,13 +288,13 @@ void p4p_acpi_sleep(uint8_t state)
     val &= (uint16_t)~P4P_ACPI_SLP_EN;
     val |= (uint16_t)((state & 0x07U) << 10U);
     p4p_outw(p4p_dev.acpi_base + P4P_ACPI_PM1A_CNT, val | P4P_ACPI_SLP_EN);
-    for (volatile uint32_t wait = 0; wait < 100000U; wait++);
+    for (uint32_t wait = 0; wait < 100000U; wait++);
 }
 
 void p4p_acpi_reboot(void)
 {
     p4p_outb(0xCF9U, 0x02U);
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++);
+    for (uint32_t wait = 0; wait < 1000000U; wait++);
     p4p_outb(0x64U, 0xFEU);
 }
 
@@ -429,7 +429,7 @@ int p4p_audio_codec_read(uint8_t reg, uint16_t *value)
 {
     if (!p4p_ac97_base || !value) return 0;
     p4p_outw(p4p_ac97_base + P4P_AC97_REG_RESET + reg, 0x8000U);
-    for (volatile uint32_t wait = 0; wait < 1000U; wait++);
+    for (uint32_t wait = 0; wait < 1000U; wait++);
     *value = p4p_inw(p4p_ac97_base + P4P_AC97_REG_RESET + reg);
     p4p_stats.audio.codec_reads++;
     return 1;
@@ -448,7 +448,7 @@ int p4p_audio_codec_reset(int cold)
     if (!p4p_ac97_base) return 0;
     if (cold) p4p_outb(p4p_ac97_base, 0x01U);
     else p4p_outb(p4p_ac97_base, 0x02U);
-    for (volatile uint32_t wait = 0; wait < 10000U; wait++);
+    for (uint32_t wait = 0; wait < 10000U; wait++);
     p4p_outb(p4p_ac97_base, 0x00U);
     return 1;
 }
@@ -538,9 +538,9 @@ int p4p_eth_init(void)
         p4p_eth_base = p4p_pci_read32(bus, slot, func, P4P_PCI_REG_BAR0) & 0xFFFFFFF0U;
         p4p_pci_set_bus_master(bus, slot, func, 1);
         p4p_outl(p4p_eth_base + P4P_ETH_CSR_PORT, P4P_ETH_CSR_PORT_SW_RESET);
-        for (volatile uint32_t wait = 0; wait < 10000U; wait++);
+        for (uint32_t wait = 0; wait < 10000U; wait++);
         p4p_outl(p4p_eth_base + P4P_ETH_CSR_PORT, P4P_ETH_CSR_PORT_SEL_RESET);
-        for (volatile uint32_t wait = 0; wait < 10000U; wait++);
+        for (uint32_t wait = 0; wait < 10000U; wait++);
         for (uint32_t i = 0; i < 6; i++) p4p_eth_mac[i] = p4p_inb(p4p_eth_base + 0x14U + i);
         p4p_outl(p4p_eth_base + P4P_ETH_CSR_SCB, P4P_ETH_SCB_CMD_IACK);
         p4p_outl(p4p_eth_base + P4P_ETH_CSR_SCB, P4P_ETH_SCB_CMD_CU_START | P4P_ETH_SCB_CMD_RU_START);

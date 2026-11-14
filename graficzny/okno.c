@@ -433,7 +433,7 @@ void okno_zakoncz_przeciaganie(void)
 
 static void okno_genie_czekaj(void)
 {
-    volatile int i;
+    int i;
     for (i = 0; i < 400000; i++) {
         __asm__ volatile("nop");
     }

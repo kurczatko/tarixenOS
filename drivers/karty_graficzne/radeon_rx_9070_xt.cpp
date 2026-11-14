@@ -157,7 +157,7 @@ static inline void mmio_write32_posted(uint32_t offset, uint32_t value)
 static void rx_9070_xt_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -255,7 +255,7 @@ static void rx_9070_xt_cp_gfx_flush(void)
 {
     uint32_t tail = g_ring_gfx_head & (RX_9070_XT_RING_BUFFER_SIZE / 4U - 1U);
     mmio_write32(REG_CP_GFX_ME_RB_WPTR, tail);
-    for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+    for (uint32_t wait = 0; wait < 2000000U; wait++) {
         if (mmio_read32(REG_CP_GFX_ME_RB_RPTR) == tail) {
             break;
         }
@@ -1482,7 +1482,7 @@ void rx_9070_xt_semaphore_signal(rx_9070_xt_handle_t handle, uint32_t value)
 void rx_9070_xt_semaphore_wait(rx_9070_xt_handle_t handle, uint32_t value)
 {
     if (handle >= RX_9070_XT_MAX_SEMAPHORES || !g_semaphore_used[handle]) return;
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++) {
+    for (uint32_t wait = 0; wait < 1000000U; wait++) {
         if (g_semaphore[handle].value >= value) break;
     }
 }
@@ -1652,7 +1652,7 @@ void rx_9070_xt_present(rx_9070_xt_handle_t chain)
     if (chain >= RX_9070_XT_MAX_SWAP_CHAINS || !g_swap_used[chain]) return;
 
     if (g_swap[chain].vsync) {
-        for (volatile uint32_t wait = 0; wait < 4000000U; wait++) {
+        for (uint32_t wait = 0; wait < 4000000U; wait++) {
             if (mmio_read32(REG_DCN_CRTC_CONTROL) & 0x80000000U) break;
         }
     }

@@ -329,7 +329,7 @@ int nvme_init(void)
     cc &= ~NVME_CC_EN;
     nvme_write_reg(NVME_REG_CC, cc);
 
-    for (volatile uint32_t wait = 0; wait < 1000000; wait++);
+    for (uint32_t wait = 0; wait < 1000000; wait++);
     while ((nvme_read_reg(NVME_REG_CSTS) & NVME_CSTS_RDY) != 0) {
     }
 
@@ -355,7 +355,7 @@ int nvme_init(void)
     cc |= NVME_CC_EN;
     nvme_write_reg(NVME_REG_CC, cc);
 
-    for (volatile uint32_t wait = 0; wait < 1000000; wait++);
+    for (uint32_t wait = 0; wait < 1000000; wait++);
     while ((nvme_read_reg(NVME_REG_CSTS) & NVME_CSTS_RDY) == 0) {
     }
 

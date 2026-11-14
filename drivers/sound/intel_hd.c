@@ -43,7 +43,7 @@ static void pci_write_32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset
 
 static void hda_pit_sleep_ms(uint32_t ms) {
     for (uint32_t i = 0; i < ms; i++) {
-        for (volatile int j = 0; j < 10000; j++);
+        for (int j = 0; j < 10000; j++);
     }
 }
 

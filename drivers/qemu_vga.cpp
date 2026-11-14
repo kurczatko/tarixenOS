@@ -154,7 +154,7 @@ static void ring_flush(void)
 {
     uint32_t tail = g_ring_head & (QEMU_VGA_RING_SIZE - 1U);
     mmio_write(QEMU_VGA_REG_CTRL, mmio_read(QEMU_VGA_REG_CTRL));
-    for (volatile int wait = 0; wait < 1000000; wait++) {
+    for (int wait = 0; wait < 1000000; wait++) {
         if ((g_ring_head & (QEMU_VGA_RING_SIZE - 1U)) == tail) {
             break;
         }
@@ -227,7 +227,7 @@ static void cmd_flush(void)
     uint32_t i = 0;
     while (i < g_cmd_count) {
         qv3_cmd_t *cmd = &g_cmd_buffer[i];
-        volatile int wait;
+        int wait;
         for (wait = 0; wait < 1000000; wait++) {
             if (mmio_read(QEMU_VGA_REG_3D_STATUS) == QEMU_VGA_3D_STATUS_IDLE) {
                 break;

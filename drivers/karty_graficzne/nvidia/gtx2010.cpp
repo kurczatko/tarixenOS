@@ -205,7 +205,6 @@ int Gtx2010::znajdz_urzadzenie(void)
     uint16_t device;
     uint32_t class_code;
     uint8_t base_class;
-    uint8_t sub_class;
     uint32_t bar;
 
     for (bus = 0; bus < 256; bus++) {
@@ -219,7 +218,6 @@ int Gtx2010::znajdz_urzadzenie(void)
                 device = (uint16_t)(id >> 16);
                 class_code = pci_odczytaj32(bus, slot, funkcja, 0x08);
                 base_class = (uint8_t)(class_code >> 24);
-                sub_class = (uint8_t)((class_code >> 16) & 0xFF);
                 if (base_class != 0x03) {
                     continue;
                 }
@@ -502,6 +500,8 @@ void Gtx2010::bufor_wierzcholkow_zniszcz(gtx2010_handle_t uchwyt)
 
 void Gtx2010::bufor_wierzcholkow_zaktualizuj(gtx2010_handle_t uchwyt, uint32_t przesuniecie, uint32_t rozmiar, const void *dane_we)
 {
+    (void)przesuniecie;
+    (void)rozmiar;
     if (uchwyt >= GTX2010_MAX_VERTEX_BUFFERS || !bufor_wierzcholkow_tab[uchwyt].used) {
         return;
     }
@@ -543,6 +543,8 @@ void Gtx2010::bufor_indeksow_zniszcz(gtx2010_handle_t uchwyt)
 
 void Gtx2010::bufor_indeksow_zaktualizuj(gtx2010_handle_t uchwyt, uint32_t przesuniecie, uint32_t rozmiar, const void *dane_we)
 {
+    (void)przesuniecie;
+    (void)rozmiar;
     if (uchwyt >= GTX2010_MAX_INDEX_BUFFERS || !bufor_indeksow_tab[uchwyt].used) {
         return;
     }
@@ -698,6 +700,14 @@ void Gtx2010::tekstura_zniszcz(gtx2010_handle_t uchwyt)
 
 void Gtx2010::tekstura_zaktualizuj(gtx2010_handle_t uchwyt, uint32_t poziom, uint32_t x, uint32_t y, uint32_t z, uint32_t warstwa, uint32_t w, uint32_t h, uint32_t d, const void *dane_we)
 {
+    (void)poziom;
+    (void)x;
+    (void)y;
+    (void)z;
+    (void)warstwa;
+    (void)w;
+    (void)h;
+    (void)d;
     if (uchwyt >= GTX2010_MAX_TEXTURES || !tekstury_tab[uchwyt].used) {
         return;
     }
@@ -1137,6 +1147,8 @@ void Gtx2010::bufor_stale_zniszcz(gtx2010_handle_t uchwyt)
 
 void Gtx2010::bufor_stale_zaktualizuj(gtx2010_handle_t uchwyt, uint32_t przesuniecie, uint32_t rozmiar, const void *dane_we)
 {
+    (void)przesuniecie;
+    (void)rozmiar;
     if (uchwyt >= GTX2010_MAX_CONSTANT_BUFFERS || !bufor_stale_tab[uchwyt].used) {
         return;
     }

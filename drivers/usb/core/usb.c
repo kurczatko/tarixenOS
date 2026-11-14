@@ -173,7 +173,7 @@ static int pci_scan(void) {
 
 static void uhci_reset(void) {
     usb_outw(uhci_io_base + USB_REG_CMD, usb_inw(uhci_io_base + USB_REG_CMD) | USB_CMD_HCRESET);
-    volatile int i;
+    int i;
     for (i = 0; i < 1000; i++) {
         if (!(usb_inw(uhci_io_base + USB_REG_CMD) & USB_CMD_HCRESET)) break;
     }
@@ -191,7 +191,7 @@ static int uhci_port_connected(uint8_t port) {
 static void uhci_port_reset(uint8_t port) {
     uint16_t reg = usb_inw(uhci_io_base + USB_REG_PORTSC1 + (port - 1) * 2);
     usb_outw(uhci_io_base + USB_REG_PORTSC1 + (port - 1) * 2, reg | USB_PSC_PR);
-    volatile int i;
+    int i;
     for (i = 0; i < 1000; i++) {
         if (!(usb_inw(uhci_io_base + USB_REG_PORTSC1 + (port - 1) * 2) & USB_PSC_PR)) break;
     }
@@ -207,7 +207,7 @@ static int uhci_port_enabled(uint8_t port) {
 }
 
 static void uhci_delay(void) {
-    volatile int i;
+    int i;
     for (i = 0; i < 1000; i++) {}
 }
 
@@ -234,7 +234,7 @@ static void usb_free_device(usb_device_t *dev) {
 }
 
 static int td_wait_complete(uhci_td_t *td) {
-    volatile int i;
+    int i;
     for (i = 0; i < 2000; i++) {
         if (!(td->token & TD_ACTIVE)) break;
     }

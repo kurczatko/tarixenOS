@@ -111,7 +111,7 @@ static inline void mmio_write32_posted_8500(uint32_t offset, uint32_t value)
 static void radeon_8500_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -192,7 +192,7 @@ static void radeon_8500_cp_flush(void)
 {
     uint32_t tail = g_ring_head_8500 & (RADEON_8500_RING_BUFFER_SIZE / 4U - 1U);
     mmio_write32_8500(REG_CP_ME_RB_WPTR, tail);
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++) {
+    for (uint32_t wait = 0; wait < 1000000U; wait++) {
         if (mmio_read32_8500(REG_CP_ME_RB_RPTR) == tail) {
             break;
         }
@@ -1203,7 +1203,7 @@ void radeon_8500_fence_signal(radeon_8500_handle_t handle, uint32_t value)
 int radeon_8500_fence_wait(radeon_8500_handle_t handle, uint32_t value, uint32_t timeout_us)
 {
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_FENCES || !g_fence_used_8500[handle]) return 0;
-    for (volatile uint32_t wait = 0; wait < timeout_us * 10U; wait++) {
+    for (uint32_t wait = 0; wait < timeout_us * 10U; wait++) {
         if (g_fence_8500[handle].signaled && g_fence_8500[handle].value >= value) return 1;
     }
     return 0;
@@ -1238,7 +1238,7 @@ void radeon_8500_semaphore_signal(radeon_8500_handle_t handle, uint32_t value)
 void radeon_8500_semaphore_wait(radeon_8500_handle_t handle, uint32_t value)
 {
     if (handle == RADEON_8500_HANDLE_NULL || handle >= RADEON_8500_MAX_SEMAPHORES || !g_sem_used_8500[handle]) return;
-    for (volatile uint32_t wait = 0; wait < 10000000U; wait++) {
+    for (uint32_t wait = 0; wait < 10000000U; wait++) {
         if (g_sem_8500[handle].value >= value) break;
     }
 }
@@ -1251,7 +1251,7 @@ void radeon_8500_semaphore_destroy(radeon_8500_handle_t handle)
 
 int radeon_8500_wait_idle(uint32_t timeout_us)
 {
-    for (volatile uint32_t wait = 0; wait < timeout_us * 10U; wait++) {
+    for (uint32_t wait = 0; wait < timeout_us * 10U; wait++) {
         uint32_t rptr = mmio_read32_8500(REG_CP_ME_RB_RPTR);
         uint32_t wptr = mmio_read32_8500(REG_CP_ME_RB_WPTR);
         if (rptr == wptr) return 1;
@@ -1368,7 +1368,7 @@ void radeon_8500_present(radeon_8500_handle_t chain)
     static struct radeon_8500_swap_chain g_swap_8500[RADEON_8500_MAX_SWAP_CHAINS];
     if (chain >= RADEON_8500_MAX_SWAP_CHAINS || !g_swap_used_8500[chain]) return;
     if (g_swap_8500[chain].vsync) {
-        for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+        for (uint32_t wait = 0; wait < 2000000U; wait++) {
             if (mmio_read32_8500(REG_CRTC_CONTROL) & 0x80000000U) break;
         }
     }

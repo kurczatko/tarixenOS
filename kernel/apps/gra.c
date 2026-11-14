@@ -419,7 +419,7 @@ void gra(void)
         
         gra_rysuj_zawartosc(okno_gra.x + 8, okno_gra.y + 30, okno_gra.szerokosc - 16, okno_gra.wysokosc - 38);
         odswiez_fragment_widoku(okno_gra.x + 8, okno_gra.y + 30, okno_gra.szerokosc - 16, okno_gra.wysokosc - 38);
-        for (volatile int i = 0; i < 300000; i++) {
+        for (int i = 0; i < 300000; i++) {
             __asm__ volatile("nop");
         }
     }

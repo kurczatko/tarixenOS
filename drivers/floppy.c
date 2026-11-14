@@ -44,7 +44,7 @@ static int result_byte(uint8_t *b) {
 
 static void motor_on(int drive) {
     outb(FLOPPY_DOR, 0x0C | (drive & 3));
-    for (volatile int i = 0; i < 200000; i++);
+    for (int i = 0; i < 200000; i++);
 }
 
 static void motor_off(void) {
@@ -53,9 +53,9 @@ static void motor_off(void) {
 
 static int floppy_reset(void) {
     outb(FLOPPY_DOR, 0x00);
-    for (volatile int i = 0; i < 10000; i++);
+    for (int i = 0; i < 10000; i++);
     outb(FLOPPY_DOR, 0x0C);
-    for (volatile int i = 0; i < 100000; i++);
+    for (int i = 0; i < 100000; i++);
     uint8_t st0, st1;
     cmd_byte(CMD_SENSE_INT);
     result_byte(&st0);
@@ -67,7 +67,7 @@ static int floppy_recalibrate(void) {
     motor_on(0);
     if (!cmd_byte(CMD_RECALIBRATE)) return 0;
     if (!cmd_byte(0x00)) return 0;
-    for (volatile int i = 0; i < 500000; i++);
+    for (int i = 0; i < 500000; i++);
     uint8_t st0, st1;
     cmd_byte(CMD_SENSE_INT);
     result_byte(&st0);

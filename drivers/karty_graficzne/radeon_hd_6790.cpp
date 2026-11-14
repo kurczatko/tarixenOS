@@ -156,7 +156,7 @@ static inline void mmio_write32_posted(uint32_t offset, uint32_t value)
 static void radeon_6790_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -248,7 +248,7 @@ static void radeon_6790_cp_flush(void)
 {
     uint32_t tail = g_ring_gfx_head & (RADEON_6790_RING_BUFFER_SIZE / 4U - 1U);
     mmio_write32(REG_6790_CP_ME_RB_WPTR, tail);
-    for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+    for (uint32_t wait = 0; wait < 2000000U; wait++) {
         if (mmio_read32(REG_6790_CP_ME_RB_RPTR) == tail) {
             break;
         }
@@ -272,7 +272,7 @@ static void radeon_6790_dma_flush(void)
 {
     uint32_t tail = g_ring_dma_head & (RADEON_6790_DMA_RING_SIZE / 4U - 1U);
     mmio_write32(REG_6790_DMA_RB_WPTR, tail);
-    for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+    for (uint32_t wait = 0; wait < 2000000U; wait++) {
         if (mmio_read32(REG_6790_DMA_RB_RPTR) == tail) {
             break;
         }
@@ -1558,7 +1558,7 @@ void radeon_6790_semaphore_signal(radeon_6790_handle_t handle, uint32_t value)
 void radeon_6790_semaphore_wait(radeon_6790_handle_t handle, uint32_t value)
 {
     if (handle >= RADEON_6790_MAX_SEMAPHORES || !g_semaphore_used[handle]) return;
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++) {
+    for (uint32_t wait = 0; wait < 1000000U; wait++) {
         if (g_semaphore[handle].value >= value) break;
     }
 }
@@ -1688,7 +1688,7 @@ void radeon_6790_present(radeon_6790_handle_t chain)
     if (chain >= RADEON_6790_MAX_SWAP_CHAINS || !g_swap_used[chain]) return;
 
     if (g_swap[chain].vsync) {
-        for (volatile uint32_t wait = 0; wait < 4000000U; wait++) {
+        for (uint32_t wait = 0; wait < 4000000U; wait++) {
             if (mmio_read32(REG_6790_DCN_CRTC_CONTROL) & 0x80000000U) break;
         }
     }

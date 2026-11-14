@@ -5,7 +5,7 @@
 * kurczatkojestslodkie@gmail.com
 */
 
-volatile unsigned long long timer_ticks = 0; 
+unsigned long long timer_ticks = 0; 
 
 void d10() {
     unsigned long long target_ticks = timer_ticks + 1000; 

@@ -65,7 +65,7 @@ static void pci_write_config_dword(uint8_t bus, uint8_t slot, uint8_t function,
 static void delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -235,7 +235,7 @@ static int ac97_reset_link(void)
     ac97_write16(AC97_IO_CRST, 0x0001);
     delay_ms(10);
     ac97_write16(AC97_IO_CRST, 0x0000);
-    for (volatile int wait = 0; wait < 1000000; wait++) {
+    for (int wait = 0; wait < 1000000; wait++) {
         if (!(ac97_read16(AC97_IO_CRST) & 0x0001)) break;
     }
     delay_ms(10);
@@ -248,7 +248,7 @@ static void codec_write_reg(uint16_t reg, uint16_t value)
 {
     ac97_write16(AC97_IO_CODEC_INDEX, (uint16_t)(reg & 0x7FU));
     ac97_write16(AC97_IO_CODEC_DATA, value);
-    for (volatile int wait = 0; wait < 1000000; wait++) {
+    for (int wait = 0; wait < 1000000; wait++) {
         if ((ac97_read16(AC97_IO_CSTAT) & 0x0001U) == 0U) break;
     }
 }
@@ -256,7 +256,7 @@ static void codec_write_reg(uint16_t reg, uint16_t value)
 static uint16_t codec_read_reg(uint16_t reg)
 {
     ac97_write16(AC97_IO_CODEC_INDEX, (uint16_t)((reg & 0x7FU) | 0x8000U));
-    for (volatile int wait = 0; wait < 1000000; wait++) {
+    for (int wait = 0; wait < 1000000; wait++) {
         if ((ac97_read16(AC97_IO_CSTAT) & 0x0001U) == 0U) break;
     }
     return ac97_read16(AC97_IO_CODEC_DATA);

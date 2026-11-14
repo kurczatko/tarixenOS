@@ -223,7 +223,7 @@ static inline void mmio_write32_posted(uint32_t offset, uint32_t value)
 static void gma_x4500_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -373,7 +373,7 @@ static void gma_x4500_blt_flush(void)
 {
     uint32_t tail = g_ring_head & (RING_SIZE / 4U - 1U);
     mmio_write32(REG_BLT_TAIL, tail);
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++) {
+    for (uint32_t wait = 0; wait < 1000000U; wait++) {
         if (mmio_read32(REG_BLT_HEAD) == tail) {
             break;
         }
@@ -1165,7 +1165,7 @@ void gma_x4500_present(gma_handle_t chain)
     (void)chain;
     if (!g_swap[0].used) return;
     if (g_swap[0].vsync) {
-        for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+        for (uint32_t wait = 0; wait < 2000000U; wait++) {
             if (mmio_read32(REG_PIPEA_CONF) & 0x80000000U) break;
         }
     }

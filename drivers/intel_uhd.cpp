@@ -158,7 +158,7 @@ static void ring_flush(void)
 {
     uint32_t tail = g_ring_head & (RING_SIZE - 1U);
     mmio_write(INTEL_UHD_REG_RING_TAIL, tail);
-    for (volatile int wait = 0; wait < 1000000; wait++) {
+    for (int wait = 0; wait < 1000000; wait++) {
         if (mmio_read(INTEL_UHD_REG_RING_HEAD) == tail) {
             break;
         }
@@ -207,7 +207,7 @@ int intel_uhd_init(void)
 
     uint32_t dpll = mmio_read(INTEL_UHD_REG_DPLL_A);
     mmio_write(INTEL_UHD_REG_DPLL_A, dpll | 0x80000000U);
-    for (volatile int wait = 0; wait < 100000; wait++) {
+    for (int wait = 0; wait < 100000; wait++) {
         if ((mmio_read(INTEL_UHD_REG_DPLL_A) & 0x20000000U) != 0U) {
             break;
         }
@@ -242,7 +242,7 @@ int intel_uhd_init(void)
     g_ring_head = 0;
     g_ring_tail = 0;
 
-    for (volatile int wait = 0; wait < 100000; wait++);
+    for (int wait = 0; wait < 100000; wait++);
 
     intel_uhd_cursor_hide();
 

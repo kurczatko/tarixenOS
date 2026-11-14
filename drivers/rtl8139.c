@@ -107,7 +107,7 @@ int rtl8139_init(void)
     if (!rtl8139_find_device()) return 0;
 
     outb(io_base + RTL_REG_CMDR, 0x40);
-    for (volatile uint32_t wait = 0; wait < 200000; wait++);
+    for (uint32_t wait = 0; wait < 200000; wait++);
     if (inb(io_base + RTL_REG_CMDR) & 0x40) return 0;
 
     for (uint32_t i = 0; i < 6; i++) {

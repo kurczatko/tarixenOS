@@ -20,7 +20,7 @@ static uint32_t kernel_page_dir_phys = 0;
 static uint64_t global_ticks = 0;
 uint32_t smp_cpu_count = 1;
 uint32_t cpu_online_mask = 1;
-volatile uint32_t smp_this_cpu = 0;
+uint32_t smp_this_cpu = 0;
 
 static uint32_t driver_kernel_stacks[64][1024] __attribute__((aligned(16)));
 static uint32_t driver_stack_count = 0;
@@ -31,14 +31,14 @@ struct runqueue {
     struct proces *prio_tail[NR_PRIORITIES];
     uint64_t nr_running;
     uint64_t load;
-    volatile uint32_t lock;
+    uint32_t lock;
 };
 
 static struct runqueue cpu_rq[SMP_MAX_CPUS];
 
 static struct proces *wait_head = 0;
 static struct proces *wait_tail = 0;
-static volatile uint32_t waitq_lock = 0;
+static uint32_t waitq_lock = 0;
 static struct proces *idle_task[SMP_MAX_CPUS] = {0};
 
 uint32_t cpu_id(void) {

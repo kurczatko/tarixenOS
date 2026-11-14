@@ -110,8 +110,8 @@ static uint8_t i915_pci_find_bus_slot_func(uint16_t vendor, uint16_t device, uin
     return 0;
 }
 
-static volatile uint8_t i915_ready;
-static volatile uint32_t i915_init_counter;
+static uint8_t i915_ready;
+static uint32_t i915_init_counter;
 static struct i915_info i915_dev;
 static struct i915_stats i915_stats;
 static void (*i915_irq_handlers[16])(uint8_t irq) = {0};
@@ -511,13 +511,13 @@ void i915_acpi_sleep(uint8_t state)
     val &= (uint16_t)~I915_ACPI_SLP_EN;
     val |= (uint16_t)((state & 0x07U) << 10U);
     i915_outw(i915_dev.acpi_base + I915_ACPI_PM1A_CNT, val | I915_ACPI_SLP_EN);
-    for (volatile uint32_t wait = 0; wait < 100000U; wait++);
+    for (uint32_t wait = 0; wait < 100000U; wait++);
 }
 
 void i915_acpi_reboot(void)
 {
     i915_outb(0xCF9U, 0x02U);
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++);
+    for (uint32_t wait = 0; wait < 1000000U; wait++);
     i915_outb(0x64U, 0xFEU);
 }
 
@@ -1355,7 +1355,7 @@ int i915_audio_codec_read(uint8_t reg, uint16_t *value)
 {
     if (!i915_ac97_mixer_base || !value) return 0;
     i915_outw(i915_ac97_mixer_base + I915_AC97_REG_RESET + reg, 0x8000U);
-    for (volatile uint32_t wait = 0; wait < 1000U; wait++);
+    for (uint32_t wait = 0; wait < 1000U; wait++);
     *value = i915_inw(i915_ac97_mixer_base + I915_AC97_REG_RESET + reg);
     i915_stats.audio.codec_reads++;
     return 1;
@@ -1374,7 +1374,7 @@ int i915_audio_codec_reset(int cold)
     if (!i915_ac97_mixer_base) return 0;
     if (cold) i915_outb(i915_ac97_mixer_base, 0x01U);
     else i915_outb(i915_ac97_mixer_base, 0x02U);
-    for (volatile uint32_t wait = 0; wait < 10000U; wait++);
+    for (uint32_t wait = 0; wait < 10000U; wait++);
     i915_outb(i915_ac97_mixer_base, 0x00U);
     return 1;
 }
@@ -1500,7 +1500,7 @@ static void i915_gfx_ring_flush(void)
 {
     uint32_t tail = i915_gfx_ring_head & (I915_RING_SIZE - 1U);
     i915_mmio_write(I915_GFX_REG_RING_TAIL, tail);
-    for (volatile int wait = 0; wait < 1000000; wait++) {
+    for (int wait = 0; wait < 1000000; wait++) {
         if (i915_mmio_read(I915_GFX_REG_RING_HEAD) == tail) {
             break;
         }
@@ -1583,7 +1583,7 @@ int i915_graphics_init(void)
 
     uint32_t dpll = i915_mmio_read(I915_GFX_REG_DPLL_A);
     i915_mmio_write(I915_GFX_REG_DPLL_A, dpll | 0x80000000U);
-    for (volatile int wait = 0; wait < 100000; wait++) {
+    for (int wait = 0; wait < 100000; wait++) {
         if ((i915_mmio_read(I915_GFX_REG_DPLL_A) & 0x20000000U) != 0U) {
             break;
         }

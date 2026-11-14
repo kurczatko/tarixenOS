@@ -24,7 +24,7 @@ extern "C" {
 extern struct proces *current_cpu[SMP_MAX_CPUS];
 extern uint32_t smp_cpu_count;
 extern uint32_t cpu_online_mask;
-extern volatile uint32_t smp_this_cpu;
+extern uint32_t smp_this_cpu;
 
 uint32_t cpu_id(void);
 

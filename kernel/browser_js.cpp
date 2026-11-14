@@ -190,6 +190,7 @@ static void next_token() {
     if (c >= '0' && c <= '9') {
         int n = 0; double val = 0;
         while (peek_char() >= '0' && peek_char() <= '9') { val = val * 10 + (next_char() - '0'); n++; }
+        (void)n;
         if (peek_char() == '.') { next_char(); double f = 0.1; while (peek_char() >= '0' && peek_char() <= '9') { val += (next_char() - '0') * f; f *= 0.1; } }
         tok_type = TOK_NUMBER; tok_num = val; return;
     }

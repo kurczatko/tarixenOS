@@ -201,7 +201,6 @@ int Gtx3080::znajdz_urzadzenie(void)
     uint16_t device;
     uint32_t class_code;
     uint8_t base_class;
-    uint8_t sub_class;
     uint32_t bar;
 
     for (bus = 0; bus < 256; bus++) {
@@ -215,7 +214,6 @@ int Gtx3080::znajdz_urzadzenie(void)
                 device = (uint16_t)(id >> 16);
                 class_code = pci_odczytaj32(bus, slot, funkcja, 0x08);
                 base_class = (uint8_t)(class_code >> 24);
-                sub_class = (uint8_t)((class_code >> 16) & 0xFF);
                 if (base_class != 0x03) {
                     continue;
                 }
@@ -502,6 +500,8 @@ void Gtx3080::bufor_wierzcholkow_zniszcz(gtx3080_handle_t uchwyt)
 
 void Gtx3080::bufor_wierzcholkow_zaktualizuj(gtx3080_handle_t uchwyt, uint32_t przesuniecie, uint32_t rozmiar, const void *dane_we)
 {
+    (void)przesuniecie;
+    (void)rozmiar;
     if (uchwyt >= GTX3080_MAX_VERTEX_BUFFERS || !bufor_wierzcholkow_tab[uchwyt].used) {
         return;
     }
@@ -543,6 +543,8 @@ void Gtx3080::bufor_indeksow_zniszcz(gtx3080_handle_t uchwyt)
 
 void Gtx3080::bufor_indeksow_zaktualizuj(gtx3080_handle_t uchwyt, uint32_t przesuniecie, uint32_t rozmiar, const void *dane_we)
 {
+    (void)przesuniecie;
+    (void)rozmiar;
     if (uchwyt >= GTX3080_MAX_INDEX_BUFFERS || !bufor_indeksow_tab[uchwyt].used) {
         return;
     }
@@ -598,6 +600,11 @@ void Gtx3080::tekstura_zniszcz(gtx3080_handle_t uchwyt)
 
 void Gtx3080::tekstura_zaktualizuj(gtx3080_handle_t uchwyt, uint32_t poziom, uint32_t x, uint32_t y, uint32_t w, uint32_t h, const void *dane_we)
 {
+    (void)poziom;
+    (void)x;
+    (void)y;
+    (void)w;
+    (void)h;
     if (uchwyt >= GTX3080_MAX_TEXTURES || !tekstury_tab[uchwyt].used) {
         return;
     }
@@ -968,6 +975,8 @@ void Gtx3080::bufor_stale_zniszcz(gtx3080_handle_t uchwyt)
 
 void Gtx3080::bufor_stale_zaktualizuj(gtx3080_handle_t uchwyt, uint32_t przesuniecie, uint32_t rozmiar, const void *dane_we)
 {
+    (void)przesuniecie;
+    (void)rozmiar;
     if (uchwyt >= GTX3080_MAX_CONSTANT_BUFFERS || !bufor_stale_tab[uchwyt].used) {
         return;
     }
@@ -1111,6 +1120,7 @@ void Gtx3080::ustaw_mieszanie_alpha_globalne(uint8_t wlacz)
 
 void Gtx3080::wyczysc_cel_renderowania(gtx3080_handle_t cel, uint32_t kolor)
 {
+    (void)kolor;
     if (cel >= GTX3080_MAX_RENDER_TARGETS || !cele_tab[cel].used) {
         return;
     }
@@ -1127,6 +1137,8 @@ void Gtx3080::wyczysc_bufor_glebii(gtx3080_handle_t bufor, float glebia, uint8_t
 
 void Gtx3080::rysuj(uint32_t liczba_wierzcholkow, uint32_t pierwszy_wierzcholek)
 {
+    (void)liczba_wierzcholkow;
+    (void)pierwszy_wierzcholek;
     if (!inicjalizowane) {
         return;
     }
@@ -1142,6 +1154,8 @@ void Gtx3080::rysuj(uint32_t liczba_wierzcholkow, uint32_t pierwszy_wierzcholek)
 void Gtx3080::rysuj_indeksowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka)
 {
     (void)baza_wierzcholka;
+    (void)liczba_indeksow;
+    (void)pierwszy_indeks;
     if (!inicjalizowane) {
         return;
     }
@@ -1178,6 +1192,7 @@ void Gtx3080::rysuj_po_indirekcie(uint32_t adres_bufora, uint32_t liczba_rysowan
 
 void Gtx3080::oblicz_wyslij(uint32_t grupa_x, uint32_t grupa_y, uint32_t grupa_z)
 {
+    (void)grupa_z;
     if (!inicjalizowane) {
         return;
     }

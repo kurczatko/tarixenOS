@@ -287,7 +287,7 @@ static inline void mmio_write32_posted(uint32_t offset, uint32_t value)
 static void radeon_hd_8370d_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -375,7 +375,7 @@ static void radeon_hd_8370d_cp_flush(void)
 {
     uint32_t tail = g_ring_head & (RING_SIZE / 4U - 1U);
     mmio_write32(REG_CP_ME_RB_WPTR, tail);
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++) {
+    for (uint32_t wait = 0; wait < 1000000U; wait++) {
         if (mmio_read32(REG_CP_ME_RB_RPTR) == tail) {
             break;
         }
@@ -1320,7 +1320,7 @@ void radeon_hd_8370d_present(radeon_handle_t chain)
     if (!g_swap[0].used) return;
 
     if (g_swap[0].vsync) {
-        for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+        for (uint32_t wait = 0; wait < 2000000U; wait++) {
             if (mmio_read32(REG_CRTC0_CONTROL) & 0x80000000U) break;
         }
     }

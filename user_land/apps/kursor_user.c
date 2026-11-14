@@ -68,7 +68,7 @@ int main(void) {
             ostatni_y = my;
         }
 
-        for (volatile int i = 0; i < 50000; i++) {
+        for (int i = 0; i < 50000; i++) {
             __asm__ volatile("nop");
         }
 

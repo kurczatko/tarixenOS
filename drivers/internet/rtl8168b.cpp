@@ -186,7 +186,7 @@ static inline void mmio_write8(uint16_t offset, uint8_t value)
 static void rtl8168b_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 

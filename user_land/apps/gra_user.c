@@ -424,7 +424,7 @@ int main(void) {
 
         okno_rysuj_user(&okno_gra);
 
-        for (volatile int i = 0; i < 30000; i++) {
+        for (int i = 0; i < 30000; i++) {
             __asm__ volatile("nop");
         }
 

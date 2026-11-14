@@ -145,7 +145,7 @@ static inline void mmio_write32_posted(uint32_t offset, uint32_t value)
 static void radeon_6870_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
@@ -228,7 +228,7 @@ static void radeon_6870_cp_flush(void)
 {
     uint32_t tail = g_ring_gfx_head & (RADEON_6870_RING_BUFFER_SIZE / 4U - 1U);
     mmio_write32(REG_6870_CP_ME_RB_WPTR, tail);
-    for (volatile uint32_t wait = 0; wait < 2000000U; wait++) {
+    for (uint32_t wait = 0; wait < 2000000U; wait++) {
         if (mmio_read32(REG_6870_CP_ME_RB_RPTR) == tail) {
             break;
         }
@@ -1236,7 +1236,7 @@ void radeon_6870_semaphore_signal(radeon_6870_handle_t handle, uint32_t value)
 void radeon_6870_semaphore_wait(radeon_6870_handle_t handle, uint32_t value)
 {
     if (handle >= RADEON_6870_MAX_SEMAPHORES || !g_semaphore_used[handle]) return;
-    for (volatile uint32_t wait = 0; wait < 1000000U; wait++) {
+    for (uint32_t wait = 0; wait < 1000000U; wait++) {
         if (g_semaphore[handle].value >= value) break;
     }
 }
@@ -1367,7 +1367,7 @@ void radeon_6870_present(radeon_6870_handle_t chain)
     if (chain >= RADEON_6870_MAX_SWAP_CHAINS || !g_swap_used[chain]) return;
 
     if (g_swap[chain].vsync) {
-        for (volatile uint32_t wait = 0; wait < 4000000U; wait++) {
+        for (uint32_t wait = 0; wait < 4000000U; wait++) {
             if (mmio_read32(REG_6870_DCN_CRTC_CONTROL) & 0x80000000U) break;
         }
     }

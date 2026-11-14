@@ -59,7 +59,7 @@ static uint8_t g_hci_evt_ready = 0;
 static void bt_delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 

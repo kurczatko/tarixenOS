@@ -147,14 +147,14 @@ ALC880* ALC880::instance()
 void ALC880::delay_us(uint32_t us)
 {
     for (uint32_t i = 0; i < us; i++) {
-        for (volatile int j = 0; j < 40; j++);
+        for (int j = 0; j < 40; j++);
     }
 }
 
 void ALC880::delay_ms(uint32_t ms)
 {
     for (uint32_t i = 0; i < ms; i++) {
-        for (volatile int j = 0; j < 10000; j++);
+        for (int j = 0; j < 10000; j++);
     }
 }
 
