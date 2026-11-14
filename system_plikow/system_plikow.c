@@ -1,3 +1,10 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
 #include <system_plikow/system_plikow.h>
 #include <include/printf/printf.h>
 #include <drivers/floppy.h>

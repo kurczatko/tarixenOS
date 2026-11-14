@@ -1,3 +1,10 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
 #include <user_land/okno_user.h>
 #include <kernel/syscall.h>
 #include <libc/string.h>

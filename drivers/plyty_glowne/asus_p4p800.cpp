@@ -1,3 +1,10 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
 #include <drivers/plyty_glowne/asus_p4p800.h>
 
 static inline void p4p_outb(uint16_t port, uint8_t value)

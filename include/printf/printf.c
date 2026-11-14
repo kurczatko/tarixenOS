@@ -1,4 +1,11 @@
 /*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
+/*
 * okej na pocztku ta funkcja sluzyla do wypisywania tekstu w vga
 * ale teraz sluzy do wypisywania rzeczy na porcie szeregowym
 * bo system jest juz graficzny i nikt nie odczyta

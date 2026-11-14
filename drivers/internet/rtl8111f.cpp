@@ -1,3 +1,10 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
 #include <drivers/internet/rtl8111f.h>
 
 static inline uint8_t rtl8111f_inb(uint16_t port)

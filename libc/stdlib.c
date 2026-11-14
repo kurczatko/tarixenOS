@@ -1,3 +1,10 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
 #include <libc/stdlib.h>
 #include <libc/syscall.h>
 static uint32_t heap_ptr = 0;

@@ -1,4 +1,11 @@
 /*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
+/*
 * nie pozwolcie aby terry davis to zobaczyl
 * pewnie by mnie zjadl za to ze uzytkownik jest w ring 3
 * a nie w ring 0

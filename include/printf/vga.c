@@ -1,4 +1,11 @@
 /*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
+/*
 * wlasciwie jedyny powod dlaczego ten plik nie zostal usuniety
 * to to ze gdybym go usunal wywaliloby
 * milion bledow bo duzo plikow bo includuje

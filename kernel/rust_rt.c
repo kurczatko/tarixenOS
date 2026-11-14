@@ -1,3 +1,10 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
 /* Minimal Rust runtime support for freestanding kernel linkage.
  * Provides symbols that rustc emits references to when compiling
  * with -C panic=abort and -C link-arg=-nodefaultlibs. */
