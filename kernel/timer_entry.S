@@ -85,12 +85,12 @@ timer_entry:
     popf                               # regs.eflags
     movl 28(%edx), %edi
     movl 24(%edx), %esi
-    movl 20(%edx), %edx
     movl 16(%edx), %ecx
     movl 12(%edx), %ebx
     movl 8(%edx), %eax
     movl 4(%edx), %ebp
     movl (%edx), %esp
+    movl 20(%edx), %edx
 
 2:
     pop %gs

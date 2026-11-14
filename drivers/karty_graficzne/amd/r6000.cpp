@@ -193,7 +193,7 @@ void RadeonHD6000::pci_zapisz32(uint8_t bus, uint8_t slot, uint8_t funkcja, uint
 
 int RadeonHD6000::znajdz_urzadzenie(void)
 {
-    uint8_t bus;
+    uint16_t bus;
     uint8_t slot;
     uint8_t funkcja;
     uint32_t id;

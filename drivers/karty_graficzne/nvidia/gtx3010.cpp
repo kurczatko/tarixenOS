@@ -197,7 +197,7 @@ void Gtx3010::pci_zapisz32(uint8_t bus, uint8_t slot, uint8_t funkcja, uint8_t p
 
 int Gtx3010::znajdz_urzadzenie(void)
 {
-    uint8_t bus;
+    uint16_t bus;
     uint8_t slot;
     uint8_t funkcja;
     uint32_t id;

@@ -117,13 +117,12 @@ Acpi::Acpi(void)
 
 int Acpi::inicjalizuj(void)
 {
-    uint8_t i;
+    uint32_t i;
     const struct acpi_rsdp *rsdp = 0;
     const struct acpi_rsdp20 *rsdp20 = 0;
     const struct acpi_fadt *fadt = 0;
     const struct acpi_sdt_header *tabela = 0;
 
-    rsdp = (const struct acpi_rsdp *)0x000E0000;
     for (i = 0; i < 0x20000 / 16; i++) {
         const struct acpi_rsdp *kandydat = (const struct acpi_rsdp *)((uint8_t *)0x000E0000 + i * 16);
         uint8_t j;
