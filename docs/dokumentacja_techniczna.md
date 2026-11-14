@@ -1151,6 +1151,264 @@ zeruje wszystkie liczniki statystyk sterownika.
 void pixa3848_stats_reset(void)
 ```
 
+## sterownik kamery Quanta Computer ACER HD User Facing - drivers/hid/kamerki/quanta_acer_hd.cpp
+
+zaawansowany sterownik kamery internetowej Quanta Computer ACER HD User Facing napisany w C++. obsluguje wykrycie urzadzenia na magistrali USB (vendor 0x0408, urzadzenia 0x0606/0x0607/0x0608), klasę USB Video (UVC), interfejs sterowania i przesyłania strumieni wideo, negocjacje formatu wideo (MJPEG, nieskompresowany), wybór rozmiaru klatki i liczby klatek na sekundę, przekazywanie danych przez transfery izochroniczne (ISO), przechwytywanie klatek (snapshot), sterowanie jasnoscią, kontrastem, nasyceniem, odcieniem, wzmocnieniem, balansem bieli, trybem automatycznej ekspozycji, ostrością i trybem automatycznego ostrości, zarządzanie zasilaniem (power management), resetowanie kamery, przetwarzanie przerwań oraz statystyki sterownika (przechwycone klatki, utracone klatki, odczytane/zapisane sterowniki, błędy ISO, bajty odebrane). klasa QuantaACERHD jest singletonem dostepna przez `QuantaACERHD::instance()`. integracja przez driver manager z funkcjami C `quanta_acer_hd_init`, `quanta_acer_hd_shutdown`, `quanta_acer_hd_poll`.
+
+### quanta_acer_hd_init
+
+inicjalizuje sterownik kamery Quanta ACER HD: skanuje magistrale PCI/USB w poszukiwaniu kamery, wlacza magistrale (bus master + memory space), odczytuje deskryptory UVC, wylicza interfejs sterowania (control) i przesyłania strumieni (streaming), wylicza dostępne formaty i rozmiary klatek, wylicza sterowniki kamery (jasnosc, kontrast, nasycenie itp.), inicjalizuje strumienie wideo.
+
+```
+int quanta_acer_hd_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy kamera nie zostanie znaleziona lub inicjalizacja nie powiedzie sie.
+
+### quanta_acer_hd_shutdown
+
+zatrzymuje przesyłanie strumieni wideo, wylacza kamere i dezaktywuje sterownik.
+
+```
+void quanta_acer_hd_shutdown(void)
+```
+
+### quanta_acer_hd_poll
+
+wykonuje okreslne odswiezenie sterownika: przetwarza dane z transferow izochronicznych, aktualizuje statystyki klatek i sprawdza gotowosc nowych klatek. wywolywane przez driver manager w petli kernela.
+
+```
+void quanta_acer_hd_poll(void)
+```
+
+### quanta_acer_hd_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int quanta_acer_hd_is_ready(void)
+```
+
+### quanta_acer_hd_camera_count
+
+zwraca liczbe wykrytych kamer Quanta ACER HD.
+
+```
+int quanta_acer_hd_camera_count(void)
+```
+
+### quanta_acer_hd_camera_info
+
+pobiera informacje o kamerze o podanym indeksie: adres PCI/USB, vendor/product ID, numer wydania urzadzenia, adres urzadzenia, indeksy interfejsow sterowania i przesyłania, stan inicjalizacji, obsluge UVC, wersje UVC, czestotliwosc zegara, liczbe formatow i klatek, domyslny format i klatke, liczbe strumieni, liczbe sterownikow, stan zasilania, statystyki klatek i bledow.
+
+```
+int quanta_acer_hd_camera_info(uint8_t index, struct quanta_camera *out)
+```
+
+zwraca 1 przy sukcesie, 0 gdy indeks jest poza zakresem.
+
+### quanta_acer_hd_stream_start
+
+uruchamia strumien wideo na podanym indeksie strumienia z podanymi parametrami: szerokosc, wysokosc i liczba klatek na sekundę (fps).
+
+```
+int quanta_acer_hd_stream_start(uint8_t camera_index, uint8_t stream_index,
+                                 uint32_t width, uint32_t height, uint32_t fps)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach lub gdy strumien juz jest uruchomiony.
+
+### quanta_acer_hd_stream_stop
+
+zatrzymuje strumien wideo na podanym indeksie strumienia.
+
+```
+int quanta_acer_hd_stream_stop(uint8_t camera_index, uint8_t stream_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### quanta_acer_hd_stream_pause
+
+wstrzymuje przesyłanie strumienia wideo na podanym indeksie.
+
+```
+int quanta_acer_hd_stream_pause(uint8_t camera_index, uint8_t stream_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### quanta_acer_hd_stream_resume
+
+wznawia przesyłanie strumienia wideo na podanym indeksie po wstrzymaniu.
+
+```
+int quanta_acer_hd_stream_resume(uint8_t camera_index, uint8_t stream_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### quanta_acer_hd_frame_ready
+
+sprawdza czy nowa klatka wideo jest gotowa do odczytu na podanym strumieniu.
+
+```
+int quanta_acer_hd_frame_ready(uint8_t camera_index, uint8_t stream_index)
+```
+
+zwraca 1 gdy klatka jest gotowa, 0 gdy brak nowej klatki.
+
+### quanta_acer_hd_frame_read
+
+odczytuje gotowa klatke wideo do podanego bufora i zwraca jej rozmiar w bajtach.
+
+```
+int quanta_acer_hd_frame_read(uint8_t camera_index, uint8_t stream_index,
+                               void *buf, uint32_t *size)
+```
+
+zwraca 1 przy sukcesie, 0 gdy brak gotowej klatki lub bledne argumenty.
+
+### quanta_acer_hd_snapshot
+
+przechwytuje pojedyncza klatke (snapshot) z kamery na podanym strumieniu.
+
+```
+int quanta_acer_hd_snapshot(uint8_t camera_index, uint8_t stream_index,
+                             void *buf, uint32_t *size)
+```
+
+zwraca 1 przy sukcesie, 0 gdy brak gotowej klatki lub bledne argumenty.
+
+### quanta_acer_hd_control_get
+
+pobiera aktualna wartosc sterownika kamery (np. jasnosc, kontrast, nasycenie) o podanym selektorze sterowania.
+
+```
+int quanta_acer_hd_control_get(uint8_t camera_index, uint8_t ctrl_sel, int32_t *value)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie zostanie znaleziony.
+
+### quanta_acer_hd_control_set
+
+ustawia wartosc sterownika kamery o podanym selektorze sterowania.
+
+```
+int quanta_acer_hd_control_set(uint8_t camera_index, uint8_t ctrl_sel, int32_t value)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie zostanie znaleziony.
+
+### quanta_acer_hd_control_range
+
+pobiera zakres wartosci (min, max, rozmiar kroku, wartosc domyslna) dla danego sterownika kamery.
+
+```
+int quanta_acer_hd_control_range(uint8_t camera_index, uint8_t ctrl_sel,
+                                  int32_t *min, int32_t *max,
+                                  int32_t *res, int32_t *def)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie zostanie znaleziony.
+
+### quanta_acer_hd_control_auto
+
+wlacza lub wylacza tryb automatyczny dla danego sterownika (np. automatyczna ekspozycja, automatyczne ostroście).
+
+```
+int quanta_acer_hd_control_auto(uint8_t camera_index, uint8_t ctrl_sel,
+                                 uint8_t enable)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie zostanie znaleziony.
+
+### quanta_acer_hd_power_set_state / quanta_acer_hd_power_get_state
+
+ustawia lub pobiera stan zasilania kamery (D0-D3).
+
+```
+int quanta_acer_hd_power_set_state(uint8_t camera_index, uint8_t power_state);
+int quanta_acer_hd_power_get_state(uint8_t camera_index, uint8_t *power_state);
+```
+
+### quanta_acer_hd_reset
+
+resetuje kamere: zatrzymuje strumienie, wylacza urzadzenie i ponownie inicjalizuje.
+
+```
+int quanta_acer_hd_reset(uint8_t camera_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### quanta_acer_hd_stats_get
+
+pobiera statystyki sterownika do struktury `quanta_stats` (liczba wykrytych/zainicjowanych kamer, uruchomione/zatrzymane strumienie, przechwycone/utracone klatki, odczyte/zapisane sterowniki, bledy sterownikow i ISO, resety, bajty odebrane).
+
+```
+void quanta_acer_hd_stats_get(struct quanta_stats *out);
+```
+
+struktura `quanta_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| cameras_found | liczba wykrytych kamer |
+| cameras_init | liczba zainicjowanych kamer |
+| streams_started | liczba uruchomionych strumieni |
+| streams_stopped | liczba zatrzymanych strumieni |
+| frames_captured | liczba przechwyconych klatek |
+| frames_dropped | liczba utraconych klatek |
+| controls_read | liczba odczytanych sterownikow |
+| controls_written | liczba zapisanych sterownikow |
+| control_errors | liczba bledow sterownikow |
+| iso_errors | liczba bledow transferow ISO |
+| resets | liczba resetow kamery |
+| bytes_received | liczba odebranych bajtów |
+
+### QuantaACERHD::instance
+
+zwraca singleton sterownika.
+
+```
+static QuantaACERHD* instance();
+```
+
+### QuantaACERHD::probe
+
+sprawdza czy urzadzenie to kamera Quanta ACER HD (porownuje vendor ID i device ID).
+
+```
+uint8_t probe(uint16_t vendor, uint16_t device);
+```
+
+zwraca 1 gdy urzadzenie zostalo rozpoznane, 0 gdy nie.
+
+### QuantaACERHD::init
+
+inicjalizuje sterownik: skanuje kamery, inicjalizuje kazda z nich, odczytuje deskryptory i wylicza sterowniki.
+
+```
+void init(void);
+```
+
+### QuantaACERHD::deinit
+
+zatrzymuje wszystkie strumienie, wylacza kamery i dezaktywuje sterownik.
+
+```
+void deinit(void);
+```
+
+### QuantaACERHD::poll
+
+przetwarza przerwania i aktualizuje stan sterownika.
+
+```
+void poll(void);
+```
+
 ## dyskietka - drivers/floppy.c
 
 ### floppy_init

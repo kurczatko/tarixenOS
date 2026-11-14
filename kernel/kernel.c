@@ -19,6 +19,7 @@
 #include <drivers/plyty_glowne/intel_915.h>
 #include <drivers/mouse.h>
 #include <drivers/hid/touchpady/pixa3848.h>
+#include <drivers/hid/kamerki/quanta_acer_hd.h>
 #include <drivers/usb/core/usb.h>
 #include <drivers/usb/core/hid.h>
 #include <drivers/usb/mouse/mouse.h>
@@ -233,6 +234,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("raptorlake_cavs_audio", intel_raptorlake_cavs_init, intel_raptorlake_cavs_shutdown, intel_raptorlake_cavs_poll, 2);
     driver_manager_register("rst_vmd_disk", intel_rst_vmd_init, intel_rst_vmd_shutdown, intel_rst_vmd_poll, 2);
     driver_manager_register("thunderbolt4", thunderbolt4_init, thunderbolt4_shutdown, thunderbolt4_poll, 2);
+    driver_manager_register("quanta_acer_hd_cam", quanta_acer_hd_init, quanta_acer_hd_shutdown, quanta_acer_hd_poll, 2);
     driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);
     driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
     driver_manager_register("radeon_hd6000", radeon_hd6000_init, 0, 0, 4);
