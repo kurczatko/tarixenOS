@@ -728,11 +728,11 @@ void konta_obsluz(void)
         konta_start();
     }
     char znak;
-    while (keyboard_try_getchar(&znak)) {
-        uint8_t ctrl = keyboard_ctrl_pressed();
-        if (okno_konta.pole_tekstowe_znak) {
-            if (!okno_konta.pole_tekstowe_znak(&okno_konta, znak, ctrl)) break;
-        }
+    if (!keyboard_dane_dostepne()) return;
+    if (!keyboard_try_getchar(&znak)) return;
+    uint8_t ctrl = keyboard_ctrl_pressed();
+    if (okno_konta.pole_tekstowe_znak) {
+        okno_konta.pole_tekstowe_znak(&okno_konta, znak, ctrl);
     }
 }
 

@@ -70,6 +70,7 @@
 #include <drivers/internet/rtl8111e.h>
 #include <drivers/internet/rtl8168b.h>
 #include <drivers/internet/rtl8188ce.h>
+#include <include/printf/printf.h> /*do debugowania*/
 
 /*wykrywanie sprzetu*/
 
@@ -255,44 +256,64 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     __asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
     __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    konta_start();
-
+    //konta_start();
+    printf("q");
     pik_init();
+    printf("w");
     timer_init(100);
+    printf("e");
     pik_enable_irq(0);
-
+    printf("r");
     proces_init();
-
+    printf("t");
     driver_manager_init_all();
-
+    printf("y");
     if (!net_ready()) {
+        printf("u");
         net_init();
     }
+    printf("i");
     ustaw_status_internetu(net_ready());
 
     /*glowna petla kernela*/
 
     while(1) {
+        printf("o");
         char tekst_czasu[9];
+        printf("p");
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
+        printf("r");
         driver_manager_poll_all();
+        printf("s");
         mouse_poll();
+        printf("t");
         usb_poll();
+        printf("u");
         bluetooth_poll();
+        printf("y");
         hid_poll();
+        printf("z");
         kursor_tekstowy_tick();
+        printf("a");
         if (!konta_czy_zalogowano()) {
+            printf("s");
             konta_obsluz();
+            printf("d");
             keyboard_discard_pending();
+            printf("f");
+            if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
             continue;
         }
         if (keyboard_windows_pressed()) {
+            printf("g");
             menu_start_przelacz();
         }
         if (keyboard_dane_dostepne()) {
+            printf("h");
             klawiatura_obsługa_aktywnego_okna();
         }
         if (!aktywne_okno || !aktywne_okno->otwarte) {
+            printf("j");
             if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
         }
     }
