@@ -1409,6 +1409,227 @@ przetwarza przerwania i aktualizuje stan sterownika.
 void poll(void);
 ```
 
+## sterownik NVIDIA Titan X - drivers/karty_graficzne/nvidia/titanx.cpp
+
+zaawansowany sterownik karty graficznej NVIDIA Titan X (GP102 Pascal) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x10DE, urzadzenie 0x10D0), mapowanie MMIO, ring buffer, zarzadzanie VRAM (12 GB), inicjalizację wyświetlacza, potok graficzny, bufor wierzcholkow, bufor indeksow, tekstury, cele renderowania, bufor glebii, shadery (wierzcholkow, pikseli, geometrii, tessellation sterowania i evaluacji, obliczeniowe), stany probnika, mieszania, rasteryzacji i glebii-stencil, układy wejść, buforów stałych, łańcuchy wymiany, ogrodzenia i semafory, zaawansowaną akcelerację 3D oraz shadery. rejestracja przez driver manager z funkcjami C `titanx_init`, `titanx_shutdown`.
+
+### titanx_init
+
+inicjalizuje sterownik Titan X: skanuje magistrale PCI w poszukiwaniu karty GP102, wlacza magistrale (bus master + memory space), inicjalizuje ring buffer, pamiec VRAM, wyswietlacz i resetuje potok graficzny.
+
+```
+int titanx_init(void)
+```
+
+zwraca 0 przy sukcesie, -1 gdy urzadzenie nie zostalo wykryte lub inicjalizacja nie powiodla sie.
+
+### titanx_shutdown
+
+zatrzymuje potok graficzny i oznacza sterownik jako niegotowy.
+
+```
+void titanx_shutdown(void)
+```
+
+### titanx_czy_gotowy
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+uint8_t titanx_czy_gotowy(void)
+```
+
+### titanx_putpixel / titanx_fillrect / titanx_blt
+
+rysuje piksel, wypelnia prostokat oraz wykonuje operacje blit na ramce systemowej.
+
+```
+void titanx_putpixel(uint32_t x, uint32_t y, uint32_t kolor)
+void titanx_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t kolor)
+void titanx_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
+```
+
+### titanx_get_fb / titanx_get_szerokosc / titanx_get_wysokosc
+
+pobiera wskaznik na ramke systemowa oraz rozmiary bufora ramki.
+
+```
+void *titanx_get_fb(void)
+uint32_t titanx_get_szerokosc(void)
+uint32_t titanx_get_wysokosc(void)
+```
+
+### titanx_shader_stworz / titanx_shader_skompiluj
+
+tworzy shader o podanym typie (vertex, pixel, geometry, compute, tess_control, tess_eval) z podanym kodem i kompiluje go, zapisujac program shadera w rejestrze GPU.
+
+```
+titanx_handle_t titanx_shader_stworz(uint32_t typ, const uint8_t *kod, uint32_t rozmiar_kodu)
+void titanx_shader_skompiluj(titanx_handle_t uchwyt)
+void titanx_shader_zniszcz(titanx_handle_t uchwyt)
+```
+
+### titanx_rysuj / titanx_rysuj_indeksowane
+
+rysuje polygony z uzyciem powiazanych shaderow i celu renderowania, wspierajac zaawansowana akceleracje 3D.
+
+```
+void titanx_rysuj(uint32_t liczba_wierzcholkow, uint32_t pierwszy_wierzcholek)
+void titanx_rysuj_indeksowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka)
+void titanx_rysuj_indeksowane_instancjonowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka, uint32_t liczba_instancji, uint32_t pierwsza_instancja)
+void titanx_rysuj_po_indirekcie(uint32_t adres_bufora, uint32_t liczba_rysowan, uint32_t krok)
+```
+
+### titanx_oblicz_wyslij
+
+uruchamia shader obliczeniowy na podanych wymiarach grup (compute shader).
+
+```
+void titanx_oblicz_wyslij(uint32_t grupa_x, uint32_t grupa_y, uint32_t grupa_z)
+void titanx_oblicz_wyslij_po_indirekcie(uint32_t adres_bufora)
+```
+
+### titanx_ustaw_viewport / titanx_ustaw_scissor / titanx_ustaw_typ_pierwotnego / titanx_ustaw_tessellation
+
+konfiguruje viewport, obszar odcinania, typ pierwotnego oraz tryb i czynnik tessellation.
+
+```
+void titanx_ustaw_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_glebia, float max_glebia)
+void titanx_ustaw_scissor(uint32_t lewa, uint32_t gora, uint32_t prawa, uint32_t dol)
+void titanx_ustaw_typ_pierwotnego(uint32_t typ_pierwotnego)
+void titanx_ustaw_tessellation(uint32_t tryb, uint32_t factor)
+```
+
+### titanx_wyczysc_cel_renderowania / titanx_wyczysc_bufor_glebii
+
+czyszczy cel renderowania oraz bufor glebii/stencil.
+
+```
+void titanx_wyczysc_cel_renderowania(titanx_handle_t cel, uint32_t kolor)
+void titanx_wyczysc_bufor_glebii(titanx_handle_t bufor, float glebia, uint8_t stencil)
+```
+
+### titanx_vram_alokuj / titanx_vram_zwolnij
+
+alokuje i zwalnia pamiec VRAM karty graficznej.
+
+```
+uint64_t titanx_vram_alokuj(uint64_t rozmiar, uint32_t typ)
+void titanx_vram_zwolnij(uint64_t uchwyt)
+uint64_t titanx_vram_uzyto(void)
+uint64_t titanx_vram_calkowicie(void)
+```
+
+### titanx_lancuch_stworz / titanx_prezentuj
+
+tworzy lancuch wymiany (swap chain) z opcja vsync i prezentuje tylny bufor na ekranie.
+
+```
+titanx_handle_t titanx_lancuch_stworz(uint32_t szerokosc, uint32_t wysokosc, uint8_t vsync, uint8_t alpha_premultiplied)
+void titanx_prezentuj(titanx_handle_t lancuch)
+void titanx_lancuch_zniszcz(titanx_handle_t uchwyt)
+```
+
+### titanx_powiaz_shader_wierzcholkow / titanx_powiaz_shader_pikseli / titanx_powiaz_shader_geometrii / titanx_powiaz_shader_obliczeniowy
+
+powiazuje odpowiednie shadery z kontekstem graficznym i kompiluje je w GPU.
+
+```
+void titanx_powiaz_shader_wierzcholkow(titanx_handle_t uchwyt)
+void titanx_powiaz_shader_pikseli(titanx_handle_t uchwyt)
+void titanx_powiaz_shader_geometrii(titanx_handle_t uchwyt)
+void titanx_powiaz_shader_tess_kontrola(titanx_handle_t uchwyt)
+void titanx_powiaz_shader_tess_evaluacja(titanx_handle_t uchwyt)
+void titanx_powiaz_shader_obliczeniowy(titanx_handle_t uchwyt)
+```
+
+### titanx_powiaz_cel_renderowania / titanx_powiaz_bufor_glebii / titanx_powiaz_stan_mieszania / titanx_powiaz_stan_rasteryzacji / titanx_powiaz_stan_glebii_stencil
+
+powiazuje cele renderowania, bufor glebii, stany mieszania, rasteryzacji oraz glebii-stencil z kontekstem.
+
+```
+void titanx_powiaz_cel_renderowania(titanx_handle_t uchwyt)
+void titanx_powiaz_bufor_glebii(titanx_handle_t uchwyt)
+void titanx_powiaz_stan_mieszania(titanx_handle_t uchwyt)
+void titanx_powiaz_stan_rasteryzacji(titanx_handle_t uchwyt)
+void titanx_powiaz_stan_glebii_stencil(titanx_handle_t uchwyt)
+```
+
+### titanx_powiaz_probnik_i_teksture / titanx_powiaz_bufor_stale
+
+powiazuje probnik i teksture do gniazda oraz bufor stale do gniazda stalych.
+
+```
+void titanx_powiaz_probnik_i_teksture(uint32_t gniazdo, titanx_handle_t probnik, titanx_handle_t tekstura)
+void titanx_powiaz_bufor_stale(uint32_t gniazdo, titanx_handle_t uchwyt)
+```
+
+### titanx_tekstura_stworz / titanx_bufor_wierzcholkow_stworz / titanx_bufor_indeksow_stworz / titanx_cel_renderowania_stworz / titanx_bufor_glebii_stworz
+
+tworzy tekstury, bufor wierzcholkow, bufor indeksow, cele renderowania i bufor glebii z alokacja w VRAM.
+
+```
+titanx_handle_t titanx_tekstura_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint32_t poziomy_mip, const void *dane)
+titanx_handle_t titanx_bufor_wierzcholkow_stworz(uint32_t liczba_wierzcholkow, uint32_t rozmiar_wierzcholka, uint32_t format, const void *dane)
+titanx_handle_t titanx_bufor_indeksow_stworz(uint32_t liczba_indeksow, uint32_t format, const void *dane)
+titanx_handle_t titanx_cel_renderowania_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint8_t alpha_blend)
+titanx_handle_t titanx_bufor_glebii_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint8_t kompresja)
+```
+
+### titanx_stan_probnika_stworz / titanx_stan_mieszania_stworz / titanx_stan_rasteryzacji_stworz / titanx_stan_glebii_stencil_stworz / titanx_uklad_wejsc_stworz / titanx_bufor_stale_stworz
+
+tworzy odpowiednie stany graficzne: probnik, mieszanie, rasteryzacja, glebia-stencil, układ wejść i bufor stale.
+
+```
+titanx_handle_t titanx_stan_probnika_stworz(uint32_t filtr_min, uint32_t filtr_mag, uint32_t filtr_mip, uint32_t adres_u, uint32_t adres_v, uint32_t adres_w, uint32_t max_anizotropia, uint8_t wlacz_porownanie, uint8_t func_porownania)
+titanx_handle_t titanx_stan_mieszania_stworz(uint8_t wlacz_mieszanie, uint32_t src_blend, uint32_t dest_blend, uint32_t op_mieszania, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t op_mieszania_alpha, uint32_t maska_zapisu, uint32_t blend_factor)
+titanx_handle_t titanx_stan_rasteryzacji_stworz(uint32_t tryb_wypelnienia, uint32_t tryb_odcinania, uint8_t front_ccw, uint8_t clip_glebii, uint8_t scissor, uint8_t wielopr_probowanie, uint8_t aa_linia, uint8_t alpha_do_pokrycia)
+titanx_handle_t titanx_stan_glebii_stencil_stworz(uint8_t wlacz_glebie, uint32_t maska_zapisu_glebii, uint32_t func_glebii, uint8_t wlacz_stencil, uint8_t maska_odczytu_stencil, uint8_t maska_zapisu_stencil, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)
+titanx_handle_t titanx_uklad_wejsc_stworz(uint32_t liczba_elementow, const uint32_t *sloty, const uint32_t *przesuniecia, const uint32_t *formaty)
+titanx_handle_t titanx_bufor_stale_stworz(uint32_t rozmiar)
+```
+
+### titanx_ogrodzenie_stworz / titanx_semafor_stworz
+
+tworzy ogrodzenia i semafory do synchronizacji potoku graficznego.
+
+```
+void titanx_ogrodzenie_stworz(titanx_handle_t *wyjscie)
+void titanx_ogrodzenie_sygnalizuj(titanx_handle_t uchwyt, uint32_t wartosc)
+int titanx_ogrodzenie_poczekaj(titanx_handle_t uchwyt, uint32_t wartosc, uint32_t timeout_us)
+void titanx_ogrodzenie_zniszcz(titanx_handle_t uchwyt)
+void titanx_semafor_stworz(titanx_handle_t *wyjscie)
+void titanx_semafor_sygnalizuj(titanx_handle_t uchwyt, uint32_t wartosc)
+void titanx_semafor_poczekaj(titanx_handle_t uchwyt, uint32_t wartosc)
+void titanx_semafor_zniszcz(titanx_handle_t uchwyt)
+```
+
+### titanx_ustaw_stan_zasilania / titanx_ustaw_zegar_graficzny / titanx_ustaw_zegar_pamieci / titanx_pobierz_temperature / titanx_ustaw_predkosc_wiatraka / titanx_ustaw_rgb
+
+zarzadza stanem zasilania, zegarami graficznym i pamieci, temperatura, predkoscia wiatraka oraz podswietleniem RGB.
+
+```
+void titanx_ustaw_stan_zasilania(uint8_t stan)
+uint8_t titanx_pobierz_stan_zasilania(void)
+void titanx_ustaw_zegar_graficzny(uint32_t mhz)
+void titanx_ustaw_zegar_pamieci(uint32_t mhz)
+uint32_t titanx_pobierz_zegar_graficzny(void)
+uint32_t titanx_pobierz_zegar_pamieci(void)
+uint32_t titanx_pobierz_temperature(void)
+void titanx_ustaw_predkosc_wiatraka(uint32_t obroty)
+uint32_t titanx_pobierz_predkosc_wiatraka(void)
+void titanx_ustaw_rgb(uint32_t kolor, uint8_t tryb)
+void titanx_wylacz_rgb(void)
+```
+
+### titanx_akceleracja_3d_dostepna
+
+zwraca 1 gdy zaawansowana akceleracja 3D jest dostepna (sterownik zainicjowany).
+
+```
+int titanx_akceleracja_3d_dostepna(void)
+```
+
 ## dyskietka - drivers/floppy.c
 
 ### floppy_init
