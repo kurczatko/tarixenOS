@@ -5025,6 +5025,245 @@ rejestry DSP cAVS:
 | CAVS_DSP_IPC_IER | maska przerwan IPC |
 | CAVS_DSP_CLK_CTL | kontrola zegara DSP |
 
+## sterownik kontrolera Intel RST VMD - drivers/kontrolery/intel_rst_vmd.cpp
+
+zaawansowany sterownik kontrolera Intel RST VMD (Volume Management Device) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenia 0x5060/0x5062/0x5063/0x5065/0x7A02/0x7A03/0x7A08), mapowanie MMIO, inicjalizacje kontrolera VMD, skanowanie urzadzen NVMe za pomoca VMD, tworzenie i zarzadzanie wolumenami RAID (RAID 0, 1, 5, 10), obsługę hot-plug portow, zarzadzanie zasilaniem (power management), monitorowanie temperatury, resetowanie kontrolera, przetwarzanie przerwan oraz statystyki sterownika. klasa IntelRSTVMD jest singletonem dostepna przez `IntelRSTVMD::instance()`. integracja przez driver manager z funkcjami C `intel_rst_vmd_init`, `intel_rst_vmd_shutdown`, `intel_rst_vmd_poll`.
+
+### intel_rst_vmd_init
+
+inicjalizuje sterownik Intel RST VMD: skanuje magistrale PCI w poszukiwaniu kontrolerow VMD, mapuje adresy MMIO, odczytuje rejestry mozliwosci (wlaczenie NVMe, RAID, hot-plug, zarzadzanie zasilaniem, monitor temperatury), wlacza kontrolery, konfiguruje porty, skanuje urzadzenia NVMe i wolumeny RAID.
+
+```
+int intel_rst_vmd_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy zadny kontroler VMD nie zostanie znaleziony lub inicjalizacja nie powiedzie sie.
+
+### intel_rst_vmd_shutdown
+
+wylacza wszystkie kontrolery VMD, dezaktywuje sterownik i zwalnia zasoby.
+
+```
+void intel_rst_vmd_shutdown(void)
+```
+
+### intel_rst_vmd_poll
+
+wykonuje okreslne odswiezenie sterownika: przetwarza przerwania kontrolera VMD (zmiany portow, zmiany wolumenow, progi temperatury, bledy), aktualizuje odczyty temperatury i skanuje nowe urzadzenia (hot-plug). wywolywane przez driver manager w petli kernela.
+
+```
+void intel_rst_vmd_poll(void)
+```
+
+### intel_rst_vmd_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int intel_rst_vmd_is_ready(void)
+```
+
+### intel_rst_vmd_controller_count
+
+zwraca liczbe wykrytych kontrolerow VMD.
+
+```
+int intel_rst_vmd_controller_count(void)
+```
+
+### intel_rst_vmd_controller_info
+
+pobiera informacje o kontrolerze VMD o podanym indeksie: adres PCI, vendor/device ID, adres BAR0, wskaznik MMIO, stan inicjalizacji, liczbe portow, obsluge NVMe/RAID/hot-plug/zasilania/temperatury, stan zasilania, rejestr mozliwosci, wersje firmware i temperature.
+
+```
+int intel_rst_vmd_controller_info(uint8_t index, struct rst_vmd_controller *out)
+```
+
+zwraca 1 przy sukcesie, 0 gdy indeks jest poza zakresem.
+
+### intel_rst_vmd_device_count
+
+zwraca liczbe wykrytych urzadzen NVMe dla danego kontrolera VMD.
+
+```
+int intel_rst_vmd_device_count(uint8_t controller_index)
+```
+
+### intel_rst_vmd_device_info
+
+pobiera informacje o urzadzeniu NVMe o podanym indeksie dla danego kontrolera: indeks portu, vendor/device ID, obecnosc, stan lacza, obsługe NVMe, pojemnosc, rozmiar bloku i temperature.
+
+```
+int intel_rst_vmd_device_info(uint8_t controller_index, uint8_t device_index, struct rst_vmd_device *out)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### intel_rst_vmd_volume_count
+
+zwraca liczbe wolumenów RAID dla danego kontrolera VMD.
+
+```
+int intel_rst_vmd_volume_count(uint8_t controller_index)
+```
+
+### intel_rst_vmd_volume_info
+
+pobiera informacje o wolumenie o podanym indeksie: ID wolumenu, typ (RAID 0/1/5/10/single), stan (online/degraded/failed/rebuilding), liczbe skladnikow, porty skladnikowe, pojemnosc, rozmiar bloku i postep odbudowy.
+
+```
+int intel_rst_vmd_volume_info(uint8_t controller_index, uint8_t volume_index, struct rst_vmd_volume *out)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### intel_rst_vmd_port_enable / intel_rst_vmd_port_disable
+
+wlacza lub wylacza port VMD o podanym indeksie dla danego kontrolera, wlacza/wylacza obsluge NVMe na porcie.
+
+```
+int intel_rst_vmd_port_enable(uint8_t controller_index, uint8_t port_index);
+int intel_rst_vmd_port_disable(uint8_t controller_index, uint8_t port_index);
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### intel_rst_vmd_port_rescan
+
+ponownie skanuje porty kontrolera VMD w poszukiwaniu nowych urzadzen (obsługa hot-plug).
+
+```
+int intel_rst_vmd_port_rescan(uint8_t controller_index)
+```
+
+zwraca 1 przy sucesso, 0 przy blednych argumentach.
+
+### intel_rst_vmd_volume_create
+
+tworzy nowy wolumen RAID na danym kontrolerze VMD z podanymi portami skladnikowymi i typem wolumenu (RAID 0, 1, 5, 10 lub single).
+
+```
+int intel_rst_vmd_volume_create(uint8_t controller_index, uint8_t volume_type, const uint8_t *member_ports, uint8_t member_count)
+```
+
+zwraca ID stworzonego wolumenu lub 0 przy bledzie.
+
+### intel_rst_vmd_volume_delete
+
+usuwa wolumen RAID o podanym ID dla danego kontrolera.
+
+```
+int intel_rst_vmd_volume_delete(uint8_t controller_index, uint8_t volume_id)
+```
+
+zwraca 1 przy sukcesie, 0 gdy wolumen nie zostanie znaleziony.
+
+### intel_rst_vmd_volume_rebuild
+
+uruchamia odbudowe wolumenu RAID o podanym ID.
+
+```
+int intel_rst_vmd_volume_rebuild(uint8_t controller_index, uint8_t volume_id)
+```
+
+zwraca 1 przy sukcesie, 0 gdy wolumen nie zostanie znaleziony.
+
+### intel_rst_vmd_power_set_state / intel_rst_vmd_power_get_state
+
+ustawia lub pobiera stan zasilania kontrolera VMD (D0-D3).
+
+```
+int intel_rst_vmd_power_set_state(uint8_t controller_index, uint8_t power_state);
+int intel_rst_vmd_power_get_state(uint8_t controller_index, uint8_t *power_state);
+```
+
+### intel_rst_vmd_temperature_read
+
+odczytuje temperatura kontrolera VMD w stopniach Celsjusza.
+
+```
+int intel_rst_vmd_temperature_read(uint8_t controller_index, int32_t *temperature_c)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### intel_rst_vmd_reset
+
+resetuje kontroler VMD (zatrzymanie, wlaczenie ponownie, ponowne skanowanie urzadzen i wolumenow).
+
+```
+int intel_rst_vmd_reset(uint8_t controller_index)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### intel_rst_vmd_stats_get
+
+pobiera statystyki sterownika do struktury `rst_vmd_stats` (liczba wykrytych/zainicjowanych kontrolerow, urzadzen, wolumenow, zdarzen hot-plug, zmian zasilania, ostrzezen temperatury, temperatur krytycznych, bledow i resetow).
+
+```
+void intel_rst_vmd_stats_get(struct rst_vmd_stats *out);
+```
+
+struktura `rst_vmd_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| controllers_found | liczba wykrytych kontrolerow VMD |
+| controllers_init | liczba zainicjowanych kontrolerow |
+| devices_found | liczba wykrytych urzadzen NVMe |
+| devices_online | liczba urzadzen online |
+| volumes_created | liczba stworzonych wolumenow RAID |
+| volumes_online | liczba wolumenow online |
+| hot_plug_events | liczba zdarzen hot-plug |
+| power_changes | liczba zmian stanu zasilania |
+| temp_warnings | liczba ostrzezen temperatury |
+| temp_critical | liczba krytycznych temperatur |
+| errors | liczba bledow sterownika |
+| resets | liczba resetow kontrolera |
+
+### IntelRSTVMD::instance
+
+zwraca singleton sterownika.
+
+```
+static IntelRSTVMD* instance();
+```
+
+### IntelRSTVMD::probe
+
+sprawdza czy urzadzenie to Intel RST VMD (porownuje vendor ID i device ID).
+
+```
+uint8_t probe(uint16_t vendor, uint16_t device);
+```
+
+zwraca 1 gdy urzadzenie zostalo rozpoznane, 0 gdy nie.
+
+### IntelRSTVMD::init
+
+inicjalizuje sterownik: skanuje kontrolery na PCI, inicjalizuje kazdy z nich, skanuje urzadzenia i wolumeny.
+
+```
+void init(void);
+```
+
+### IntelRSTVMD::deinit
+
+wylacza wszystkie kontrolery, dezaktywuje sterownik.
+
+```
+void deinit(void);
+```
+
+### IntelRSTVMD::poll
+
+przetwarza przerwania i aktualizuje stan sterownika.
+
+```
+void poll(void);
+```
+
 ## sterownik plyty glownej ASUS P4P800 - drivers/plyty_glowne/asus_p4p800.cpp
 
 Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.
