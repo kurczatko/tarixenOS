@@ -55,12 +55,10 @@
 #include <user_land/konta.h>
 #include <gdt.h>
 #include <idt.h>
-#include <syscall.h>
 #include <user_land/tapeta.h>
 #include <drivers/karty_graficzne/radeon_rx_9070_xt.h>
 #include <graficzny/podzespoly.h>
 #include <graficzny/eksplorator_plikow.h>
-#include <panika.h>
 #include <proces.h>
 #include <driver_manager.h>
 #include <timer.h>
