@@ -12,6 +12,7 @@
 #include <drivers/internet/rtl8188ce.h>
 #include <drivers/internet/rtl8111e.h>
 #include <drivers/internet/rtl8111f.h>
+#include <drivers/internet/mt7921.h>
 
 extern int intel_82578dc_driver_init(void);
 extern int intel_82578dc_driver_detected(void);
@@ -228,6 +229,9 @@ int net_init(void)
     if (intel_82578dc_driver_init() && intel_82578dc_driver_detected()) {
         net_send_fn = intel_82578dc_send_packet;
         net_receive_fn = intel_82578dc_receive_packet;
+    } else if (mt7921_init() && mt7921_get_mac(mac_address)) {
+        net_send_fn = mt7921_send;
+        net_receive_fn = mt7921_receive;
     } else if (rtl8111f_init() && rtl8111f_get_mac(mac_address)) {
         net_send_fn = rtl8111f_send;
         net_receive_fn = rtl8111f_receive;

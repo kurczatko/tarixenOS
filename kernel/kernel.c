@@ -68,6 +68,7 @@
 #include <drivers/internet/rtl8111e.h>
 #include <drivers/internet/rtl8168b.h>
 #include <drivers/internet/rtl8188ce.h>
+#include <drivers/internet/mt7921.h>
 #include <include/printf/printf.h> /*do debugowania*/
 
 /*wykrywanie sprzetu*/
@@ -221,6 +222,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("rtl8111e_net", rtl8111e_init, 0, 0, 2);
     driver_manager_register("rtl8168b_net", rtl8168b_init, 0, 0, 2);
     driver_manager_register("rtl8188ce_net", rtl8188ce_init, 0, 0, 2);
+    driver_manager_register("mt7921_wifi", mt7921_init, mt7921_shutdown, mt7921_poll, 2);
     driver_manager_register("bluetooth", bluetooth_init, 0, bluetooth_poll, 2);
     driver_manager_register("mouse", mouse_init, 0, mouse_poll, 2);
     driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);

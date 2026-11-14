@@ -1359,6 +1359,195 @@ struktura `rtl8188ce_stats` zawiera:
 | rx_errors | bledy odbioru |
 | resets | liczba resetow chipa |
 
+## sterownik MediaTek MT7921 - drivers/internet/mt7921.cpp
+
+zaawansowany sterownik karty sieciowej MediaTek MT7921 (PCIe WiFi 6, 802.11ax, 2x2 MU-MIMO, pasma 2.4 GHz i 5 GHz) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x14C3, urzadznia 0x0616/0x7916), mapowanie MMIO, soft-reset chipa, odczyt adresu MAC, wlaczenie radia WiFi, wybór pasma i kanalu, skanowanie SSID, autoryzację/asocjację, odczyt mocy sygnaly (RSSI), wysylanie i odbieranie ramek ethernet za pomocą wielu deskryptorów TX/RX (8 TX, 16 RX), tryb polling (bez przerwan), monitorowanie lacza, statystyki TX/RX z licznikami bledow, test petli (loopback), \filtr multicast, reset statystyk oraz wylaczenie sterownika. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive`, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
+
+### mt7921_init
+
+inicjalizuje sterownik MT7921: wyszukuje urzadzenie na magistrali PCI, mapuje adresy MMIO, resetuje chip, czytujeadres MAC, konfiguruje rejestry CFG (TX/RX/radio), wlacza radio WiFi, ustawia kanal domyslny 1 (2.4 GHz), konfiguruje adresy buforow odbiorczych i deskryptorow nadawczych, wlacza nadawanie i odbieranie.
+
+```
+int mt7921_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja ne powiodla sie.
+
+### mt7921_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int mt7921_is_ready(void)
+```
+
+### mt7921_get_mac
+
+pobiera adres MAC karty WiFi do tablicy 6 bajtow.
+
+```
+int mt7921_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### mt7921_send
+
+wysyla ramke ethernet przez karte WiFi. oczekuje az deskryptor nadawczy zostanie zwolniony przez karte (bit OWN), kopiuje ramke do bufora nadawczego, ustawia bity OWN i dlugosc w deskryptorze oraz oczekuje na zakonczenie nadawania. aktualizuje statystyki TX (pakiety, bajty, bledy).
+
+```
+int mt7921_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie nadawania (deskryptor zajety), -1 przy blednych argumentach.
+
+### mt7921_receive
+
+odbiera nastepna dostepna ramke z bufora odbiorczego do podanego bufora. tryb polling (bez przerwan), sprawdza rejestr ISR, potwierdza przerwanie odbioru, parsuje naglowek ramki (status + dlugosc) i kopiuje dane do bufora wyjsciowego. aktualizuje statystyki RX (pakiety, bajty, bledy).
+
+```
+int mt7921_receive(void *frame, uint16_t capacity)
+```
+
+zwraca dlugosc odebranej ramki w bajtach, 0 gdy brak danych, -1 przy blednych argumentach.
+
+### mt7921_link_up
+
+sprawdza stan lacza WiFi poprzez odczyt rejestru statusu. aktualizuje wewnetrzny stan lacza i zwraca 1 gdy lacze jest aktywne.
+
+```
+int mt7921_link_up(void)
+```
+
+### mt7921_speed_mbps
+
+zwraca predkosc lacza WiFi w Mbps (np. 866 dla 802.11ax) lub 0 gdy lacze jest nieaktywne.
+
+```
+int mt7921_speed_mbps(void)
+```
+
+### mt7921_rssi
+
+zwraca moc sygnału WiFi (RSSI) w dBm. odczytuje wartosc z rejestru chipu lub zwraca ostatnia zanotowana wartosc.
+
+```
+int mt7921_rssi(void)
+```
+
+### mt7921_channel_get
+
+zwraca aktualny kanal WiFi.
+
+```
+int mt7921_channel_get(void)
+```
+
+### mt7921_channel_set
+
+ustawia kanal WiFi (1-14 dla 2.4 GHz, 36-165 dla 5 GHz) i dopasowuje pasmo (2.4 GHz lub 5 GHz).
+
+```
+int mt7921_channel_set(uint8_t channel)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach lub gdy sterownik nie jest gotowy.
+
+### mt7921_ssid_scan
+
+uruchamia skanowanie sieci WiFi (SSID), czeka na zakonczenie skanowania (bit SCAN_DONE w rejestrze statusu) i zwraca liczbe znalezionych sieci.
+
+```
+int mt7921_ssid_scan(void)
+```
+
+zwraca 1 gdy skanowanie zakonczylo sie sukcesem, 0 przy bledzie.
+
+### mt7921_autonegotiate
+
+uruchamia autoryzację/asocjację WiFi (wlącza radio i asocjację), czeka na zakonczenie (AUTH_SUCCESS lub AUTH_FAILED w rejestrze AUTH) i aktualizuje informacje o laczu.
+
+```
+int mt7921_autonegotiate(void)
+```
+
+zwraca 1 gdy autoryzacja zakonczyla sie sukcesem i lacze jest aktywne, 0 w przeciwnym razie.
+
+### mt7921_reset_link
+
+resetuje lacze WiFi (wylacza radio) i ponownie uruchamia autoryzację.
+
+```
+int mt7921_reset_link(void)
+```
+
+zwraca 1 gdy lacze zostalo przywrocone, 0 przy bledzie.
+
+### mt7921_loopback_test
+
+wykonuje test petli (loopback): wlacza loopback w rejestrze CFG, wysyla ramke testowa, odbiera ja z powrotem i porownuje zawartosc. nastepnie wraca do poprzedniej wartosci CFG.
+
+```
+int mt7921_loopback_test(const void *frame, uint16_t length)
+```
+
+zwraca 1 gdy test powiodl sie (ramka wyslana i odebrana identycznie), 0 przy bledzie, -1 przy blednych argumentach.
+
+### mt7921_set_multicast
+
+konfiguruje filtr multicast (tablica hasha). obecna implementacja ustawia wszystkie bity na 1 (akceptuje wszystkie adresy multicast).
+
+```
+void mt7921_set_multicast(const uint8_t *addresses, uint32_t count)
+```
+
+### mt7921_stats_get
+
+pobiera statystyki sterownika do struktury `mt7921_stats` (liczniki pakietow i bajtow TX/RX, bledy nadawania i odbioru, resets, link_changes, auth_failures, scan_results).
+
+```
+void mt7921_stats_get(struct mt7921_stats *out)
+```
+
+struktura `mt7921_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| tx_packets | liczba wyslanych pakietow |
+| tx_bytes | liczba wyslanych bajtow |
+| tx_errors | bledy nadawania |
+| rx_packets | liczba odebranych pakietow |
+| rx_bytes | liczba odebranych bajtow |
+| rx_errors | bledy odbioru |
+| resets | liczba resetow chipa |
+| link_changes | liczba zmian stanu lacza |
+| auth_failures | liczba nieudanych autoryzacji |
+| scan_results | liczba wynikow skanowania SSID |
+
+### mt7921_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void mt7921_stats_reset(void)
+```
+
+### mt7921_shutdown
+
+zatrzymuje karte (reset CFG) i oznacz sterownik jako niegotowy.
+
+```
+void mt7921_shutdown(void)
+```
+
+### mt7921_poll
+
+wykonuje okreslne odswiezenie stanu lacza i potwierdza oczekujace przerwania (ISR). uzywane przez driver manager w trybie polling.
+
+```
+void mt7921_poll(void)
+```
+
 ## sterownik intel 82578dc wifi - rust/drivers/wifi/intel_82578dc.rs
 
 sterownik karty sieciowej Intel 82578DC (PCIe Gigabit Ethernet / WiFi) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenie 0x1502), mapowanie MMIO, soft-reset chipa, konfiguracje adresu MAC, deskryptory nadawcze i odbiorcze (TX/RX), przerwania, odbiornik i nadajnik, monitorowanie lacza, wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. napisany w Rust z `#[no_std]` i `#[no_main]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/wifi/*.rs)`) i linkowany do jadra. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed Realtek/E1000, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
