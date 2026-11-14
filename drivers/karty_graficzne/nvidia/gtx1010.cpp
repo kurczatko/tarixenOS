@@ -322,7 +322,7 @@ int Gtx1010::inicjalizuj(void)
     inicjalizuj_wyswietlacz();
     resetuj_potok();
     inicjalizowane = 1;
-    return 0;
+    return 1;
 }
 
 void Gtx1010::zamknij(void)
