@@ -9906,3 +9906,208 @@ driver_manager_register("gtx2010", gtx2010_init, 0, 0, 4);
 
 `gtx2010_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
 
+## sterownik grafiki NVIDIA GeForce GTX 1010 - drivers/karty_graficzne/nvidia/gtx1010
+
+zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 1010 (architektura Pascal, GP107) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, zaawansowana akceleracja 3D, tekstury 2D/3D/tablice/cubemapy, shadry (wierzcholkowe, pikselowe, geometrii, obliczeniowe, tessellation kontrolny i ewaluacyjny), render targety z MSAA, depth-stencil, command buffer, presentation oraz zarzadzanie zasilaniem i chlodzeniem. pliki: `drivers/karty_graficzne/nvidia/gtx1010.h` i `drivers/karty_graficzne/nvidia/gtx1010.cpp`. kompilowany jako C++ i laczony do jadra 32-bitowego.
+
+### wykrywanie urzadzenia
+
+sterownik skanuje szyne PCI w poszukiwaniu urzadzenia klasy 0x03 (grafika) z vendor ID 0x10DE (NVIDIA) i dev ice ID GP107 (0x1D01 lub 0x1D02). po wykryciu odczytuje BAR0 (adres MMIO), wlacza dostep do pmieci i rejestrow poleceń, inicjalizuje ring buffer PFIFO, pamiec VRAM oraz wyswietlacz (DISP/CRTC).
+
+### klasa Gtx1010
+
+| metoda | opis |
+|--------|------|
+| Gtx1010() | konstruktor, zeruje stan wszystkich buforow, tekstur, shaderow i kontekstu |
+| int inicjalizuj(void) | wykrywa karte PCI, inicjalizuje MMIO, ring buffer, VRAM, wyswietlacz, resetuje potok graficzny |
+| void zamknij(void) | zatrzymuje PFIFO i dezaktywuje sterownik |
+| uint8_t czy_gotowy(void) | 1 gdy sterownik zainicjalizowany |
+| void putpixel(x, y, kolor) | rysuje pojedynczy piksel w framebufferze |
+| void fillrect(x, y, w, h, kolor) | wypelnia prostokat kolorem |
+| void blt(dst_x, dst_y, src_x, src_y, w, h) | kopiuje blok pikseli (bitblt) |
+| void cursor_set(x, y, obraz) | ustawia kursor myszy i jego bitmape |
+| void cursor_hide(void) | ukrywa kursor |
+| void *get_fb(void) | zwraca wskaznik do framebuffera |
+| uint32_t get_szerokosc(void) | szerokosc framebuffera |
+| uint32_t get_wysokosc(void) | wysokosc framebuffera |
+| uint16_t get_device_id(void) | identyfikator urzadzenia PCI |
+| uint8_t get_rewizja(void) | rewizja ukladu |
+| void info_pobierz(struct gtx1010_info *wyjscie) | pelne informacje o urzadzeniu |
+
+### zarzadzanie pamiecia VRAM
+
+| metoda | opis |
+|--------|------|
+| uint64_t vram_alokuj(rozmiar, typ) | alokuje blok w VRAM, zwraca offset lub HANDLE_NULL |
+| void vram_zwolnij(uchwyt) | zwalnia blok VRAM |
+| uint64_t vram_uzyto(void) | uzyta pamiec VRAM |
+| uint64_t vram_calkowicie(void) | calkowita pamiec VRAM |
+
+### obiekty graficzne (bufory, tekstury, shadery, stany)
+
+sterownik obsluguje tworzenie, niszczenie, aktualizacje i wiazanie:
+- buforow wierzcholkow (`bufor_wierzcholkow_stworz/zniszcz/zaktualizuj`)
+- buforow indeksow (`bufor_indeksow_stworz/zniszcz/zaktualizuj`)
+- tekstur 2D (`tekstura_stworz/zniszcz/zaktualizuj/wygeneruj_mipmapy`)
+- tekstur 3D (`tekstura_stworz_3d`)
+- tekstur tablicowych (`tekstura_stworz_tablice`)
+- tekstur cubemap (`tekstura_stworz_cubemap`)
+- celow renderowania (`cel_renderowania_stworz/zniszcz`) oraz MSAA (`cel_renderowania_stworz_msaa`)
+- buforow glebi-stencil (`bufor_glebii_stworz/zniszcz`)
+- shaderow wierzcholkowych, pikselowych, geometrii, obliczeniowych i tessellation (`shader_stworz/zniszcz/skompiluj`)
+- stanu probnika (`stan_probnika_stworz/zniszcz`)
+- stanu mieszania alpha (`stan_mieszania_stworz/zniszcz`)
+- stanu rasteryzacji (`stan_rasteryzacji_stworz/zniszcz`)
+- stanu glebi-stencil (`stan_glebii_stencil_stworz/zniszcz`)
+- ukladow wejścia (`uklad_wejsc_stworz/zniszcz`)
+- buforow stalych (`bufor_stale_stworz/zniszcz/zaktualizuj`)
+
+### wiazanie i rysowanie 3D
+
+| metoda | opis |
+|--------|------|
+| powiaz_bufor_wierzcholkow(uchwyt) | wiaze aktywny bufor wierzcholkow |
+| powiaz_shader_wierzcholkow/pikseli/geometrii/obliczeniowy(uchwyt) | wiaze shader danego typu |
+| powiaz_shader_tess_kontrolny/evaluacyjny(uchwyt) | wiaze shader tessellation |
+| powiaz_cel_renderowania(uchwyt) | wiaze cel renderowania (framebuffer wyjsciowy) |
+| powiaz_bufor_glebii(uchwyt) | wiaze bufor glebi |
+| powiaz_stan_mieszania/rasteryzacji/glebii_stencil(uchwyt) | wiaze stany potoku |
+| powiaz_probnik_i_teksture(gniazdo, probnik, tekstura) | wiaze probnik i teksture do gniazda |
+| powiaz_bufor_stale(gniazdo, uchwyt) | wiaze bufor stalych |
+| ustaw_viewport(x, y, w, h, min_glebia, max_glebia) | ustawia okno widoku |
+| ustaw_scissor(lewa, gora, prawa, dol) | ustawia region odciecia |
+| ustaw_typ_pierwotnego(typ) | ustawia typ primitive (punkt, linia, trojkat, trojkat_pasek, trojkat_fan, linia_pasek, linia_petla, patch, trojkat_sasiadow, linia_sasiadow) |
+| ustaw_mieszanie_alpha_globalne(wlacz) | globalne mieszanie alpha |
+| ustaw_tess_czynnik(czynnik) | ustawia czynnik tessellation |
+| ustaw_msaa(proben) | ustawia liczba probek MSAA |
+| wyczysc_cel_renderowania(cel, kolor) | czyści cel renderowania |
+| wyczysc_bufor_glebii(bufor, glebia, stencil) | czyści bufor glebi-stencil |
+| rysuj(liczba_wierzcholkow, pierwszy) | rysuje geometryczne primitive |
+| rysuj_indeksowane(liczba_indeksow, pierwszy_indeks, baza) | rysuje z indeksami |
+| rysuj_indeksowane_instancjonowane(...) | rysuje instancjonowane |
+| rysuj_po_indirekcie(adres, liczba, krok) | rysowanie po indirekcie |
+
+### compute i synchronizacja
+
+| metoda | opis |
+|--------|------|
+| oblicz_wyslij(grupa_x, grupa_y, grupa_z) | wysyla zadanie compute shader |
+| oblicz_wyslij_po_indirekcie(adres) | compute po indirekcie |
+| ogrodzenie_stworz/sygnalizuj/poczekaj/zniszcz | ogrodzenia (fences) |
+| semafor_stworz/sygnalizuj/poczekaj/zniszcz | semafory |
+| int czekaj_na_bezczynnosc(timeout_us) | czeka na bezczynnosc GPU |
+| uint64_t znacznik_czasu(void) | zwraca znacznik czasu GPU |
+
+### zasilanie, zegary, temperatura, wiatrak, RGB
+
+| metoda | opis |
+|--------|------|
+| ustaw_stan_zasilania(stan) | ustawia stan ACPI D0-D3 |
+| pobierz_stan_zasilania(void) | zwraca aktualny stan zasilania |
+| ustaw_zegar_graficzny(mhz) | ustawia zegar rdzenia GPU |
+| ustaw_zegar_pamieci(mhz) | ustawia zegar pamieci |
+| pobierz_zegar_graficzny(void) | zwraca zegar rdzenia MHz |
+| pobierz_zegar_pamieci(void) | zwraca zegar pamieci MHz |
+| pobierz_temperature(void) | zwraca temperature GPU |
+| ustaw_predkosc_wiatraka(obroty) | ustawia predkosc wiatraka RPM |
+| pobierz_predkosc_wiatraka(void) | zwraca predkosc wiatraka |
+| ustaw_rgb(kolor, tryb) | sterowanie podswietleniem RGB |
+| wylacz_rgb(void) | wylacza RGB |
+
+### swap chain i presentation
+
+| metoda | opis |
+|--------|------|
+| lancuch_stworz(szerokosc, wysokosc, vsync, alpha_premultiplied) | tworzy lancuch zamiany buforow |
+| lancuch_zniszcz(uchwyt) | niszczy lancuch |
+| prezentuj(lancuch) | prezentuje klatke (przelacza front/back buffer) |
+
+### command buffer
+
+| metoda | opis |
+|--------|------|
+| polecenia_rozpocznij() | rozpoczyna nagrywanie do command buffera |
+| polecenia_zakoncz() | konczy i oddaje command buffer do wykonania |
+| kontekst_pobierz(wyjscie) | zwraca aktualny kontekst graficzny |
+| int akceleracja_3d_dostepna(void) | 1 gdy akceleracja 3D aktywna |
+
+### API C
+
+wszystkie funkcje z prefixem `gtx1010_` otaczaja metody klasy `Gtx1010` i maja linkage C (np. `gtx1010_init`, `gtx1010_putpixel`, `gtx1010_shader_stworz`, `gtx1010_rysuj`, `gtx1010_oblicz_wyslij`, `gtx1010_prezentuj` itd.).
+
+### rejestry MMIO (wybrane)
+
+| rejestr | offset | opis |
+|---------|--------|------|
+| PGRAPH_CTX_CONTROL | 0x400800 | sterowanie kontekstem PGRAPH |
+| PFIFO_CACHE_DMA_PUT | 0x100200 | wskaznik zapisu PFIFO |
+| PFIFO_CACHE_DMA_GET | 0x100204 | wskaznik odczytu PFIFO |
+| PFIFO_CACHE_DMA_CTRL | 0x100208 | sterowanie PFIFO |
+| PBUS_PWR | 0x000200 | stan zasilania PCI |
+| PCLOCK_GFX | 0x000210 | zegar grafiki |
+| PCLOCK_MEM | 0x000214 | zegar pamieci |
+| PCOUNTER_TEMP | 0x000220 | licznik temperatury |
+| PFAN_PWM | 0x000224 | PWM wiatraka |
+| PFAN_RPM | 0x000228 | obroty wiatraka |
+| PRGB_CONTROL | 0x000230 | sterowanie RGB |
+| PRGB_COLOR | 0x000234 | kolor RGB |
+| DISP_CRTC_CONTROL | 0x600004 | sterowanie wyswietlaczem |
+| DISP_CRTC_H_TOTAL | 0x600008 | calkowita szerokosc linii |
+| DISP_CRTC_V_TOTAL | 0x60000C | calkowita liczba linii |
+| DISP_CRTC_SURFACE | 0x600010 | adres powierzchni wyswietlania |
+| DISP_CRTC_PITCH | 0x600014 | krok pikseli powierzchni |
+| CURSOR_CONTROL | 0x600100 | sterowanie kursorem |
+| CURSOR_POSITION | 0x600104 | pozycja kursora |
+| CURSOR_BASE | 0x600108 | adres bitmapy kursora |
+| RT_CONTROL | 0x800000 | sterowanie celem renderowania |
+| RT_BASE0 | 0x800004 | adres celu renderowania 0 |
+| RT_PITCH0 | 0x800008 | krok celu renderowania 0 |
+| RT_FORMAT0 | 0x80000C | format celu renderowania 0 |
+| DS_CONTROL | 0x800010 | sterowanie depth-stencil |
+| DS_BASE | 0x800014 | adres depth-stencil |
+| DS_FORMAT | 0x800018 | format depth-stencil |
+| BLEND_CONTROL | 0x800020 | sterowanie mieszaniem |
+| BLEND_SRC | 0x800024 | zrodlo mieszania |
+| BLEND_DST | 0x800028 | cel mieszania |
+| BLEND_OP | 0x80002C | operacja mieszania |
+| RASTER_CONTROL | 0x800030 | sterowanie rasteryzacja |
+| RASTER_CULL | 0x800034 | odcinanie culling |
+| RASTER_FILL | 0x800038 | tryb wypelnienia |
+| ZS_CONTROL | 0x800040 | sterowanie glebokoscia |
+| ZS_FUNC | 0x800044 | funkcja porownania glebokosci |
+| SHADER_PROGRAM | 0x900000 | aktywny program shader |
+| SHADER_CONSTANT | 0x900004 | bufor stalych shader |
+| SHADER_VTX_BASE | 0x900008 | bazowy bufor wierzcholkow |
+| SHADER_VTX_STRIDE | 0x90000C | krok wierzcholkow |
+| TEX_BASE | 0xA00000 | baza tekstur |
+| TEX_SAMPLER | 0xA00004 | probniki tekstur |
+| COMPUTE_PROGRAM | 0xB00000 | program compute shader |
+| COMPUTE_DIM | 0xB00004 | wymiary grup compute |
+| TESS_PROGRAM | 0xC00000 | program tessellation shader |
+| TESS_FACTOR | 0xC00004 | czynnik tessellation |
+| TIMESTAMP_LO | 0xD00000 | znacznik czasu niskie |
+| TIMESTAMP_HI | 0xD00004 | znacznik czasu wysokie |
+| VRAM_USAGE | 0xD00008 | uzycie VRAM |
+| VRAM_TOTAL | 0xD0000C | calkowity VRAM |
+| QUERY_BASE | 0xE00000 | baza zapytan GPU |
+| QUERY_RESULT | 0xE00004 | wynik zapytania |
+| QUERY_TYPE | 0xE00008 | typ zapytania |
+
+### identyfikatory urzadzen
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| GTX1010_VENDOR_ID | 0x10DE | vendor NVIDIA |
+| GTX1010_DEVICE_ID_GP107 | 0x1D01 | GP107 GTX 1010 |
+| GTX1010_DEVICE_ID_GP107_TI | 0x1D02 | GP107 GTX 1010 Ti |
+
+### integracja z driver managerem
+
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+
+```
+driver_manager_register("gtx1010", gtx1010_init, 0, 0, 4);
+```
+
+`gtx1010_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
+
