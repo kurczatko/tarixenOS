@@ -4782,6 +4782,249 @@ funkcja C do obslugi przerwan:
 extern "C" void hda_codec_irq(void);
 ```
 
+## sterownik dzwieku Intel Raptor Lake cAVS - drivers/karty_dzwiekowe/intel_raptorlake_cavs.cpp
+
+zaawansowany sterownik karty dzwiekowej Intel Raptor Lake cAVS (Intel Smart Sound Technology, Intel High Definition Audio) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenia 0x7A50/0x51C8/0xA0C8), mapowanie MMIO, inicjalizacje kontrolera HDA, reset i uruchomienie kontrolera, wykrycie adresu kodeka, odkrycie widgetow audio, parsowanie konfiguracji pinow, konfiguracje domyslne pinow, mixer, jack detection, strumienie PCM odtwarzania i nagrywania, bufora DMA i deskryptorow BDL, formaty PCM, zarzadzanie zasilaniem (power management), pause/resume strumieni, DSP cAVS (ladowanie i uruchamianie firmware, komunikacja IPC przez rejestry IPC0-IPC3, IMR/ISR/IER), statystyki sterownika oraz debugowanie widgetow. klasa IntelRaptorLakeCAVS jest singletonem dostepna przez `IntelRaptorLakeCAVS::instance()`. integracja przez driver manager z funkcjami C `intel_raptorlake_cavs_init`, `intel_raptorlake_cavs_shutdown`, `intel_raptorlake_cavs_poll`.
+
+### intel_raptorlake_cavs_init
+
+inicjalizuje sterownik Intel Raptor Lake cAVS: wyszukuje urzadzenie na magistrali PCI, mapuje adresy MMIO kontrolera HDA i DSP cAVS, aktywuje magistrale PCI (bus master + memory space), resetuje i wlacza kontroler HDA, wykrywa adres kodeka, odkrywa widgety audio, parsuje konfiguracje pinow, konfiguruje domyslne piny, inicjalizuje mixer, jack detection, DSP cAVS (zegar, status firmware) i zarzadzanie zasilaniem.
+
+```
+int intel_raptorlake_cavs_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie.
+
+### intel_raptorlake_cavs_shutdown
+
+zatrzymuje odtwarzanie i nagrywanie, zwalnia bufory DMA, dezaktywuje DSP i sterownik.
+
+```
+void intel_raptorlake_cavs_shutdown(void)
+```
+
+### intel_raptorlake_cavs_poll
+
+wykonuje okreslne odswiezenie sterownika: obsluguje przerwania kontrolera HDA oraz komunikaty IPC z DSP cAVS. wywolywane przez driver manager w petli kernela.
+
+```
+void intel_raptorlake_cavs_poll(void)
+```
+
+### IntelRaptorLakeCAVS::instance
+
+zwraca singleton sterownika.
+
+```
+static IntelRaptorLakeCAVS* instance();
+```
+
+### IntelRaptorLakeCAVS::probe
+
+sprawdza czy urzadzenie to Intel Raptor Lake cAVS (porownuje vendor ID i device ID).
+
+```
+uint8_t probe(uint16_t vendor, uint16_t device);
+```
+
+zwraca 1 gdy urzadzenie zostalo rozpoznane, 0 gdy nie.
+
+### IntelRaptorLakeCAVS::init
+
+inicjalizuje sterownik: odczytuje wersje HDA, resetuje i wlacza kontroler, wykrywa adres kodeka, odkrywa widgety, parsuje piny, konfiguruje domyslne piny, inicjalizuje mixer, jack, DSP i zasilanie.
+
+```
+void init(void);
+```
+
+### IntelRaptorLakeCAVS::deinit
+
+zatrzymuje strumienie, zwalnia bufory DMA, wylacza zegar DSP i dezaktywuje sterownik.
+
+```
+void deinit(void);
+```
+
+### IntelRaptorLakeCAVS::irq_handler
+
+obsluguje przerwanie kontrolera HDA (wymazuje bit GSTS) oraz przerwania IPC z DSP cAVS (czyta i wymazuje ISR).
+
+```
+void irq_handler(void);
+```
+
+### IntelRaptorLakeCAVS::pcm_open / pcm_close
+
+otwiera strumien PCM do odtwarzania lub nagrywania z podanymi parametrami (liczba kanalow, czestotliwosc, format), tworzy bufor DMA i deskryptor BDL oraz konfiguruje potok strumienia.
+
+```
+int pcm_open(uint16_t channels, uint32_t rate, uint16_t format, uint8_t playback);
+void pcm_close(uint8_t playback);
+```
+
+zwraca indeks strumienia lub -1 przy bledzie.
+
+### IntelRaptorLakeCAVS::pcm_write / pcm_read
+
+zapisuje dane do bufora odtwarzania lub odczytuje dane z bufora nagrywania.
+
+```
+int pcm_write(const void* data, uint32_t bytes);
+int pcm_read(void* data, uint32_t bytes);
+```
+
+zwraca liczbe skopiowanych bajtow lub -1 przy bledzie.
+
+### IntelRaptorLakeCAVS::pcm_pause / pcm_resume
+
+wstrzymuje lub wznawia odtwarzanie strumienia PCM.
+
+```
+int pcm_pause(uint8_t playback, uint8_t pause);
+int pcm_resume(uint8_t playback);
+```
+
+### IntelRaptorLakeCAVS::mixer_get_control_count / mixer_get_control
+
+pobiera liczbe sterownikow mixer oraz informacje o sterowniku po indeksie.
+
+```
+int mixer_get_control_count(void);
+int mixer_get_control(uint8_t index, struct cavs_mixer_control* ctrl);
+```
+
+### IntelRaptorLakeCAVS::mixer_set_volume / mixer_get_volume
+
+ustawia lub pobiera wzmocnienie danego sterownika mixer.
+
+```
+int mixer_set_volume(uint8_t index, int32_t gain);
+int mixer_get_volume(uint8_t index, int32_t* gain);
+```
+
+### IntelRaptorLakeCAVS::mixer_set_mute / mixer_get_mute
+
+ustawia lub pobiera stan wyciszenia danego sterownika mixer.
+
+```
+int mixer_set_mute(uint8_t index, uint8_t mute);
+int mixer_get_mute(uint8_t index, uint8_t* mute);
+```
+
+### IntelRaptorLakeCAVS::jack_get_count / jack_get_status / jack_get_config / jack_enable_unsolicited
+
+pobiera liczbe wykrytych jack, sprawdza czy dany jack ma wlaczone wtyczke, pobiera konfiguracje pinu jack oraz wlacza/wylacza niesprosowane odpowiedzi dla jack.
+
+```
+int jack_get_count(void);
+int jack_get_status(uint8_t index, uint8_t* present);
+int jack_get_config(uint8_t index, struct cavs_pin_config* config);
+int jack_enable_unsolicited(uint8_t index, uint8_t enable);
+```
+
+### IntelRaptorLakeCAVS::dsp_fw_load / dsp_fw_start
+
+laduje firmware do DSP cAVS i uruchamia DSP.
+
+```
+int dsp_fw_load(const void* fw_data, uint32_t fw_size);
+int dsp_fw_start(void);
+```
+
+### IntelRaptorLakeCAVS::dsp_ipc_send / dsp_ipc_receive
+
+wysyla komunikat IPC do DSP cAVS przez rejestry IPC0-IPC3 lub odbiera komunikat z DSP.
+
+```
+int dsp_ipc_send(uint32_t ipc0, uint32_t ipc1, uint32_t ipc2, uint32_t ipc3);
+int dsp_ipc_receive(uint32_t* ipc0, uint32_t* ipc1, uint32_t* ipc2, uint32_t* ipc3);
+```
+
+### IntelRaptorLakeCAVS::dsp_ready / dsp_reset / dsp_clock_enable
+
+sprawdza czy DSP jest gotowy, resetuje DSP lub wlacza/wylacza zegar DSP.
+
+```
+int dsp_ready(void);
+int dsp_reset(void);
+int dsp_clock_enable(uint8_t enable);
+```
+
+### IntelRaptorLakeCAVS::set_master_volume / get_master_volume
+
+ustawia lub pobiera glosnosc glowna w procentach (0-100).
+
+```
+void set_master_volume(uint8_t percent);
+uint8_t get_master_volume(void);
+```
+
+### IntelRaptorLakeCAVS::power_set_state / power_get_state / widget_power_set
+
+ustawia lub pobiera stan zasilania kodeka (D0-D3) oraz ustawia stan zasilania konkretnego widgetu.
+
+```
+void power_set_state(uint8_t state);
+uint8_t power_get_state(void);
+void widget_power_set(uint8_t nid, uint8_t state);
+```
+
+### IntelRaptorLakeCAVS::stats_get
+
+pobiera statystyki sterownika do struktury `cavs_stats` (liczba wyslanych verbow, bledy verbow, przerwania, wiadomosci IPC, bledy firmware DSP, przepelnienia/niedobory bufora, zmiany jack).
+
+```
+void stats_get(struct cavs_stats* out);
+```
+
+struktura `cavs_stats` zawiera:
+
+| pole | opis |
+|------|------|
+| verbs_sent | liczba wyslanych verbow HDA |
+| verbs_failed | bledy wysylania verbow |
+| interrupts | liczba przerwan |
+| buffer_underruns | niedobory bufora odtwarzania |
+| buffer_overruns | przepelnienia bufora nagrywania |
+| jack_changes | zmiany stanu jack |
+| dsp_ipc_messages | liczba wiadomosci IPC DSP |
+| dsp_fw_errors | bledy firmware DSP |
+
+struktura `cavs_widget` zawiera:
+
+| pole | opis |
+|------|------|
+| nid | id widgetu |
+| type | typ widgetu (output/input/mixer/selector/pin) |
+| capabilities | mozliwosci widgetu |
+| connection_count | liczba polaczen |
+| pin_capabilities | mozliwosci pinu |
+| config_default | domysla konfiguracja pinu |
+| power_state | stan zasilania widgetu |
+
+widgety HDA Audio:
+
+| typ | opis |
+|------|------|
+| output | konwerter cyfrowo-analogowy (DAC) |
+| input | konwerter analogowo-cyfrowy (ADC) |
+| mixer | mikser audio |
+| selector | selektor wejsc |
+| pin | pin gniazda audio |
+
+rejestry DSP cAVS:
+
+| rejestr | opis |
+|---------|------|
+| CAVS_DSP_REW | rewizja DSP |
+| CAVS_DSP_FW_STATUS | status firmware |
+| CAVS_DSP_FW_CMD | komenda firmware |
+| CAVS_DSP_IPC0-IPC3 | wiadomosci IPC |
+| CAVS_DSP_IPC_ISR | status przerwan IPC |
+| CAVS_DSP_IPC_IER | maska przerwan IPC |
+| CAVS_DSP_CLK_CTL | kontrola zegara DSP |
+
 ## sterownik plyty glownej ASUS P4P800 - drivers/plyty_glowne/asus_p4p800.cpp
 
 Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.

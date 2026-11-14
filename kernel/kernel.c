@@ -70,6 +70,7 @@
 #include <drivers/internet/rtl8168b.h>
 #include <drivers/internet/rtl8188ce.h>
 #include <drivers/internet/mt7921.h>
+#include <drivers/karty_dzwiekowe/intel_raptorlake_cavs.h>
 #include <include/printf/printf.h> /*do debugowania*/
 
 /*wykrywanie sprzetu*/
@@ -227,6 +228,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("bluetooth", bluetooth_init, 0, bluetooth_poll, 2);
     driver_manager_register("mouse", mouse_init, 0, mouse_poll, 2);
     driver_manager_register("pixa3848_touchpad", pixa3848_init, pixa3848_shutdown, pixa3848_poll, 2);
+    driver_manager_register("raptorlake_cavs_audio", intel_raptorlake_cavs_init, intel_raptorlake_cavs_shutdown, intel_raptorlake_cavs_poll, 2);
     driver_manager_register("bateria", bateria_init, 0, bateria_poll, 2);
     driver_manager_register("acpi", acpi_init, 0, acpi_odswiez, 2);
     driver_manager_register("radeon_hd6000", radeon_hd6000_init, 0, 0, 4);

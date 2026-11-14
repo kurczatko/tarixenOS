@@ -8,6 +8,8 @@
 #include <drivers/karty_dzwiekowe/hda_codec.h>
 #include <include/printf/vga.h>
 
+typedef unsigned int uintptr_t;
+
 static inline uint8_t inb(uint16_t port)
 {
     uint8_t value;
