@@ -43,8 +43,7 @@ void driver_manager_register(const char *name, driver_init_fn init, driver_shutd
     g_driver_count++;
 }
 
-int driver_manager_init_all(void)
-{
+int driver_manager_init_all(void) {
     int started = 0;
     for (uint32_t i = 0; i < g_driver_count; i++) {
         struct driver_desc *d = &g_drivers[i];
