@@ -16,6 +16,7 @@
 #include <kernel/browser.h>
 #include <kernel/kalkulator.h>
 #include <kernel/apps/gra.h>
+#include <kernel/apps/duszki.h>
 #include <kernel/malowanie.h>
 #include <kernel/zadania.h>
 
@@ -25,7 +26,7 @@
 #define START_WYSOKOSC PASEK_ZADAN_WYSOKOSC
 #define MENU_X 0
 #define MENU_SZEROKOSC 150
-#define MENU_WYSOKOSC 340
+#define MENU_WYSOKOSC 380
 #define MENU_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - MENU_WYSOKOSC)
 
 #define KOLOR_PRZYCISKU_START 0x004A5D6E
@@ -270,6 +271,31 @@ static void menu_start_narysuj(void)
         }
     }
 
+    rysuj_prostokat_polprzezroczysty(MENU_X + 6, MENU_Y + 336, MENU_SZEROKOSC - 12, 28, KOLOR_ELEMENT_MENU, 85);
+    rysuj_tekst_chicago(MENU_X + 26, MENU_Y + 346, "DUSZKI", KOLOR_TEKST_BIALY);
+
+    static const uint8_t ikona_duszka[12][12] = {
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,1,1,1,1,1,1,1,1,0,0},
+        {0,1,1,0,0,0,0,1,1,1,0,0},
+        {0,1,0,0,0,0,0,0,1,1,0,0},
+        {0,1,0,0,0,0,0,0,1,1,0,0},
+        {0,1,0,0,0,0,0,0,1,0,0,0},
+        {0,1,0,0,0,0,0,0,0,0,0,0},
+        {0,1,1,0,0,0,0,1,1,0,0,0},
+        {0,0,1,1,1,1,1,1,1,1,0,0},
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0,0,0,0,0},
+        {0,0,0,0,0,0,0,0,0,0,0,0}
+    };
+    for (int iy = 0; iy < 12; iy++) {
+        for (int ix = 0; ix < 12; ix++) {
+            if (ikona_duszka[iy][ix]) {
+                rysuj_piksel(MENU_X + 12 + ix, MENU_Y + 344 + iy, KOLOR_ZOLTY);
+            }
+        }
+    }
+
     static const uint8_t ikona_palety[12][12] = {
         {0,0,0,0,0,0,0,0,0,0,0,0},
         {0,1,1,1,1,1,1,1,1,1,0,0},
@@ -418,6 +444,12 @@ void menu_start_mouse_click(void)
         menu_otwarte = 0;
         menu_start_wyczysc();
         zadania_otworz();
+    }
+    if (menu_otwarte && x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+        y >= MENU_Y + 336 && y < MENU_Y + 364) {
+        menu_otwarte = 0;
+        menu_start_wyczysc();
+        duszki();
     }
     if (menu_otwarte && (x < MENU_X || x >= MENU_X + MENU_SZEROKOSC ||
                          y < MENU_Y || y >= MENU_Y + MENU_WYSOKOSC)) {
