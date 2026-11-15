@@ -3,7 +3,7 @@
 
 KERNEL_LOAD_SEGMENT equ 0x1000
 KERNEL_LOAD_OFFSET  equ 0x1000
-KERNEL_SECTORS      equ 768
+KERNEL_SECTORS      equ 1536
 KERNEL_START_LBA    equ 126000
 CODE_SEG            equ 0x08
 DATA_SEG            equ 0x10
@@ -195,12 +195,12 @@ protected_mode:
     mov esp, 0x02000000
 
     mov esi, reloc_code
-    mov edi, 0x90000
+    mov edi, 0xE0000
     mov ecx, reloc_code_end - reloc_code
     cld
     rep movsb
 
-    jmp 0x90000
+    jmp 0xE0000
 
 reloc_code:
     mov esi, 0x10000
