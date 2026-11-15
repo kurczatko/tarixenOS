@@ -12301,3 +12301,301 @@ driver_manager_register("gtx660", gtx660_init, 0, 0, 4);
 
 `gtx660_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
 
+## sterownik NVIDIA GeForce GTX 560 - drivers/karty_graficzne/nvidia/gtx560.cpp
+
+zaawansowany sterownik karty graficznej NVIDIA GeForce GTX 560 (GF114 Fermi) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x10DE, urzadzenia 0x1200/0x1201), mapowanie MMIO, ring buffer, zarzadzanie VRAM (1 GB), inicjalizację wyswietlacza, potok graficzny, bufor wierzcholkow, bufor indeksow, tekstury, cele renderowania, bufor glebii, shadery (wierzcholkow, pikseli, geometrii, tessellation sterowania i evaluacji, obliczeniowe), stany probnika, mieszania, rasteryzacji i glebii-stencil, układy wejść, buforów stałych, łańcuchy wymiany, ogrodzenia i semafory, zaawansowaną akcelerację 3D oraz shadery. rejestracja przez driver manager z funkcjami C `gtx560_init`, `gtx560_shutdown`.
+
+### gtx560_init
+
+inicjalizuje sterownik GTX 560: skanuje magistrale PCI w poszukiwaniu karty GF114, wlacza magistrale (bus master + memory space), inicjalizuje ring buffer, pamiec VRAM, wyswietlacz i resetuje potok graficzny.
+
+```
+int gtx560_init(void)
+```
+
+zwraca 0 przy sukcesie, -1 gdy urzadzenie nie zostalo wykryte lub inicjalizacja nie powiodla sie.
+
+### gtx560_shutdown
+
+zatrzymuje potok graficzny i oznacza sterownik jako niegotowy.
+
+```
+void gtx560_shutdown(void)
+```
+
+### gtx560_czy_gotowy
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+uint8_t gtx560_czy_gotowy(void)
+```
+
+### gtx560_putpixel / gtx560_fillrect / gtx560_blt
+
+rysuje piksel, wypelnia prostokat oraz wykonuje operacje blit na ramce systemowej.
+
+```
+void gtx560_putpixel(uint32_t x, uint32_t y, uint32_t kolor)
+void gtx560_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t kolor)
+void gtx560_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
+```
+
+### gtx560_get_fb / gtx560_get_szerokosc / gtx560_get_wysokosc
+
+pobiera wskaznik na ramke systemowa oraz rozmiary bufora ramki.
+
+```
+void *gtx560_get_fb(void)
+uint32_t gtx560_get_szerokosc(void)
+uint32_t gtx560_get_wysokosc(void)
+```
+
+### gtx560_shader_stworz / gtx560_shader_skompiluj
+
+tworzy shader o podanym typie (vertex, pixel, geometry, compute, tess_control, tess_eval) z podanym kodem i kompiluje go, zapisujac program shadera w rejestrze GPU.
+
+```
+gtx560_handle_t gtx560_shader_stworz(uint32_t typ, const uint8_t *kod, uint32_t rozmiar_kodu)
+void gtx560_shader_skompiluj(gtx560_handle_t uchwyt)
+void gtx560_shader_zniszcz(gtx560_handle_t uchwyt)
+```
+
+### gtx560_rysuj / gtx560_rysuj_indeksowane
+
+rysuje polygony z uzyciem powiazanych shaderow i celu renderowania, wspierajac zaawansowana akceleracje 3D.
+
+```
+void gtx560_rysuj(uint32_t liczba_wierzcholkow, uint32_t pierwszy_wierzcholek)
+void gtx560_rysuj_indeksowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka)
+void gtx560_rysuj_indeksowane_instancjonowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka, uint32_t liczba_instancji, uint32_t pierwsza_instancja)
+void gtx560_rysuj_po_indirekcie(uint32_t adres_bufora, uint32_t liczba_rysowan, uint32_t krok)
+```
+
+### gtx560_oblicz_wyslij
+
+uruchamia shader obliczeniowy na podanych wymiarach grup (compute shader).
+
+```
+void gtx560_oblicz_wyslij(uint32_t grupa_x, uint32_t grupa_y, uint32_t grupa_z)
+void gtx560_oblicz_wyslij_po_indirekcie(uint32_t adres_bufora)
+```
+
+### gtx560_ustaw_viewport / gtx560_ustaw_scissor / gtx560_ustaw_typ_pierwotnego / gtx560_ustaw_tessellation
+
+konfiguruje viewport, obszar odcinania, typ pierwotnego oraz tryb i czynnik tessellation.
+
+```
+void gtx560_ustaw_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_glebia, float max_glebia)
+void gtx560_ustaw_scissor(uint32_t lewa, uint32_t gora, uint32_t prawa, uint32_t dol)
+void gtx560_ustaw_typ_pierwotnego(uint32_t typ_pierwotnego)
+void gtx560_ustaw_tess_czynnik(uint32_t czynnik)
+void gtx560_ustaw_msaa(uint32_t proben)
+```
+
+### gtx560_wyczysc_cel_renderowania / gtx560_wyczysc_bufor_glebii
+
+czyszczy cel renderowania oraz bufor glebii/stencil.
+
+```
+void gtx560_wyczysc_cel_renderowania(gtx560_handle_t cel, uint32_t kolor)
+void gtx560_wyczysc_bufor_glebii(gtx560_handle_t bufor, float glebia, uint8_t stencil)
+```
+
+### gtx560_vram_alokuj / gtx560_vram_zwolnij
+
+alokuje i zwalnia pamiec VRAM karty graficznej.
+
+```
+uint64_t gtx560_vram_alokuj(uint64_t rozmiar, uint32_t typ)
+void gtx560_vram_zwolnij(uint64_t uchwyt)
+uint64_t gtx560_vram_uzyto(void)
+uint64_t gtx560_vram_calkowicie(void)
+```
+
+### gtx560_lancuch_stworz / gtx560_prezentuj
+
+tworzy lancuch wymiany (swap chain) z opcja vsync i prezentuje tylny bufor na ekranie.
+
+```
+gtx560_handle_t gtx560_lancuch_stworz(uint32_t szerokosc, uint32_t wysokosc, uint8_t vsync, uint8_t alpha_premultiplied)
+void gtx560_prezentuj(gtx560_handle_t lancuch)
+void gtx560_lancuch_zniszcz(gtx560_handle_t uchwyt)
+```
+
+### gtx560_powiaz_shader_wierzcholkow / gtx560_powiaz_shader_pikseli / gtx560_powiaz_shader_geometrii / gtx560_powiaz_shader_obliczeniowy
+
+powiazuje odpowiednie shadery z kontekstem graficznym i kompiluje je w GPU.
+
+```
+void gtx560_powiaz_shader_wierzcholkow(gtx560_handle_t uchwyt)
+void gtx560_powiaz_shader_pikseli(gtx560_handle_t uchwyt)
+void gtx560_powiaz_shader_geometrii(gtx560_handle_t uchwyt)
+void gtx560_powiaz_shader_tess_kontrolny(gtx560_handle_t uchwyt)
+void gtx560_powiaz_shader_tess_evaluacyjny(gtx560_handle_t uchwyt)
+void gtx560_powiaz_shader_obliczeniowy(gtx560_handle_t uchwyt)
+```
+
+### gtx560_powiaz_cel_renderowania / gtx560_powiaz_bufor_glebii / gtx560_powiaz_stan_mieszania / gtx560_powiaz_stan_rasteryzacji / gtx560_powiaz_stan_glebii_stencil
+
+powiazuje cele renderowania, bufor glebii, stany mieszania, rasteryzacji oraz glebii-stencil z kontekstem.
+
+```
+void gtx560_powiaz_cel_renderowania(gtx560_handle_t uchwyt)
+void gtx560_powiaz_bufor_glebii(gtx560_handle_t uchwyt)
+void gtx560_powiaz_stan_mieszania(gtx560_handle_t uchwyt)
+void gtx560_powiaz_stan_rasteryzacji(gtx560_handle_t uchwyt)
+void gtx560_powiaz_stan_glebii_stencil(gtx560_handle_t uchwyt)
+```
+
+### gtx560_powiaz_probnik_i_teksture / gtx560_powiaz_bufor_stale
+
+powiazuje probnik i teksture do gniazda oraz bufor stale do gniazda stalych.
+
+```
+void gtx560_powiaz_probnik_i_teksture(uint32_t gniazdo, gtx560_handle_t probnik, gtx560_handle_t tekstura)
+void gtx560_powiaz_bufor_stale(uint32_t gniazdo, gtx560_handle_t uchwyt)
+```
+
+### gtx560_tekstura_stworz / gtx560_bufor_wierzcholkow_stworz / gtx560_bufor_indeksow_stworz / gtx560_cel_renderowania_stworz / gtx560_bufor_glebii_stworz
+
+tworzy tekstury, bufor wierzcholkow, bufor indeksow, cele renderowania i bufor glebii z alokacja w VRAM.
+
+```
+gtx560_handle_t gtx560_tekstura_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint32_t poziomy_mip, const void *dane)
+gtx560_handle_t gtx560_bufor_wierzcholkow_stworz(uint32_t liczba_wierzcholkow, uint32_t rozmiar_wierzcholka, uint32_t format, const void *dane)
+gtx560_handle_t gtx560_bufor_indeksow_stworz(uint32_t liczba_indeksow, uint32_t format, const void *dane)
+gtx560_handle_t gtx560_cel_renderowania_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint8_t alpha_blend)
+gtx560_handle_t gtx560_bufor_glebii_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint8_t kompresja)
+```
+
+### gtx560_stan_probnika_stworz / gtx560_stan_mieszania_stworz / gtx560_stan_rasteryzacji_stworz / gtx560_stan_glebii_stencil_stworz / gtx560_uklad_wejsc_stworz / gtx560_bufor_stale_stworz
+
+tworzy odpowiednie stany graficzne: probnik, mieszanie, rasteryzacja, glebia-stencil, układ wejść i bufor stale.
+
+```
+gtx560_handle_t gtx560_stan_probnika_stworz(uint32_t filtr_min, uint32_t filtr_mag, uint32_t filtr_mip, uint32_t adres_u, uint32_t adres_v, uint32_t adres_w, uint32_t max_anizotropia, uint8_t wlacz_porownanie, uint8_t func_porownania)
+gtx560_handle_t gtx560_stan_mieszania_stworz(uint8_t wlacz_mieszanie, uint32_t src_blend, uint32_t dest_blend, uint32_t op_mieszania, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t op_mieszania_alpha, uint32_t maska_zapisu, uint32_t blend_factor)
+gtx560_handle_t gtx560_stan_rasteryzacji_stworz(uint32_t tryb_wypelnienia, uint32_t tryb_odcinania, uint8_t front_ccw, uint8_t clip_glebii, uint8_t scissor, uint8_t wielopr_probowanie, uint8_t aa_linia, uint8_t alpha_do_pokrycia)
+gtx560_handle_t gtx560_stan_glebii_stencil_stworz(uint8_t wlacz_glebie, uint32_t maska_zapisu_glebii, uint32_t func_glebii, uint8_t wlacz_stencil, uint8_t maska_odczytu_stencil, uint8_t maska_zapisu_stencil, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)
+gtx560_handle_t gtx560_uklad_wejsc_stworz(uint32_t liczba_elementow, const uint32_t *sloty, const uint32_t *przesuniecia, const uint32_t *formaty)
+gtx560_handle_t gtx560_bufor_stale_stworz(uint32_t rozmiar)
+```
+
+### gtx560_ogrodzenie_stworz / gtx560_semafor_stworz
+
+tworzy ogrodzenia i semafory do synchronizacji potoku graficznego.
+
+```
+void gtx560_ogrodzenie_stworz(gtx560_handle_t *wyjscie)
+void gtx560_ogrodzenie_sygnalizuj(gtx560_handle_t uchwyt, uint32_t wartosc)
+int gtx560_ogrodzenie_poczekaj(gtx560_handle_t uchwyt, uint32_t wartosc, uint32_t timeout_us)
+void gtx560_ogrodzenie_zniszcz(gtx560_handle_t uchwyt)
+void gtx560_semafor_stworz(gtx560_handle_t *wyjscie)
+void gtx560_semafor_sygnalizuj(gtx560_handle_t uchwyt, uint32_t wartosc)
+void gtx560_semafor_poczekaj(gtx560_handle_t uchwyt, uint32_t wartosc)
+void gtx560_semafor_zniszcz(gtx560_handle_t uchwyt)
+```
+
+### gtx560_ustaw_stan_zasilania / gtx560_ustaw_zegar_graficzny / gtx560_ustaw_zegar_pamieci / gtx560_pobierz_temperature / gtx560_ustaw_predkosc_wiatraka / gtx560_ustaw_rgb
+
+zarzadza stanem zasilania, zegarami graficznym i pamieci, temperatura, predkoscia wiatraka oraz podswietleniem RGB.
+
+```
+void gtx560_ustaw_stan_zasilania(uint8_t stan)
+uint8_t gtx560_pobierz_stan_zasilania(void)
+void gtx560_ustaw_zegar_graficzny(uint32_t mhz)
+void gtx560_ustaw_zegar_pamieci(uint32_t mhz)
+uint32_t gtx560_pobierz_zegar_graficzny(void)
+uint32_t gtx560_pobierz_zegar_pamieci(void)
+uint32_t gtx560_pobierz_temperature(void)
+void gtx560_ustaw_predkosc_wiatraka(uint32_t obroty)
+uint32_t gtx560_pobierz_predkosc_wiatraka(void)
+void gtx560_ustaw_rgb(uint32_t kolor, uint8_t tryb)
+void gtx560_wylacz_rgb(void)
+```
+
+### gtx560_akceleracja_3d_dostepna
+
+zwraca 1 gdy zaawansowana akceleracja 3D jest dostepna (sterownik zainicjowany).
+
+```
+int gtx560_akceleracja_3d_dostepna(void)
+```
+
+### rejestry MMIO (wybrane)
+
+| rejestr | offset | opis |
+|---------|--------|------|
+| PGRAPH_CTX_CONTROL | 0x400800 | sterowanie kontekstem PGRAPH |
+| PFIFO_CACHE_DMA_PUT | 0x100200 | wskaznik zapisu PFIFO |
+| PFIFO_CACHE_DMA_GET | 0x100204 | wskaznik odczytu PFIFO |
+| PFIFO_CACHE_DMA_CTRL | 0x100208 | sterowanie PFIFO |
+| PBUS_PWR | 0x000200 | stan zasilania PCI |
+| PCLOCK_GFX | 0x000210 | zegar grafiki |
+| PCLOCK_MEM | 0x000214 | zegar pamieci |
+| PCOUNTER_TEMP | 0x000220 | licznik temperatury |
+| PFAN_PWM | 0x000224 | PWM wiatraka |
+| PFAN_RPM | 0x000228 | obroty wiatraka |
+| PRGB_CONTROL | 0x000230 | sterowanie RGB |
+| PRGB_COLOR | 0x000234 | kolor RGB |
+| DISP_CRTC_CONTROL | 0x600004 | sterowanie wyswietlaczem |
+| DISP_CRTC_H_TOTAL | 0x600008 | calkowita szerokosc linii |
+| DISP_CRTC_V_TOTAL | 0x60000C | calkowita liczba linii |
+| DISP_CRTC_SURFACE | 0x600010 | adres powierzchni wyswietlania |
+| DISP_CRTC_PITCH | 0x600014 | krok pikseli powierzchni |
+| CURSOR_CONTROL | 0x600100 | sterowanie kursorem |
+| CURSOR_POSITION | 0x600104 | pozycja kursora |
+| CURSOR_BASE | 0x600108 | adres bitmapy kursora |
+| RT_CONTROL | 0x800000 | sterowanie celem renderowania |
+| RT_BASE0 | 0x800004 | adres celu renderowania 0 |
+| RT_PITCH0 | 0x800008 | krok celu renderowania 0 |
+| RT_FORMAT0 | 0x80000C | format celu renderowania 0 |
+| DS_CONTROL | 0x800010 | sterowanie depth-stencil |
+| DS_BASE | 0x800014 | adres depth-stencil |
+| DS_FORMAT | 0x800018 | format depth-stencil |
+| BLEND_CONTROL | 0x800020 | sterowanie mieszaniem |
+| BLEND_SRC | 0x800024 | zrodlo mieszania |
+| BLEND_DST | 0x800028 | cel mieszania |
+| BLEND_OP | 0x80002C | operacja mieszania |
+| RASTER_CONTROL | 0x800030 | sterowanie rasteryzacja |
+| RASTER_CULL | 0x800034 | odcinanie culling |
+| RASTER_FILL | 0x800038 | tryb wypelnienia |
+| ZS_CONTROL | 0x800040 | sterowanie glebokoscia |
+| ZS_FUNC | 0x800044 | funkcja porownania glebokosci |
+| SHADER_PROGRAM | 0x900000 | aktywny program shader |
+| SHADER_CONSTANT | 0x900004 | bufor stalych shader |
+| SHADER_VTX_BASE | 0x900008 | bazowy bufor wierzcholkow |
+| SHADER_VTX_STRIDE | 0x90000C | krok wierzcholkow |
+| TEX_BASE | 0xA00000 | baza tekstur |
+| TEX_SAMPLER | 0xA00004 | probniki tekstur |
+| COMPUTE_PROGRAM | 0xB00000 | program compute shader |
+| COMPUTE_DIM | 0xB00004 | wymiary grup compute |
+| TESS_PROGRAM | 0xC00000 | program tessellation shader |
+| TESS_FACTOR | 0xC00004 | czynnik tessellation |
+| TIMESTAMP_LO | 0xD00000 | znacznik czasu niskie |
+| TIMESTAMP_HI | 0xD00004 | znacznik czasu wysokie |
+| VRAM_USAGE | 0xD00008 | uzycie VRAM |
+| VRAM_TOTAL | 0xD0000C | calkowity VRAM |
+| QUERY_BASE | 0xE00000 | baza zapytan GPU |
+| QUERY_RESULT | 0xE00004 | wynik zapytania |
+| QUERY_TYPE | 0xE00008 | typ zapytania |
+
+### identyfikatory urzadzen
+
+| nazwa | wartosc | opis |
+|-------|---------|------|
+| GTX560_VENDOR_ID | 0x10DE | vendor NVIDIA |
+| GTX560_DEVICE_ID_GF114 | 0x1200 | GF114 GTX 560 |
+| GTX560_DEVICE_ID_GF114_VARIANT | 0x1201 | GF114 GTX 560 wariant |
+
+### integracja z driver managerem
+
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+
+```
+driver_manager_register("gtx560", gtx560_init, 0, 0, 4);
+```
+
+`gtx560_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
+
