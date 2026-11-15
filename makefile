@@ -169,7 +169,7 @@ $(KERNEL_ELF64): $(KERNEL_OBJECTS64) linker64.ld | $(BUILD_DIR)
 	fi
 
 $(KERNEL_BIN32): $(KERNEL_ELF32)
-	$(OBJCOPY) --change-addresses=-0x1000 -O binary $< $@
+	$(OBJCOPY) -O binary $< $@
 
 $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) $(TAPETA_JASNA_RAW) | $(BUILD_DIR)
 	dd if=/dev/zero of=$@ bs=$(FLOPPY_SIZE) count=1 status=none
@@ -182,6 +182,7 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) $(TAPETA_JASNA_RAW) | $
 	dd if=$(BUILD_DIR)/fat32.img of=$@ conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 count=3 conv=notrunc status=none
 	dd if=$(BOOT_BIN32) of=$@ bs=1 skip=90 seek=90 count=420 conv=notrunc status=none
+	dd if=$(BOOT_BIN32) of=$@ bs=512 skip=1 seek=8 count=4 conv=notrunc status=none
 	@kernel_size=$$(stat -c %s $(KERNEL_BIN32)); \
 	if [ $$kernel_size -gt $$(( $(KERNEL_MAX_SECTORS) * 512 )) ]; then \
 		echo "Kernel jest za duzy: $$kernel_size bajtow"; exit 1; \
@@ -215,4 +216,4 @@ $(ISO_IMAGE): $(UEFI_BIN) $(KERNEL_ELF64) | $(ISO_DIR)
 clean:
 
 run: image
-	qemu-system-x86_64 -m 2G -enable-kvm -cpu host -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc 
+	qemu-system-x86_64 -m 2G -enable-kvm -cpu host -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc

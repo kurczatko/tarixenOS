@@ -34,9 +34,10 @@ exc_noerr 16
 exc_noerr 18
 exc_noerr 19
 
-exc_err 8
+exc_noerr 8
 exc_err 10
 exc_err 11
 exc_err 12
 exc_err 13
 exc_err 14
+exc_err 17

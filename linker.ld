@@ -2,13 +2,13 @@ ENTRY(kernel_main)
 
 PHDRS
 {
-    text PT_LOAD FLAGS(0x5);  /* R, X */
-    data PT_LOAD FLAGS(0x3);  /* R, W */
+    text PT_LOAD FLAGS(0x5);
+    data PT_LOAD FLAGS(0x3);
 }
 
 SECTIONS
 {
-    . = 0x1000;
+    . = 0x100000;
 
     .text ALIGN(4) :
     {

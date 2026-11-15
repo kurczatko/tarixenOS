@@ -17,7 +17,7 @@ extern void default_irq_handler(void);
 extern void timer_entry(void);
 extern void exc_0(void), exc_1(void), exc_3(void), exc_4(void), exc_5(void), exc_6(void), exc_7(void);
 extern void exc_8(void), exc_9(void), exc_10(void), exc_11(void), exc_12(void), exc_13(void), exc_14(void);
-extern void exc_15(void), exc_16(void), exc_18(void), exc_19(void);
+extern void exc_15(void), exc_16(void), exc_17(void), exc_18(void), exc_19(void);
 
 void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags)
 {
@@ -52,6 +52,7 @@ void idt_install(void)
     idt_set_gate(14, (uint32_t)exc_14, GDT_RING0_CODE, 0x8E);
     idt_set_gate(15, (uint32_t)exc_15, GDT_RING0_CODE, 0x8E);
     idt_set_gate(16, (uint32_t)exc_16, GDT_RING0_CODE, 0x8E);
+    idt_set_gate(17, (uint32_t)exc_17, GDT_RING0_CODE, 0x8E);
     idt_set_gate(18, (uint32_t)exc_18, GDT_RING0_CODE, 0x8E);
     idt_set_gate(19, (uint32_t)exc_19, GDT_RING0_CODE, 0x8E);
 

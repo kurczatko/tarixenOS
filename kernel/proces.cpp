@@ -90,7 +90,6 @@ static inline int prio_find_highest(struct runqueue *rq) {
     return -1;
 }
 
-/* Caller MUST hold cpu_rq[cpu].lock. */
 static void runq_enqueue_locked(struct proces *p) {
     uint32_t cpu = p->cpu;
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
@@ -150,7 +149,7 @@ static void waitq_dequeue_locked(struct proces *p) {
     p->wait_prev = 0;
 }
 
-/* Caller MUST hold cpu_rq[cpu].lock. Returns next task for this cpu. */
+
 static struct proces *sched_pick_next_locked(uint32_t cpu) {
     struct runqueue *rq = &cpu_rq[cpu];
     int prio = prio_find_highest(rq);
@@ -165,7 +164,7 @@ static struct proces *sched_pick_next_locked(uint32_t cpu) {
         }
     }
 
-    /* SMP load balancing: steal from the busiest other CPU. */
+
     uint64_t best = 0;
     uint32_t victim = cpu;
     for (uint32_t i = 0; i < smp_cpu_count; i++) {

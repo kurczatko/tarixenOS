@@ -183,6 +183,9 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         *bss = 0;
     }
 
+    gdt_install();
+    idt_install();
+
     /*
     * i tak nie zrozumiesz tych hackow w assemblerze
     */
@@ -267,8 +270,6 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("intel_hda", init_intel_hda, 0, 0, 4);
     driver_manager_register("alc650", alc650_init, alc650_shutdown, 0, 4);
     tapeta_wczytaj();
-    gdt_install();
-    idt_install();
     syscall_install();
     bluetooth_ui_init();
     kamera_ui_init();
