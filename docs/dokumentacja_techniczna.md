@@ -1630,6 +1630,227 @@ zwraca 1 gdy zaawansowana akceleracja 3D jest dostepna (sterownik zainicjowany).
 int titanx_akceleracja_3d_dostepna(void)
 ```
 
+## sterownik NVIDIA GTX 360 - drivers/karty_graficzne/nvidia/gtx360.cpp
+
+zaawansowany sterownik karty graficznej NVIDIA GTX 360 (GK107 Kepler) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x10DE, urzadzenie 0x1186), mapowanie MMIO, ring buffer, zarzadzanie VRAM (2 GB), inicjalizację wyswietlacza, potok graficzny, bufor wierzcholkow, bufor indeksow, tekstury, cele renderowania, bufor glebii, shadery (wierzcholkow, pikseli, geometrii, tessellation sterowania i evaluacji, obliczeniowe), stany probnika, mieszania, rasteryzacji i glebii-stencil, układy wejść, buforów stalych, łańcuchy wymiany, ogrodzenia i semafory, zaawansowana akceleracja 3D oraz shadery. rejestracja przez driver manager z funkcjami C `gtx360_init`, `gtx360_shutdown`.
+
+### gtx360_init
+
+inicjalizuje sterownik GTX 360: skanuje magistrale PCI w poszukiwaniu karty GK107, wlacza magistrale (bus master + memory space), inicjalizuje ring buffer, pamiec VRAM, wyswietlacz i resetuje potok graficzny.
+
+```
+int gtx360_init(void)
+```
+
+zwraca 0 przy sukcesie, -1 gdy urzadzenie nie zostalo wykryte lub inicjalizacja nie powiodla sie.
+
+### gtx360_shutdown
+
+zatrzymuje potok graficzny i oznacza sterownik jako niegotowy.
+
+```
+void gtx360_shutdown(void)
+```
+
+### gtx360_czy_gotowy
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+uint8_t gtx360_czy_gotowy(void)
+```
+
+### gtx360_putpixel / gtx360_fillrect / gtx360_blt
+
+rysuje piksel, wypelnia prostokat oraz wykonuje operacje blit na ramce systemowej.
+
+```
+void gtx360_putpixel(uint32_t x, uint32_t y, uint32_t kolor)
+void gtx360_fillrect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t kolor)
+void gtx360_blt(uint32_t dst_x, uint32_t dst_y, uint32_t src_x, uint32_t src_y, uint32_t w, uint32_t h)
+```
+
+### gtx360_get_fb / gtx360_get_szerokosc / gtx360_get_wysokosc
+
+pobiera wskaznik na ramke systemowa oraz rozmiary bufora ramki.
+
+```
+void *gtx360_get_fb(void)
+uint32_t gtx360_get_szerokosc(void)
+uint32_t gtx360_get_wysokosc(void)
+```
+
+### gtx360_shader_stworz / gtx360_shader_skompiluj
+
+tworzy shader o podanym typie (vertex, pixel, geometry, compute, tess_control, tess_eval) z podanym kodem i kompiluje go, zapisujac program shadera w rejestrze GPU.
+
+```
+gtx360_handle_t gtx360_shader_stworz(uint32_t typ, const uint8_t *kod, uint32_t rozmiar_kodu)
+void gtx360_shader_skompiluj(gtx360_handle_t uchwyt)
+void gtx360_shader_zniszcz(gtx360_handle_t uchwyt)
+```
+
+### gtx360_rysuj / gtx360_rysuj_indeksowane
+
+rysuje polygony z uzyciem powiazanych shaderow i celu renderowania, wspierajac zaawansowana akceleracje 3D.
+
+```
+void gtx360_rysuj(uint32_t liczba_wierzcholkow, uint32_t pierwszy_wierzcholek)
+void gtx360_rysuj_indeksowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka)
+void gtx360_rysuj_indeksowane_instancjonowane(uint32_t liczba_indeksow, uint32_t pierwszy_indeks, int32_t baza_wierzcholka, uint32_t liczba_instancji, uint32_t pierwsza_instancja)
+void gtx360_rysuj_po_indirekcie(uint32_t adres_bufora, uint32_t liczba_rysowan, uint32_t krok)
+```
+
+### gtx360_oblicz_wyslij
+
+uruchamia shader obliczeniowy na podanych wymiarach grup (compute shader).
+
+```
+void gtx360_oblicz_wyslij(uint32_t grupa_x, uint32_t grupa_y, uint32_t grupa_z)
+void gtx360_oblicz_wyslij_po_indirekcie(uint32_t adres_bufora)
+```
+
+### gtx360_ustaw_viewport / gtx360_ustaw_scissor / gtx360_ustaw_typ_pierwotnego / gtx360_ustaw_tessellation
+
+konfiguruje viewport, obszar odcinania, typ pierwotnego oraz tryb i czynnik tessellation.
+
+```
+void gtx360_ustaw_viewport(uint32_t x, uint32_t y, uint32_t w, uint32_t h, float min_glebia, float max_glebia)
+void gtx360_ustaw_scissor(uint32_t lewa, uint32_t gora, uint32_t prawa, uint32_t dol)
+void gtx360_ustaw_typ_pierwotnego(uint32_t typ_pierwotnego)
+void gtx360_ustaw_tessellation(uint32_t tryb, uint32_t factor)
+```
+
+### gtx360_wyczysc_cel_renderowania / gtx360_wyczysc_bufor_glebii
+
+czyszczy cel renderowania oraz bufor glebii/stencil.
+
+```
+void gtx360_wyczysc_cel_renderowania(gtx360_handle_t cel, uint32_t kolor)
+void gtx360_wyczysc_bufor_glebii(gtx360_handle_t bufor, float glebia, uint8_t stencil)
+```
+
+### gtx360_vram_alokuj / gtx360_vram_zwolnij
+
+alokuje i zwalnia pamiec VRAM karty graficznej.
+
+```
+uint64_t gtx360_vram_alokuj(uint64_t rozmiar, uint32_t typ)
+void gtx360_vram_zwolnij(uint64_t uchwyt)
+uint64_t gtx360_vram_uzyto(void)
+uint64_t gtx360_vram_calkowicie(void)
+```
+
+### gtx360_lancuch_stworz / gtx360_prezentuj
+
+tworzy lancuch wymiany (swap chain) z opcja vsync i prezentuje tylny bufor na ekranie.
+
+```
+gtx360_handle_t gtx360_lancuch_stworz(uint32_t szerokosc, uint32_t wysokosc, uint8_t vsync, uint8_t alpha_premultiplied)
+void gtx360_prezentuj(gtx360_handle_t lancuch)
+void gtx360_lancuch_zniszcz(gtx360_handle_t uchwyt)
+```
+
+### gtx360_powiaz_shader_wierzcholkow / gtx360_powiaz_shader_pikseli / gtx360_powiaz_shader_geometrii / gtx360_powiaz_shader_obliczeniowy
+
+powiazuje odpowiednie shadery z kontekstem graficznym i kompiluje je w GPU.
+
+```
+void gtx360_powiaz_shader_wierzcholkow(gtx360_handle_t uchwyt)
+void gtx360_powiaz_shader_pikseli(gtx360_handle_t uchwyt)
+void gtx360_powiaz_shader_geometrii(gtx360_handle_t uchwyt)
+void gtx360_powiaz_shader_tess_kontrola(gtx360_handle_t uchwyt)
+void gtx360_powiaz_shader_tess_evaluacja(gtx360_handle_t uchwyt)
+void gtx360_powiaz_shader_obliczeniowy(gtx360_handle_t uchwyt)
+```
+
+### gtx360_powiaz_cel_renderowania / gtx360_powiaz_bufor_glebii / gtx360_powiaz_stan_mieszania / gtx360_powiaz_stan_rasteryzacji / gtx360_powiaz_stan_glebii_stencil
+
+powiazuje cele renderowania, bufor glebii, stany mieszania, rasteryzacji oraz glebii-stencil z kontekstem.
+
+```
+void gtx360_powiaz_cel_renderowania(gtx360_handle_t uchwyt)
+void gtx360_powiaz_bufor_glebii(gtx360_handle_t uchwyt)
+void gtx360_powiaz_stan_mieszania(gtx360_handle_t uchwyt)
+void gtx360_powiaz_stan_rasteryzacji(gtx360_handle_t uchwyt)
+void gtx360_powiaz_stan_glebii_stencil(gtx360_handle_t uchwyt)
+```
+
+### gtx360_powiaz_probnik_i_teksture / gtx360_powiaz_bufor_stale
+
+powiazuje probnik i teksture do gniazda oraz bufor stale do gniazda stalych.
+
+```
+void gtx360_powiaz_probnik_i_teksture(uint32_t gniazdo, gtx360_handle_t probnik, gtx360_handle_t tekstura)
+void gtx360_powiaz_bufor_stale(uint32_t gniazdo, gtx360_handle_t uchwyt)
+```
+
+### gtx360_tekstura_stworz / gtx360_bufor_wierzcholkow_stworz / gtx360_bufor_indeksow_stworz / gtx360_cel_renderowania_stworz / gtx360_bufor_glebii_stworz
+
+tworzy tekstury, bufor wierzcholkow, bufor indeksow, cele renderowania i bufor glebii z alokacja w VRAM.
+
+```
+gtx360_handle_t gtx360_tekstura_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint32_t poziomy_mip, const void *dane)
+gtx360_handle_t gtx360_bufor_wierzcholkow_stworz(uint32_t liczba_wierzcholkow, uint32_t rozmiar_wierzcholka, uint32_t format, const void *dane)
+gtx360_handle_t gtx360_bufor_indeksow_stworz(uint32_t liczba_indeksow, uint32_t format, const void *dane)
+gtx360_handle_t gtx360_cel_renderowania_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint8_t alpha_blend)
+gtx360_handle_t gtx360_bufor_glebii_stworz(uint32_t szerokosc, uint32_t wysokosc, uint32_t format, uint8_t kompresja)
+```
+
+### gtx360_stan_probnika_stworz / gtx360_stan_mieszania_stworz / gtx360_stan_rasteryzacji_stworz / gtx360_stan_glebii_stencil_stworz / gtx360_uklad_wejsc_stworz / gtx360_bufor_stale_stworz
+
+tworzy odpowiednie stany graficzne: probnik, mieszanie, rasteryzacja, glebia-stencil, układ wejść i bufor stale.
+
+```
+gtx360_handle_t gtx360_stan_probnika_stworz(uint32_t filtr_min, uint32_t filtr_mag, uint32_t filtr_mip, uint32_t adres_u, uint32_t adres_v, uint32_t adres_w, uint32_t max_anizotropia, uint8_t wlacz_porownanie, uint8_t func_porownania)
+gtx360_handle_t gtx360_stan_mieszania_stworz(uint8_t wlacz_mieszanie, uint32_t src_blend, uint32_t dest_blend, uint32_t op_mieszania, uint32_t src_blend_alpha, uint32_t dest_blend_alpha, uint32_t op_mieszania_alpha, uint32_t maska_zapisu, uint32_t blend_factor)
+gtx360_handle_t gtx360_stan_rasteryzacji_stworz(uint32_t tryb_wypelnienia, uint32_t tryb_odcinania, uint8_t front_ccw, uint8_t clip_glebii, uint8_t scissor, uint8_t wielopr_probowanie, uint8_t aa_linia, uint8_t alpha_do_pokrycia)
+gtx360_handle_t gtx360_stan_glebii_stencil_stworz(uint8_t wlacz_glebie, uint32_t maska_zapisu_glebii, uint32_t func_glebii, uint8_t wlacz_stencil, uint8_t maska_odczytu_stencil, uint8_t maska_zapisu_stencil, uint32_t front_fail, uint32_t front_zfail, uint32_t front_pass, uint32_t front_func, uint32_t back_fail, uint32_t back_zfail, uint32_t back_pass, uint32_t back_func)
+gtx360_handle_t gtx360_uklad_wejsc_stworz(uint32_t liczba_elementow, const uint32_t *sloty, const uint32_t *przesuniecia, const uint32_t *formaty)
+gtx360_handle_t gtx360_bufor_stale_stworz(uint32_t rozmiar)
+```
+
+### gtx360_ogrodzenie_stworz / gtx360_semafor_stworz
+
+tworzy ogrodzenia i semafory do synchronizacji potoku graficznego.
+
+```
+void gtx360_ogrodzenie_stworz(gtx360_handle_t *wyjscie)
+void gtx360_ogrodzenie_sygnalizuj(gtx360_handle_t uchwyt, uint32_t wartosc)
+int gtx360_ogrodzenie_poczekaj(gtx360_handle_t uchwyt, uint32_t wartosc, uint32_t timeout_us)
+void gtx360_ogrodzenie_zniszcz(gtx360_handle_t uchwyt)
+void gtx360_semafor_stworz(gtx360_handle_t *wyjscie)
+void gtx360_semafor_sygnalizuj(gtx360_handle_t uchwyt, uint32_t wartosc)
+void gtx360_semafor_poczekaj(gtx360_handle_t uchwyt, uint32_t wartosc)
+void gtx360_semafor_zniszcz(gtx360_handle_t uchwyt)
+```
+
+### gtx360_ustaw_stan_zasilania / gtx360_ustaw_zegar_graficzny / gtx360_ustaw_zegar_pamieci / gtx360_pobierz_temperature / gtx360_ustaw_predkosc_wiatraka / gtx360_ustaw_rgb
+
+zarzadza stanem zasilania, zegarami graficznym i pamieci, temperatura, predkoscia wiatraka oraz podswietleniem RGB.
+
+```
+void gtx360_ustaw_stan_zasilania(uint8_t stan)
+uint8_t gtx360_pobierz_stan_zasilania(void)
+void gtx360_ustaw_zegar_graficzny(uint32_t mhz)
+void gtx360_ustaw_zegar_pamieci(uint32_t mhz)
+uint32_t gtx360_pobierz_zegar_graficzny(void)
+uint32_t gtx360_pobierz_zegar_pamieci(void)
+uint32_t gtx360_pobierz_temperature(void)
+void gtx360_ustaw_predkosc_wiatraka(uint32_t obroty)
+uint32_t gtx360_pobierz_predkosc_wiatraka(void)
+void gtx360_ustaw_rgb(uint32_t kolor, uint8_t tryb)
+void gtx360_wylacz_rgb(void)
+```
+
+### gtx360_akceleracja_3d_dostepna
+
+zwraca 1 gdy zaawansowana akceleracja 3D jest dostepna (sterownik zainicjowany).
+
+```
+int gtx360_akceleracja_3d_dostepna(void)
+```
+
 ## dyskietka - drivers/floppy.c
 
 ### floppy_init

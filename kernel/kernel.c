@@ -52,6 +52,7 @@
 #include <drivers/karty_graficzne/nvidia/gtx2010.h>
 #include <drivers/karty_graficzne/nvidia/gtx760.h>
 #include <drivers/karty_graficzne/nvidia/gtx660.h>
+#include <drivers/karty_graficzne/nvidia/gtx360.h>
 #include <drivers/karty_graficzne/nvidia/gtx560.h>
 #include <zegar.h>
 #include <notatnik.h>
@@ -103,6 +104,9 @@ uint8_t gtx660_czy_gotowy(void);
 int gtx560_init(void);
 void gtx560_shutdown(void);
 uint8_t gtx560_czy_gotowy(void);
+int gtx360_init(void);
+void gtx360_shutdown(void);
+uint8_t gtx360_czy_gotowy(void);
 bool gtx_1000_driver_init(void);
 bool gtx_1000_driver_detected(void);
 bool rx_460_driver_init(void);
@@ -263,6 +267,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("gtx760", gtx760_init, gtx760_shutdown, 0, 4);
     driver_manager_register("gtx660", gtx660_init, gtx660_shutdown, 0, 4);
     driver_manager_register("gtx560", gtx560_init, gtx560_shutdown, 0, 4);
+    driver_manager_register("gtx360", gtx360_init, gtx360_shutdown, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
