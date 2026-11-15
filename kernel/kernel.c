@@ -259,7 +259,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("titanx", titanx_init, 0, 0, 4);
     driver_manager_register("gtx760", gtx760_init, gtx760_shutdown, 0, 4);
     driver_manager_register("gtx660", gtx660_init, gtx660_shutdown, 0, 4);
-driver_manager_register("gtx560", gtx560_init, gtx560_shutdown, 0, 4);
+    driver_manager_register("gtx560", gtx560_init, gtx560_shutdown, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
     driver_manager_register("usb", usb_init, 0, usb_poll, 2);
     driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
