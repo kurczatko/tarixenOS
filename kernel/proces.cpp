@@ -10,6 +10,22 @@
 #include <kernel/idt.h>
 #include <include/printf/printf.h>
 
+#define SCHED_CPU_PERF 0U
+#define SCHED_CPU_EFF 1U
+#define SCHED_CAP_PERF 1024U
+#define SCHED_CAP_EFF 512U
+#define SCHED_BALANCE_INTERVAL 8U
+#define SCHED_ENERGY_INTERVAL 64U
+#define SCHED_PARK_IDLE_TICKS 200U
+#define SCHED_PERF_DEMAND_UTIL 300U
+#define SCHED_EFF_TASK_UTIL 160U
+#define SCHED_NEW_TASK_UTIL 256U
+#define SCHED_PULL_SCAN_LIMIT 16U
+
+void sched_enqueue(struct proces *p);
+void sched_dequeue(struct proces *p, uint32_t cpu);
+extern void smp_send_resched_ipi(uint32_t cpu) __attribute__((weak));
+
 struct proces process_table[MAX_PROCESSES];
 struct proces *current_cpu[SMP_MAX_CPUS] = {0};
 struct proces *current_process = 0;
@@ -34,7 +50,23 @@ struct runqueue {
     uint32_t lock;
 };
 
+struct cpu_meta_t {
+    uint32_t type;
+    uint32_t capacity;
+    uint32_t util;
+    uint32_t idle_ticks;
+};
+
+struct proces_ext {
+    uint32_t affinity;
+    uint32_t util;
+    uint64_t util_stamp;
+};
+
 static struct runqueue cpu_rq[SMP_MAX_CPUS];
+static struct cpu_meta_t cpu_meta[SMP_MAX_CPUS];
+static struct proces_ext proc_ext[MAX_PROCESSES];
+static uint32_t cpu_parked_mask = 0;
 
 static struct proces *wait_head = 0;
 static struct proces *wait_tail = 0;
@@ -180,27 +212,288 @@ static struct proces *sched_pick_next_locked(uint32_t cpu) {
     return rq_pop_best_locked(&cpu_rq[cpu]);
 }
 
-static struct proces *steal_work(uint32_t cpu) {
+static inline struct proces_ext *ext_of(struct proces *p) {
+    return &proc_ext[p - process_table];
+}
+
+static inline uint32_t cap_of(uint32_t c) {
+    return cpu_meta[c].capacity ? cpu_meta[c].capacity : SCHED_CAP_PERF;
+}
+
+static inline uint32_t mask_cpus(void) {
+    return smp_cpu_count >= 32U ? 0xFFFFFFFFU : ((1U << smp_cpu_count) - 1U);
+}
+
+static inline uint32_t usable_mask(void) {
+    uint32_t m = cpu_online_mask & ~cpu_parked_mask & mask_cpus();
+    return m ? m : 1U;
+}
+
+static inline int task_wants_perf(struct proces *p) {
+    return p->sched_class == SCHED_REALTIME || p->sched_class == SCHED_CRITICAL || p->sched_class == SCHED_INTERACTIVE;
+}
+
+static inline int task_wants_eff(struct proces *p) {
+    if (p->sched_class == SCHED_IDLE || p->sched_class == SCHED_BACKGROUND) return 1;
+    if (p->sched_class == SCHED_NORMAL && ext_of(p)->util < SCHED_EFF_TASK_UTIL) return 1;
+    return 0;
+}
+
+static inline int fits_cpu(struct proces *p, uint32_t c) {
+    return ext_of(p)->util * 1280U <= cap_of(c) * 1024U;
+}
+
+static uint32_t cpu_load_norm(uint32_t c) {
+    uint32_t n = (uint32_t)cpu_rq[c].nr_running;
+    if (n > 1023U) n = 1023U;
+    struct proces *cur = current_cpu[c];
+    if (cur && cur != idle_task[c] && cur->state == PROCES_RUNNING) n++;
+    return (n * 65536U) / cap_of(c);
+}
+
+static void util_decay(struct proces *p) {
+    struct proces_ext *e = ext_of(p);
+    uint64_t dt64 = global_ticks - e->util_stamp;
+    uint32_t dt = dt64 > 192ULL ? 192U : (uint32_t)dt64;
+    while (dt && e->util) {
+        e->util -= e->util >> 5;
+        dt--;
+    }
+    if (e->util < 16U) e->util = 0;
+    e->util_stamp = global_ticks;
+}
+
+static uint32_t select_cpu(struct proces *p) {
+    struct proces_ext *e = ext_of(p);
+    uint32_t usable = usable_mask();
+    uint32_t allowed = e->affinity & usable;
+    if (!allowed) allowed = e->affinity & cpu_online_mask & mask_cpus();
+    if (!allowed) allowed = usable;
+
+    int want_perf = task_wants_perf(p);
+    int want_eff = !want_perf && task_wants_eff(p);
+    uint32_t best_cpu = 0;
+    uint32_t best_cost = 0xFFFFFFFFU;
+
+    for (uint32_t c = 0; c < smp_cpu_count && c < SMP_MAX_CPUS; c++) {
+        if (!(allowed & (1U << c))) continue;
+        uint32_t cost = cpu_load_norm(c);
+        if (!fits_cpu(p, c)) cost += 1000000U;
+        if (cpu_meta[c].type == SCHED_CPU_PERF) {
+            if (want_eff) cost += 300U;
+            else if (!want_perf) cost += 20U;
+        } else if (want_perf) {
+            cost += 500000U;
+        }
+        if (c == p->cpu && cost >= 30U) cost -= 30U;
+        if (cost < best_cost) {
+            best_cost = cost;
+            best_cpu = c;
+        }
+    }
+    if (cpu_parked_mask & (1U << best_cpu)) {
+        __atomic_fetch_and(&cpu_parked_mask, ~(1U << best_cpu), __ATOMIC_SEQ_CST);
+    }
+    return best_cpu;
+}
+
+static int pullable(struct proces *p, uint32_t victim, uint32_t dest, int misfit_only) {
+    struct proces_ext *e = ext_of(p);
+    if (!((e->affinity >> dest) & 1U)) return 0;
+    if (misfit_only) return !fits_cpu(p, victim) && fits_cpu(p, dest);
+    if (!fits_cpu(p, dest) && fits_cpu(p, victim)) return 0;
+    if (task_wants_perf(p) && cpu_meta[dest].type != SCHED_CPU_PERF) return 0;
+    if (cpu_meta[dest].type == SCHED_CPU_PERF && cpu_meta[victim].type == SCHED_CPU_EFF && task_wants_eff(p)) return 0;
+    return 1;
+}
+
+static struct proces *pull_from(uint32_t victim, uint32_t dest, int misfit_only) {
+    struct runqueue *v = &cpu_rq[victim];
+    if (!v->nr_running) return 0;
+    if (__atomic_exchange_n(&v->lock, 1U, __ATOMIC_ACQUIRE)) return 0;
+
+    struct proces *found = 0;
+    uint32_t scanned = 0;
+    int words = ((int)NR_PRIORITIES + 31) / 32;
+    for (int w = 0; w < words && !found && scanned < SCHED_PULL_SCAN_LIMIT; w++) {
+        uint32_t bits = v->prio_bitmap[w];
+        while (bits && !found && scanned < SCHED_PULL_SCAN_LIMIT) {
+            int b = __builtin_ctz(bits);
+            bits &= bits - 1U;
+            struct proces *p = v->prio_head[w * 32 + b];
+            while (p && scanned < SCHED_PULL_SCAN_LIMIT) {
+                scanned++;
+                if (pullable(p, victim, dest, misfit_only)) {
+                    found = p;
+                    break;
+                }
+                p = p->run_next;
+            }
+        }
+    }
+    if (found) runq_dequeue_locked(found, v);
+    unlock_raw(&v->lock);
+    if (found) {
+        found->cpu = dest;
+        found->nr_migrations++;
+    }
+    return found;
+}
+
+static struct proces *balance_pull(uint32_t cpu) {
+    uint32_t usable = usable_mask();
+    if (!((usable >> cpu) & 1U)) return 0;
+
+    if (cpu_meta[cpu].type == SCHED_CPU_PERF) {
+        for (uint32_t i = 0; i < smp_cpu_count && i < SMP_MAX_CPUS; i++) {
+            if (i == cpu || !((usable >> i) & 1U)) continue;
+            if (cpu_meta[i].type != SCHED_CPU_EFF) continue;
+            struct proces *m = pull_from(i, cpu, 1);
+            if (m) return m;
+        }
+    }
+
+    uint32_t mine = cpu_load_norm(cpu);
+    uint32_t unit = 65536U / cap_of(cpu);
+    uint32_t best = mine + unit;
     uint32_t victim = cpu;
-    uint64_t best = 1;
-    for (uint32_t i = 0; i < smp_cpu_count; i++) {
-        if (i == cpu || !(cpu_online_mask & (1U << i))) continue;
-        uint64_t n = cpu_rq[i].nr_running;
-        if (n > best) {
-            best = n;
+    for (uint32_t i = 0; i < smp_cpu_count && i < SMP_MAX_CPUS; i++) {
+        if (i == cpu || !((usable >> i) & 1U)) continue;
+        if (!cpu_rq[i].nr_running) continue;
+        uint32_t l = cpu_load_norm(i);
+        if (l > best) {
+            best = l;
             victim = i;
         }
     }
     if (victim == cpu) return 0;
-    struct runqueue *v = &cpu_rq[victim];
-    if (__atomic_exchange_n(&v->lock, 1U, __ATOMIC_ACQUIRE)) return 0;
-    struct proces *p = rq_pop_best_locked(v);
-    unlock_raw(&v->lock);
-    if (p) {
-        p->cpu = cpu;
+    return pull_from(victim, cpu, 0);
+}
+
+static void drain_cpu(uint32_t c) {
+    struct runqueue *rq = &cpu_rq[c];
+    uint32_t n = (uint32_t)rq->nr_running;
+    while (n--) {
+        uint32_t f = lock_irqsave(&rq->lock);
+        struct proces *p = rq_pop_best_locked(rq);
+        unlock_irqrestore(&rq->lock, f);
+        if (!p) break;
+        p->cpu = select_cpu(p);
         p->nr_migrations++;
+        sched_enqueue(p);
     }
-    return p;
+}
+
+static void energy_manage(void) {
+    uint32_t total = 0;
+    int perf_demand = 0;
+    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
+        struct proces *p = &process_table[i];
+        if (!p->pid || p->sched_class == SCHED_IDLE) continue;
+        if (p->state != PROCES_READY && p->state != PROCES_RUNNING) continue;
+        uint32_t u = proc_ext[i].util;
+        total += u;
+        if (task_wants_perf(p) && u >= SCHED_PERF_DEMAND_UTIL) perf_demand = 1;
+    }
+    uint32_t need = total + (total >> 2);
+    uint32_t online = cpu_online_mask & mask_cpus();
+    uint32_t desired = 1U;
+    uint32_t cap = cap_of(0);
+
+    for (uint32_t pass = 0; pass < 2 && cap < need; pass++) {
+        uint32_t want_type = pass == 0 ? SCHED_CPU_EFF : SCHED_CPU_PERF;
+        for (uint32_t c = 1; c < smp_cpu_count && c < SMP_MAX_CPUS && cap < need; c++) {
+            if (!((online >> c) & 1U) || ((desired >> c) & 1U)) continue;
+            if (cpu_meta[c].type != want_type) continue;
+            desired |= (1U << c);
+            cap += cap_of(c);
+        }
+    }
+
+    if (perf_demand) {
+        int have_perf = 0;
+        for (uint32_t c = 0; c < smp_cpu_count && c < SMP_MAX_CPUS; c++) {
+            if (((desired >> c) & 1U) && cpu_meta[c].type == SCHED_CPU_PERF) have_perf = 1;
+        }
+        if (!have_perf) {
+            for (uint32_t c = 1; c < smp_cpu_count && c < SMP_MAX_CPUS; c++) {
+                if (((online >> c) & 1U) && cpu_meta[c].type == SCHED_CPU_PERF) {
+                    desired |= (1U << c);
+                    break;
+                }
+            }
+        }
+    }
+
+    for (uint32_t c = 1; c < smp_cpu_count && c < SMP_MAX_CPUS; c++) {
+        uint32_t bit = 1U << c;
+        if (!(online & bit)) continue;
+        if (desired & bit) {
+            if (cpu_parked_mask & bit) __atomic_fetch_and(&cpu_parked_mask, ~bit, __ATOMIC_SEQ_CST);
+        } else if (!(cpu_parked_mask & bit) && cpu_meta[c].idle_ticks >= SCHED_PARK_IDLE_TICKS && !cpu_rq[c].nr_running) {
+            __atomic_fetch_or(&cpu_parked_mask, bit, __ATOMIC_SEQ_CST);
+            drain_cpu(c);
+        }
+    }
+}
+
+static inline void cpuid_raw(uint32_t leaf, uint32_t sub, uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d) {
+    __asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "a"(leaf), "c"(sub));
+}
+
+void cpu_set_topology(uint32_t cpu, uint32_t type, uint32_t capacity) {
+    if (cpu >= SMP_MAX_CPUS) return;
+    cpu_meta[cpu].type = type;
+    cpu_meta[cpu].capacity = capacity ? capacity : SCHED_CAP_PERF;
+}
+
+void sched_register_this_cpu(void) {
+    uint32_t cpu = cpu_id();
+    if (cpu >= SMP_MAX_CPUS) return;
+    uint32_t a, b, c, d;
+    uint32_t type = SCHED_CPU_PERF;
+    uint32_t cap = SCHED_CAP_PERF;
+    cpuid_raw(0, 0, &a, &b, &c, &d);
+    uint32_t maxleaf = a;
+    if (maxleaf >= 7U) {
+        cpuid_raw(7, 0, &a, &b, &c, &d);
+        if (((d >> 15) & 1U) && maxleaf >= 0x1AU) {
+            cpuid_raw(0x1A, 0, &a, &b, &c, &d);
+            if ((a >> 24) == 0x20U) {
+                type = SCHED_CPU_EFF;
+                cap = SCHED_CAP_EFF;
+            }
+        }
+    }
+    cpu_meta[cpu].type = type;
+    cpu_meta[cpu].capacity = cap;
+}
+
+uint32_t sched_cpu_util(uint32_t cpu) {
+    if (cpu >= SMP_MAX_CPUS) return 0;
+    return cpu_meta[cpu].util;
+}
+
+uint32_t sched_cpu_capacity(uint32_t cpu) {
+    if (cpu >= SMP_MAX_CPUS) return 0;
+    return cap_of(cpu);
+}
+
+uint32_t sched_cpu_type(uint32_t cpu) {
+    if (cpu >= SMP_MAX_CPUS) return SCHED_CPU_PERF;
+    return cpu_meta[cpu].type;
+}
+
+int sched_cpu_parked(uint32_t cpu) {
+    if (cpu >= SMP_MAX_CPUS) return 0;
+    return (cpu_parked_mask >> cpu) & 1U;
+}
+
+uint32_t sched_idle_hint(uint32_t cpu) {
+    if (cpu >= SMP_MAX_CPUS) return 0;
+    if ((cpu_parked_mask >> cpu) & 1U) return 2U;
+    if (cpu_meta[cpu].idle_ticks >= 32U) return 1U;
+    return 0U;
 }
 
 static void proces_ustaw_stos(struct proces *p, uint32_t entry_point, uint32_t arg) {
@@ -272,14 +565,22 @@ static void schedule_cpu(uint32_t cpu, int yield) {
 
     if (cur_runnable && expired && cur->time_slice == 0) cur->time_slice = time_slice_for(cur);
 
+    int requeued = 0;
     if (next && cur_runnable && !cur_is_idle) {
         cur->state = PROCES_READY;
         runq_enqueue_locked(cur);
+        requeued = 1;
     }
     unlock_raw(&rq->lock);
 
+    if (requeued && !(((ext_of(cur)->affinity & usable_mask()) >> cpu) & 1U)) {
+        sched_dequeue(cur, cpu);
+        cur->cpu = select_cpu(cur);
+        sched_enqueue(cur);
+    }
+
     if (!next && (!cur_runnable || cur_is_idle)) {
-        next = steal_work(cpu);
+        next = balance_pull(cpu);
         if (!next && !cur_is_idle) next = idle;
     }
 
@@ -319,6 +620,8 @@ void proces_init(void) {
         cpu_rq[i].nr_running = 0;
         cpu_rq[i].load = 0;
         cpu_rq[i].lock = 0;
+        cpu_meta[i].util = 0;
+        cpu_meta[i].idle_ticks = 0;
         current_cpu[i] = 0;
         idle_task[i] = 0;
     }
@@ -364,18 +667,24 @@ void proces_init(void) {
         for (uint32_t k = 0; k < MAX_OKNA_PROCESU; k++) {
             p->okna_uzyte[k] = 0;
         }
+        proc_ext[i].affinity = 0xFFFFFFFFU;
+        proc_ext[i].util = 0;
+        proc_ext[i].util_stamp = 0;
     }
     wait_head = 0;
     wait_tail = 0;
     sleep_head = 0;
     sleep_tail = 0;
     waitq_lock = 0;
+    cpu_parked_mask = 0;
     current_process = 0;
     next_pid = 1;
     process_count = 0;
     global_ticks = 0;
 
     asm volatile("mov %%cr3, %0" : "=r"(kernel_page_dir_phys));
+
+    sched_register_this_cpu();
 
     for (uint32_t c = 0; c < smp_cpu_count; c++) {
         struct proces *idle = proces_stworz(0, "idle", 0);
@@ -387,6 +696,7 @@ void proces_init(void) {
             idle->time_slice = 1U;
             idle->state = PROCES_READY;
             idle->cpu = c;
+            ext_of(idle)->affinity = 1U << c;
             idle_task[c] = idle;
         }
     }
@@ -396,8 +706,6 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
     if (process_count >= MAX_PROCESSES) return 0;
     struct proces *p = proces_alloc_slot();
     if (!p) return 0;
-
-    uint32_t cpu = cpu_id();
 
     p->pid = next_pid++;
     p->state = PROCES_READY;
@@ -416,7 +724,7 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
     p->sleep_until = 0;
     p->period = 0;
     p->deadline = 0;
-    p->cpu = cpu;
+    p->cpu = cpu_id();
     p->preempt_count = 0;
     p->prio_inherited = 0;
     p->original_prio = p->priority;
@@ -426,6 +734,11 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
     p->nr_blocked = 0;
     p->sleep_ticks = 0;
     p->ctx_switches = 0;
+
+    struct proces_ext *e = ext_of(p);
+    e->affinity = 0xFFFFFFFFU;
+    e->util = SCHED_NEW_TASK_UTIL;
+    e->util_stamp = global_ticks;
 
     for (uint32_t i = 0; i < 31 && name && name[i]; i++) {
         p->name[i] = name[i];
@@ -438,6 +751,7 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
     }
 
     proces_ustaw_stos(p, entry_point, arg);
+    p->cpu = select_cpu(p);
     sched_enqueue(p);
     process_count++;
     return p;
@@ -491,16 +805,42 @@ void proces_tick(void) {
             w->sleep_until = 0;
             w->state = PROCES_READY;
             w->nr_wakeups++;
+            util_decay(w);
+            uint32_t target = select_cpu(w);
+            if (target != w->cpu) w->nr_migrations++;
+            w->cpu = target;
             sched_enqueue(w);
         }
         unlock_irqrestore(&waitq_lock, wf);
     }
 
     struct proces *cur = current_cpu[cpu];
+    int busy = cur && cur != idle_task[cpu] && cur->state == PROCES_RUNNING;
+    struct cpu_meta_t *m = &cpu_meta[cpu];
+    if (busy) {
+        m->util += (1024U - m->util) >> 4;
+        m->idle_ticks = 0;
+    } else {
+        m->util -= m->util >> 4;
+        m->idle_ticks++;
+    }
+
     if (cur && cur->state == PROCES_RUNNING) {
         cur->sum_exec_runtime += TICK_NS;
         cur->vruntime += TICK_NS;
         if (cur->time_slice > 0) cur->time_slice--;
+        if (busy) {
+            struct proces_ext *e = ext_of(cur);
+            e->util += (1024U - e->util) >> 5;
+            e->util_stamp = global_ticks;
+        }
+    }
+
+    if (cpu == 0 && (((uint32_t)global_ticks) & (SCHED_ENERGY_INTERVAL - 1U)) == 0U) energy_manage();
+
+    if (busy && ((((uint32_t)global_ticks) + cpu) & (SCHED_BALANCE_INTERVAL - 1U)) == 0U) {
+        struct proces *pulled = balance_pull(cpu);
+        if (pulled) sched_enqueue(pulled);
     }
 
     schedule_cpu(cpu, 0);
@@ -571,11 +911,10 @@ void proces_wakeup(struct proces *p) {
         p->sleep_until = 0;
         p->state = PROCES_READY;
         p->nr_wakeups++;
-        uint32_t cpu = cpu_id();
-        if (p->cpu != cpu && current_cpu[cpu] == idle_task[cpu]) {
-            p->cpu = cpu;
-            p->nr_migrations++;
-        }
+        util_decay(p);
+        uint32_t target = select_cpu(p);
+        if (target != p->cpu) p->nr_migrations++;
+        p->cpu = target;
         sched_enqueue(p);
     }
     unlock_irqrestore(&waitq_lock, f);
@@ -604,9 +943,35 @@ int proces_set_sched_class(uint32_t pid, sched_class_t cls) {
     if (queued) sched_dequeue(p, p->cpu);
     p->sched_class = cls;
     p->time_slice = time_slice_for(p);
-    if (queued) sched_enqueue(p);
+    if (queued) {
+        p->cpu = select_cpu(p);
+        sched_enqueue(p);
+    }
     irq_restore(f);
     return 0;
+}
+
+int proces_set_affinity(uint32_t pid, uint32_t mask) {
+    mask &= mask_cpus();
+    if (!mask) return -1;
+    struct proces *p = proces_find(pid);
+    if (!p) return -1;
+    uint32_t f = irq_save();
+    ext_of(p)->affinity = mask;
+    if (p->state == PROCES_READY && !((mask >> p->cpu) & 1U)) {
+        sched_dequeue(p, p->cpu);
+        p->cpu = select_cpu(p);
+        p->nr_migrations++;
+        sched_enqueue(p);
+    }
+    irq_restore(f);
+    return 0;
+}
+
+uint32_t proces_get_affinity(uint32_t pid) {
+    struct proces *p = proces_find(pid);
+    if (!p) return 0;
+    return ext_of(p)->affinity;
 }
 
 int proces_get_stats(uint32_t pid, struct proces *out) {
@@ -659,8 +1024,6 @@ struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, u
     struct proces *p = proces_alloc_slot();
     if (!p) return 0;
 
-    uint32_t cpu = cpu_id();
-
     p->pid = next_pid++;
     p->state = PROCES_READY;
     p->entry_point = entry_point;
@@ -678,7 +1041,7 @@ struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, u
     p->sleep_until = 0;
     p->period = 0;
     p->deadline = 0;
-    p->cpu = cpu;
+    p->cpu = cpu_id();
     p->preempt_count = 0;
     p->prio_inherited = 0;
     p->original_prio = p->priority;
@@ -692,6 +1055,11 @@ struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, u
     p->driver_handle = 0xFFFFFFFFU;
     p->driver_poll_interval = poll_interval;
     p->driver_last_poll = 0;
+
+    struct proces_ext *e = ext_of(p);
+    e->affinity = 0xFFFFFFFFU;
+    e->util = SCHED_NEW_TASK_UTIL;
+    e->util_stamp = global_ticks;
 
     for (uint32_t i = 0; i < 31 && name && name[i]; i++) {
         p->name[i] = name[i];
@@ -735,6 +1103,7 @@ struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, u
     p->regs.ss = GDT_RING0_DATA;
     p->regs.eip = entry_point;
 
+    p->cpu = select_cpu(p);
     sched_enqueue(p);
     process_count++;
     return p;
@@ -766,7 +1135,6 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
     }
     if (slot == -1) return;
     struct proces *p = &process_table[slot];
-    uint32_t cpu = cpu_id();
     p->pid = next_pid++;
     p->state = PROCES_READY;
     p->window = okno;
@@ -775,7 +1143,7 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
     p->kernel_stack = 0;
     p->user_stack = 0;
     p->page_directory = 0;
-    p->cpu = cpu;
+    p->cpu = cpu_id();
     if (nazwa) {
         for (uint32_t i = 0; i < 31 && nazwa[i]; i++) p->name[i] = nazwa[i];
     }
@@ -783,6 +1151,11 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
     for (uint32_t i = 0; i < MAX_OKNA_PROCESU; i++) {
         p->okna_uzyte[i] = 0;
     }
+    struct proces_ext *e = ext_of(p);
+    e->affinity = 0xFFFFFFFFU;
+    e->util = SCHED_NEW_TASK_UTIL;
+    e->util_stamp = global_ticks;
+    p->cpu = select_cpu(p);
     process_count++;
     sched_enqueue(p);
 }
@@ -790,9 +1163,16 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
 void sched_enqueue(struct proces *p) {
     uint32_t cpu = p->cpu;
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
+    if (!((usable_mask() >> cpu) & 1U)) {
+        p->cpu = select_cpu(p);
+        cpu = p->cpu;
+    }
     uint32_t f = lock_irqsave(&cpu_rq[cpu].lock);
     runq_enqueue_locked(p);
     unlock_irqrestore(&cpu_rq[cpu].lock, f);
+    if (smp_send_resched_ipi && idle_task[cpu] && cpu != cpu_id() && current_cpu[cpu] == idle_task[cpu]) {
+        smp_send_resched_ipi(cpu);
+    }
 }
 
 void sched_dequeue(struct proces *p, uint32_t cpu) {
