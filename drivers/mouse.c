@@ -184,3 +184,15 @@ void mouse_poll(void) {
         }
     }
 }
+
+uint8_t mouse_lewy_przycisk(void)
+{
+    static uint8_t ostatni_stan = 0;
+    uint8_t obecny = left_button_pressed;
+    uint8_t klik = 0;
+    if (obecny && !ostatni_stan) {
+        klik = 1;
+    }
+    ostatni_stan = obecny;
+    return klik;
+}

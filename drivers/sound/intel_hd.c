@@ -18,6 +18,16 @@ static void outl(uint16_t port, uint32_t val) {
     __asm__ volatile("outl %0, %1" : : "a"(val), "Nd"(port));
 }
 
+static inline void outb(uint16_t port, uint8_t val) {
+    __asm__ volatile("outb %0, %1" : : "a"(val), "Nd"(port));
+}
+
+static inline uint8_t inb(uint16_t port) {
+    uint8_t v;
+    __asm__ volatile("inb %1, %0" : "=a"(v) : "Nd"(port));
+    return v;
+}
+
 static uint32_t inl(uint16_t port) {
     uint32_t ret;
     __asm__ volatile("inl %1, %0" : "=a"(ret) : "Nd"(port));
@@ -200,4 +210,12 @@ found:
     hda_pit_sleep_ms(5000);
 
     *(volatile uint32_t *)(stream_base + 0x00) &= ~(1 << 1);
+}
+
+void intel_hda_beep(void)
+{
+    uint8_t val = inb(0x61);
+    outb(0x61, (uint8_t)(val | 3));
+    for (volatile int i = 0; i < 200000; i++);
+    outb(0x61, val);
 }

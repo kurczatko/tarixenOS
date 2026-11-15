@@ -8,6 +8,7 @@
 #include <kernel/apps/gra.h>
 #include <drivers/keyboard.h>
 #include <drivers/mouse.h>
+#include <drivers/sound/intel_hd.h>
 #include <graficzny/rysowanie.h>
 #include <graficzny/okno.h>
 #include <graficzny/czcionka.h>
@@ -61,6 +62,10 @@ static pilka_t pilki[MAX_PILKI];
 static uint32_t spawn_timer = 0;
 static int gra_koniec = 0;
 static uint32_t rand_seed = 123456789;
+static int strzal_aktywny = 0;
+static int strzal_timer = 0;
+static uint32_t strzal_x = 0;
+static uint32_t strzal_y = 0;
 
 static struct okno okno_gra;
 
@@ -236,6 +241,48 @@ static void rysuj_pilke_3d(int x, int y, int szerokosc, int wysokosc)
     }
 }
 
+static void rysuj_pistolet(int okno_x, int okno_y, int okno_szerokosc, int okno_wysokosc)
+{
+    int lufa_x = okno_x + okno_szerokosc - 60;
+    int lufa_y = okno_y + okno_wysokosc - 40;
+    int i;
+    int j;
+
+    for (j = 0; j < 20; j++) {
+        for (i = 0; i < 50; i++) {
+            int px = lufa_x + i;
+            int py = lufa_y + j;
+            if (px >= okno_x && px < okno_x + okno_szerokosc && py >= okno_y && py < okno_y + okno_wysokosc) {
+                if (i > 5 && i < 45 && j > 5 && j < 15) {
+                    obraz[py * EKRAN_SZEROKOSC + px] = 0x00505050;
+                } else if ((i < 8 || i > 42 || j < 8 || j > 12) && i < 50 && j < 20) {
+                    obraz[py * EKRAN_SZEROKOSC + px] = 0x00303030;
+                }
+            }
+        }
+    }
+
+    if (strzal_aktywny) {
+        int flash_x = lufa_x - 10;
+        int flash_y = lufa_y - 5;
+        for (j = 0; j < 15; j++) {
+            for (i = 0; i < 15; i++) {
+                int px = flash_x + i;
+                int py = flash_y + j;
+                if (px >= okno_x && px < okno_x + okno_szerokosc && py >= okno_y && py < okno_y + okno_wysokosc) {
+                    if (i + j < 16) {
+                        obraz[py * EKRAN_SZEROKOSC + px] = 0x00FFFF00;
+                    }
+                }
+            }
+        }
+        strzal_timer--;
+        if (strzal_timer <= 0) {
+            strzal_aktywny = 0;
+        }
+    }
+}
+
 static void gra_rysuj_zawartosc(int x, int y, int szerokosc, int wysokosc)
 {
     for (int rx = 0; rx < szerokosc; rx++) {
@@ -327,6 +374,8 @@ static void gra_rysuj_zawartosc(int x, int y, int szerokosc, int wysokosc)
     obraz[(cy + 1) * EKRAN_SZEROKOSC + cx] = 0x00FFFFFF;
     obraz[cy * EKRAN_SZEROKOSC + cx - 1] = 0x00FFFFFF;
     obraz[cy * EKRAN_SZEROKOSC + cx + 1] = 0x00FFFFFF;
+
+    rysuj_pistolet(x, y, szerokosc, wysokosc);
 }
 
 void gra(void)
@@ -407,7 +456,43 @@ void gra(void)
         }
         ostatni_x = mx;
         ostatni_y = my;
-        
+
+        if (mouse_lewy_przycisk() && !gra_koniec) {
+            intel_hda_beep();
+            strzal_aktywny = 1;
+            strzal_timer = 5;
+
+            int cel_x = okno_gra.x + 8 + (okno_gra.szerokosc - 16) / 2;
+            int cel_y = okno_gra.y + 30 + (okno_gra.wysokosc - 38) / 2;
+
+            for (int i = 0; i < MAX_PILKI; i++) {
+                if (!pilki[i].aktywna) continue;
+
+                double sprite_x = pilki[i].x - gra_pos_x;
+                double sprite_y = pilki[i].y - gra_pos_y;
+                double inv_det = 1.0 / (gra_plane_x * gra_dir_y - gra_dir_x * gra_plane_y);
+                double transform_x = inv_det * (gra_dir_y * sprite_x - gra_dir_x * sprite_y);
+                double transform_y = inv_det * (-gra_plane_y * sprite_x + gra_plane_x * sprite_y);
+
+                if (transform_y <= 0) continue;
+
+                int szer = okno_gra.szerokosc - 16;
+                int wys = okno_gra.wysokosc - 38;
+                int sprite_screen_x = (int)((okno_gra.x + 8 + szer / 2) * (1 + transform_x / transform_y));
+                int sprite_height = (int)(wys / transform_y);
+                int sprite_width = sprite_height;
+                int draw_start_x = -sprite_width / 2 + sprite_screen_x;
+                int draw_end_x = sprite_width / 2 + sprite_screen_x;
+                int draw_start_y = cel_y - sprite_height / 2;
+                int draw_end_y = cel_y + sprite_height / 2;
+
+                if (cel_x >= draw_start_x && cel_x <= draw_end_x && cel_y >= draw_start_y && cel_y <= draw_end_y) {
+                    pilki[i].aktywna = 0;
+                    break;
+                }
+            }
+        }
+
         if (!gra_koniec) {
             spawn_timer++;
             if (spawn_timer >= SPAWN_INTERVAL_MIN + (gra_rand() % (SPAWN_INTERVAL_MAX - SPAWN_INTERVAL_MIN))) {

@@ -2,5 +2,6 @@
 #define INTEL_HDA_H
 
 void init_intel_hda(void);
+void intel_hda_beep(void);
 
 #endif
