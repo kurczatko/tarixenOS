@@ -38,6 +38,8 @@ static struct runqueue cpu_rq[SMP_MAX_CPUS];
 
 static struct proces *wait_head = 0;
 static struct proces *wait_tail = 0;
+static struct proces *sleep_head = 0;
+static struct proces *sleep_tail = 0;
 static uint32_t waitq_lock = 0;
 static struct proces *idle_task[SMP_MAX_CPUS] = {0};
 
@@ -51,26 +53,31 @@ static inline int prio_clamp(int p) {
     return p;
 }
 
-static inline void smp_spin_lock(volatile uint32_t *lock) {
-    uint32_t tmp = 1;
-    __asm__ volatile (
-        "1:\n"
-        "xchg %0, %1\n"
-        "test %0, %0\n"
-        "jnz 1b\n"
-        : "+r"(tmp), "+m"(*lock)
-        :
-        : "memory"
-    );
+static inline uint32_t irq_save(void) {
+    uint32_t f;
+    __asm__ volatile("pushf; pop %0; cli" : "=r"(f) :: "memory");
+    return f;
 }
 
-static inline void smp_spin_unlock(volatile uint32_t *lock) {
-    __asm__ volatile (
-        "movl $0, %0\n"
-        : "=m"(*lock)
-        :
-        : "memory"
-    );
+static inline void irq_restore(uint32_t f) {
+    if (f & 0x200U) __asm__ volatile("sti" ::: "memory");
+}
+
+static inline uint32_t lock_irqsave(volatile uint32_t *l) {
+    uint32_t f = irq_save();
+    while (__atomic_exchange_n(l, 1U, __ATOMIC_ACQUIRE)) {
+        while (__atomic_load_n(l, __ATOMIC_RELAXED)) __builtin_ia32_pause();
+    }
+    return f;
+}
+
+static inline void unlock_raw(volatile uint32_t *l) {
+    __atomic_store_n(l, 0U, __ATOMIC_RELEASE);
+}
+
+static inline void unlock_irqrestore(volatile uint32_t *l, uint32_t f) {
+    unlock_raw(l);
+    irq_restore(f);
 }
 
 static inline void prio_bitmap_set(struct runqueue *rq, int prio) {
@@ -95,31 +102,20 @@ static void runq_enqueue_locked(struct proces *p) {
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
     struct runqueue *rq = &cpu_rq[cpu];
     int prio = prio_clamp(p->priority);
-    if (p->sched_class == SCHED_REALTIME || p->sched_class == SCHED_CRITICAL) {
-        p->run_next = 0;
-        p->run_prev = rq->prio_tail[prio];
-        if (rq->prio_tail[prio]) rq->prio_tail[prio]->run_next = p;
-        else rq->prio_head[prio] = p;
-        rq->prio_tail[prio] = p;
-    } else {
-        struct proces *cur = rq->prio_head[prio];
-        struct proces *prev = 0;
-        while (cur && cur->vruntime <= p->vruntime) {
-            prev = cur;
-            cur = cur->run_next;
-        }
-        p->run_next = cur;
-        p->run_prev = prev;
-        if (prev) prev->run_next = p;
-        else rq->prio_head[prio] = p;
-        if (cur) cur->run_prev = p;
-        else rq->prio_tail[prio] = p;
+
+    struct proces *after = rq->prio_tail[prio];
+    if (p->sched_class != SCHED_REALTIME && p->sched_class != SCHED_CRITICAL) {
+        while (after && after->vruntime > p->vruntime) after = after->run_prev;
     }
+    p->run_prev = after;
+    p->run_next = after ? after->run_next : rq->prio_head[prio];
+    if (after) after->run_next = p; else rq->prio_head[prio] = p;
+    if (p->run_next) p->run_next->run_prev = p; else rq->prio_tail[prio] = p;
+
     prio_bitmap_set(rq, prio);
     rq->nr_running++;
 }
 
-/* Caller MUST hold cpu_rq[cpu].lock. */
 static void runq_dequeue_locked(struct proces *p, struct runqueue *rq) {
     int prio = prio_clamp(p->priority);
     if (p->run_prev) p->run_prev->run_next = p->run_next;
@@ -130,6 +126,14 @@ static void runq_dequeue_locked(struct proces *p, struct runqueue *rq) {
     p->run_prev = 0;
     if (!rq->prio_head[prio]) prio_bitmap_clear(rq, prio);
     if (rq->nr_running > 0) rq->nr_running--;
+}
+
+static inline struct proces *rq_pop_best_locked(struct runqueue *rq) {
+    int prio = prio_find_highest(rq);
+    if (prio < 0) return 0;
+    struct proces *p = rq->prio_head[prio];
+    runq_dequeue_locked(p, rq);
+    return p;
 }
 
 static void waitq_enqueue_locked(struct proces *p) {
@@ -149,48 +153,54 @@ static void waitq_dequeue_locked(struct proces *p) {
     p->wait_prev = 0;
 }
 
+static void sleep_insert_locked(struct proces *p) {
+    struct proces *after = sleep_tail;
+    while (after && after->sleep_until > p->sleep_until) after = after->wait_prev;
+    p->wait_prev = after;
+    p->wait_next = after ? after->wait_next : sleep_head;
+    if (after) after->wait_next = p; else sleep_head = p;
+    if (p->wait_next) p->wait_next->wait_prev = p; else sleep_tail = p;
+}
+
+static void sleep_remove_locked(struct proces *p) {
+    if (p->wait_prev) p->wait_prev->wait_next = p->wait_next;
+    else sleep_head = p->wait_next;
+    if (p->wait_next) p->wait_next->wait_prev = p->wait_prev;
+    else sleep_tail = p->wait_prev;
+    p->wait_next = 0;
+    p->wait_prev = 0;
+}
+
+static inline void wait_remove_any_locked(struct proces *p) {
+    if (p->state == PROCES_SLEEPING) sleep_remove_locked(p);
+    else waitq_dequeue_locked(p);
+}
 
 static struct proces *sched_pick_next_locked(uint32_t cpu) {
-    struct runqueue *rq = &cpu_rq[cpu];
-    int prio = prio_find_highest(rq);
-    if (prio >= 0) {
-        struct proces *p = rq->prio_head[prio];
-        while (p) {
-            if ((p->state == PROCES_READY || p->state == PROCES_RUNNING) && p != current_cpu[cpu]) {
-                runq_dequeue_locked(p, rq);
-                return p;
-            }
-            p = p->run_next;
-        }
-    }
+    return rq_pop_best_locked(&cpu_rq[cpu]);
+}
 
-
-    uint64_t best = 0;
+static struct proces *steal_work(uint32_t cpu) {
     uint32_t victim = cpu;
+    uint64_t best = 1;
     for (uint32_t i = 0; i < smp_cpu_count; i++) {
         if (i == cpu || !(cpu_online_mask & (1U << i))) continue;
-        if (cpu_rq[i].nr_running > best) {
-            best = cpu_rq[i].nr_running;
+        uint64_t n = cpu_rq[i].nr_running;
+        if (n > best) {
+            best = n;
             victim = i;
         }
     }
-    if (victim != cpu && best > 1) {
-        struct runqueue *vrq = &cpu_rq[victim];
-        int vprio = prio_find_highest(vrq);
-        if (vprio >= 0) {
-            struct proces *p = vrq->prio_head[vprio];
-            while (p) {
-                if ((p->state == PROCES_READY || p->state == PROCES_RUNNING) && p != idle_task[victim]) {
-                    runq_dequeue_locked(p, vrq);
-                    p->cpu = cpu;
-                    p->nr_migrations++;
-                    return p;
-                }
-                p = p->run_next;
-            }
-        }
+    if (victim == cpu) return 0;
+    struct runqueue *v = &cpu_rq[victim];
+    if (__atomic_exchange_n(&v->lock, 1U, __ATOMIC_ACQUIRE)) return 0;
+    struct proces *p = rq_pop_best_locked(v);
+    unlock_raw(&v->lock);
+    if (p) {
+        p->cpu = cpu;
+        p->nr_migrations++;
     }
-    return idle_task[cpu] ? idle_task[cpu] : 0;
+    return p;
 }
 
 static void proces_ustaw_stos(struct proces *p, uint32_t entry_point, uint32_t arg) {
@@ -233,6 +243,70 @@ static uint32_t time_slice_for(struct proces *p) {
     if (p->sched_class == SCHED_INTERACTIVE) return 6U;
     if (p->sched_class == SCHED_BACKGROUND) return 8U;
     return DEFAULT_TIME_SLICE;
+}
+
+static void schedule_cpu(uint32_t cpu, int yield) {
+    struct runqueue *rq = &cpu_rq[cpu];
+    struct proces *cur = current_cpu[cpu];
+    struct proces *idle = idle_task[cpu];
+
+    int cur_runnable = cur && cur->state == PROCES_RUNNING;
+    int cur_is_idle = cur && cur == idle;
+    int expired = yield || (cur_runnable && cur->time_slice == 0);
+
+    while (__atomic_exchange_n(&rq->lock, 1U, __ATOMIC_ACQUIRE)) {
+        while (__atomic_load_n(&rq->lock, __ATOMIC_RELAXED)) __builtin_ia32_pause();
+    }
+
+    int top = prio_find_highest(rq);
+    struct proces *next = 0;
+
+    if (top >= 0) {
+        if (!cur_runnable || cur_is_idle) {
+            next = rq_pop_best_locked(rq);
+        } else {
+            int cp = prio_clamp(cur->priority);
+            if (top < cp || (expired && top == cp)) next = rq_pop_best_locked(rq);
+        }
+    }
+
+    if (cur_runnable && expired && cur->time_slice == 0) cur->time_slice = time_slice_for(cur);
+
+    if (next && cur_runnable && !cur_is_idle) {
+        cur->state = PROCES_READY;
+        runq_enqueue_locked(cur);
+    }
+    unlock_raw(&rq->lock);
+
+    if (!next && (!cur_runnable || cur_is_idle)) {
+        next = steal_work(cpu);
+        if (!next && !cur_is_idle) next = idle;
+    }
+
+    if (next && next != cur) {
+        if (cur) cur->ctx_switches++;
+        current_cpu[cpu] = next;
+        current_process = next;
+        next->cpu = cpu;
+        next->exec_start = global_ticks;
+    }
+    if (next) next->state = PROCES_RUNNING;
+}
+
+static struct proces *proces_alloc_slot(void) {
+    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i].state == PROCES_TERMINATED || process_table[i].pid == 0) {
+            return &process_table[i];
+        }
+    }
+    return 0;
+}
+
+struct proces *proces_find(uint32_t pid) {
+    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
+        if (process_table[i].pid == pid) return &process_table[i];
+    }
+    return 0;
 }
 
 void proces_init(void) {
@@ -293,6 +367,8 @@ void proces_init(void) {
     }
     wait_head = 0;
     wait_tail = 0;
+    sleep_head = 0;
+    sleep_tail = 0;
     waitq_lock = 0;
     current_process = 0;
     next_pid = 1;
@@ -302,31 +378,18 @@ void proces_init(void) {
     asm volatile("mov %%cr3, %0" : "=r"(kernel_page_dir_phys));
 
     for (uint32_t c = 0; c < smp_cpu_count; c++) {
-        char name[16];
-        int n = 0;
-        while (name[n]) n++;
-        (void)name;
         struct proces *idle = proces_stworz(0, "idle", 0);
         if (idle) {
+            sched_dequeue(idle, idle->cpu);
             idle->sched_class = SCHED_IDLE;
             idle->priority = IDLE_PRIORITY;
             idle->static_priority = IDLE_PRIORITY;
             idle->time_slice = 1U;
             idle->state = PROCES_READY;
             idle->cpu = c;
-            sched_enqueue(idle);
             idle_task[c] = idle;
         }
     }
-}
-
-static struct proces *proces_alloc_slot(void) {
-    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
-        if (process_table[i].state == PROCES_TERMINATED || process_table[i].pid == 0) {
-            return &process_table[i];
-        }
-    }
-    return 0;
 }
 
 struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t arg) {
@@ -381,103 +444,67 @@ struct proces *proces_stworz(uint32_t entry_point, const char *name, uint32_t ar
 }
 
 void proces_zakoncz(uint32_t pid) {
+    if (!pid) return;
     uint32_t cpu = cpu_id();
-    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
-        struct proces *p = &process_table[i];
-        if (p->pid == pid) {
-            int was_current = (current_cpu[cpu] == p);
-            if (p->state == PROCES_READY) sched_dequeue(p, p->cpu);
-            else if (p->state == PROCES_BLOCKED || p->state == PROCES_SLEEPING) {
-                smp_spin_lock(&waitq_lock);
-                waitq_dequeue_locked(p);
-                smp_spin_unlock(&waitq_lock);
-            }
-            p->state = PROCES_TERMINATED;
-            p->pid = 0;
-            process_count--;
-            if (p->page_directory && p->page_directory != (uint32_t *)kernel_page_dir_phys) {
-                uint32_t *user_pt = (uint32_t *)(p->page_directory[1] & ~0xFFF);
-                uint32_t *fb_pt = (uint32_t *)(p->page_directory[0xFD000000 >> 22] & ~0xFFF);
-                paging_free_frame(fb_pt);
-                paging_free_frame(user_pt);
-                paging_free_frame(p->page_directory);
-                p->page_directory = 0;
-            }
-            if (was_current) {
-                current_cpu[cpu] = 0;
-                current_process = 0;
-                struct proces *next = sched_pick_next(cpu);
-                if (next) {
-                    current_cpu[cpu] = next;
-                    current_process = next;
-                    next->state = PROCES_RUNNING;
-                    next->cpu = cpu;
-                    next->exec_start = global_ticks;
-                } else if (idle_task[cpu]) {
-                    current_cpu[cpu] = idle_task[cpu];
-                    current_process = idle_task[cpu];
-                    idle_task[cpu]->state = PROCES_RUNNING;
-                }
-            }
-            return;
-        }
+    uint32_t f = irq_save();
+    struct proces *p = proces_find(pid);
+    if (!p) {
+        irq_restore(f);
+        return;
     }
+
+    int was_current = (current_cpu[cpu] == p);
+    if (p->state == PROCES_READY) {
+        sched_dequeue(p, p->cpu);
+    } else if (p->state == PROCES_BLOCKED || p->state == PROCES_SLEEPING) {
+        lock_irqsave(&waitq_lock);
+        wait_remove_any_locked(p);
+        unlock_raw(&waitq_lock);
+    }
+    p->state = PROCES_TERMINATED;
+    p->pid = 0;
+    process_count--;
+
+    if (p->page_directory && p->page_directory != (uint32_t *)kernel_page_dir_phys) {
+        uint32_t *user_pt = (uint32_t *)(p->page_directory[1] & ~0xFFF);
+        uint32_t *fb_pt = (uint32_t *)(p->page_directory[0xFD000000 >> 22] & ~0xFFF);
+        paging_free_frame(fb_pt);
+        paging_free_frame(user_pt);
+        paging_free_frame(p->page_directory);
+        p->page_directory = 0;
+    }
+    if (was_current) schedule_cpu(cpu, 0);
+    irq_restore(f);
 }
 
 void proces_tick(void) {
     uint32_t cpu = cpu_id();
-    global_ticks++;
+    uint32_t f = irq_save();
 
-    smp_spin_lock(&waitq_lock);
-    struct proces *w = wait_head;
-    while (w) {
-        struct proces *next = w->wait_next;
-        if (w->sleep_until && global_ticks >= w->sleep_until) {
+    if (cpu == 0) global_ticks++;
+
+    if (sleep_head && sleep_head->sleep_until <= global_ticks) {
+        uint32_t wf = lock_irqsave(&waitq_lock);
+        while (sleep_head && sleep_head->sleep_until <= global_ticks) {
+            struct proces *w = sleep_head;
+            sleep_remove_locked(w);
             w->sleep_until = 0;
             w->state = PROCES_READY;
-            waitq_dequeue_locked(w);
-            w->cpu = cpu;
-            sched_enqueue(w);
             w->nr_wakeups++;
+            sched_enqueue(w);
         }
-        w = next;
+        unlock_irqrestore(&waitq_lock, wf);
     }
-    smp_spin_unlock(&waitq_lock);
 
-    smp_spin_lock(&cpu_rq[cpu].lock);
-    if (current_cpu[cpu] && current_cpu[cpu]->state == PROCES_RUNNING) {
-        struct proces *cur = current_cpu[cpu];
+    struct proces *cur = current_cpu[cpu];
+    if (cur && cur->state == PROCES_RUNNING) {
         cur->sum_exec_runtime += TICK_NS;
         cur->vruntime += TICK_NS;
         if (cur->time_slice > 0) cur->time_slice--;
-
-        if (cur->time_slice == 0 && cur != idle_task[cpu]) {
-            cur->state = PROCES_READY;
-            runq_enqueue_locked(cur);
-            cur->time_slice = time_slice_for(cur);
-        }
     }
 
-    struct proces *next = sched_pick_next_locked(cpu);
-    smp_spin_unlock(&cpu_rq[cpu].lock);
-
-    if (next && next != current_cpu[cpu]) {
-        if (current_cpu[cpu] && current_cpu[cpu]->state == PROCES_RUNNING) {
-            current_cpu[cpu]->ctx_switches++;
-        }
-        current_cpu[cpu] = next;
-        current_process = next;
-        next->state = PROCES_RUNNING;
-        next->cpu = cpu;
-        next->exec_start = global_ticks;
-    } else if (!next || next == idle_task[cpu]) {
-        if (current_cpu[cpu] && current_cpu[cpu]->state == PROCES_RUNNING && current_cpu[cpu] != idle_task[cpu]) {
-            current_cpu[cpu]->ctx_switches++;
-        }
-        current_cpu[cpu] = idle_task[cpu] ? idle_task[cpu] : 0;
-        current_process = current_cpu[cpu];
-        if (idle_task[cpu]) idle_task[cpu]->state = PROCES_RUNNING;
-    }
+    schedule_cpu(cpu, 0);
+    irq_restore(f);
 }
 
 struct proces *proces_aktualny(void) {
@@ -486,24 +513,9 @@ struct proces *proces_aktualny(void) {
 
 void proces_yield(void) {
     uint32_t cpu = cpu_id();
-    if (!current_cpu[cpu]) return;
-    smp_spin_lock(&cpu_rq[cpu].lock);
-    if (current_cpu[cpu]->state == PROCES_RUNNING) {
-        current_cpu[cpu]->state = PROCES_READY;
-        runq_enqueue_locked(current_cpu[cpu]);
-        current_cpu[cpu]->time_slice = time_slice_for(current_cpu[cpu]);
-    }
-    struct proces *next = sched_pick_next_locked(cpu);
-    smp_spin_unlock(&cpu_rq[cpu].lock);
-
-    if (next && next != current_cpu[cpu]) {
-        current_cpu[cpu]->ctx_switches++;
-        current_cpu[cpu] = next;
-        current_process = next;
-        next->state = PROCES_RUNNING;
-        next->cpu = cpu;
-        next->exec_start = global_ticks;
-    }
+    uint32_t f = irq_save();
+    if (current_cpu[cpu]) schedule_cpu(cpu, 1);
+    irq_restore(f);
 }
 
 uint32_t proces_pobierz_pid(void) {
@@ -514,64 +526,48 @@ uint32_t proces_pobierz_pid(void) {
 
 void proces_sleep_until(uint64_t ticks) {
     uint32_t cpu = cpu_id();
-    if (!current_cpu[cpu]) return;
-    smp_spin_lock(&cpu_rq[cpu].lock);
-    current_cpu[cpu]->state = PROCES_SLEEPING;
-    current_cpu[cpu]->sleep_until = ticks;
-    current_cpu[cpu]->sleep_ticks++;
-    smp_spin_unlock(&cpu_rq[cpu].lock);
-
-    smp_spin_lock(&waitq_lock);
-    waitq_enqueue_locked(current_cpu[cpu]);
-    smp_spin_unlock(&waitq_lock);
-
-    struct proces *next = sched_pick_next(cpu);
-    if (next && next != current_cpu[cpu]) {
-        current_cpu[cpu]->ctx_switches++;
-        current_cpu[cpu] = next;
-        current_process = next;
-        next->state = PROCES_RUNNING;
-        next->cpu = cpu;
-        next->exec_start = global_ticks;
-    } else {
-        current_cpu[cpu] = idle_task[cpu] ? idle_task[cpu] : 0;
-        current_process = current_cpu[cpu];
-        if (idle_task[cpu]) idle_task[cpu]->state = PROCES_RUNNING;
+    uint32_t f = irq_save();
+    struct proces *cur = current_cpu[cpu];
+    if (!cur || cur == idle_task[cpu] || ticks <= global_ticks) {
+        irq_restore(f);
+        return;
     }
+
+    lock_irqsave(&waitq_lock);
+    cur->state = PROCES_SLEEPING;
+    cur->sleep_until = ticks;
+    cur->sleep_ticks++;
+    sleep_insert_locked(cur);
+    unlock_raw(&waitq_lock);
+
+    schedule_cpu(cpu, 0);
+    irq_restore(f);
 }
 
 void proces_block(void) {
     uint32_t cpu = cpu_id();
-    if (!current_cpu[cpu]) return;
-    smp_spin_lock(&cpu_rq[cpu].lock);
-    current_cpu[cpu]->state = PROCES_BLOCKED;
-    current_cpu[cpu]->nr_blocked++;
-    smp_spin_unlock(&cpu_rq[cpu].lock);
-
-    smp_spin_lock(&waitq_lock);
-    waitq_enqueue_locked(current_cpu[cpu]);
-    smp_spin_unlock(&waitq_lock);
-
-    struct proces *next = sched_pick_next(cpu);
-    if (next && next != current_cpu[cpu]) {
-        current_cpu[cpu]->ctx_switches++;
-        current_cpu[cpu] = next;
-        current_process = next;
-        next->state = PROCES_RUNNING;
-        next->cpu = cpu;
-        next->exec_start = global_ticks;
-    } else {
-        current_cpu[cpu] = idle_task[cpu] ? idle_task[cpu] : 0;
-        current_process = current_cpu[cpu];
-        if (idle_task[cpu]) idle_task[cpu]->state = PROCES_RUNNING;
+    uint32_t f = irq_save();
+    struct proces *cur = current_cpu[cpu];
+    if (!cur || cur == idle_task[cpu]) {
+        irq_restore(f);
+        return;
     }
+
+    lock_irqsave(&waitq_lock);
+    cur->state = PROCES_BLOCKED;
+    cur->nr_blocked++;
+    waitq_enqueue_locked(cur);
+    unlock_raw(&waitq_lock);
+
+    schedule_cpu(cpu, 0);
+    irq_restore(f);
 }
 
 void proces_wakeup(struct proces *p) {
     if (!p) return;
-    smp_spin_lock(&waitq_lock);
+    uint32_t f = lock_irqsave(&waitq_lock);
     if (p->state == PROCES_BLOCKED || p->state == PROCES_SLEEPING) {
-        waitq_dequeue_locked(p);
+        wait_remove_any_locked(p);
         p->sleep_until = 0;
         p->state = PROCES_READY;
         p->nr_wakeups++;
@@ -582,39 +578,34 @@ void proces_wakeup(struct proces *p) {
         }
         sched_enqueue(p);
     }
-    smp_spin_unlock(&waitq_lock);
-}
-
-struct proces *proces_find(uint32_t pid) {
-    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
-        if (process_table[i].pid == pid) return &process_table[i];
-    }
-    return 0;
+    unlock_irqrestore(&waitq_lock, f);
 }
 
 int proces_set_priority(uint32_t pid, int32_t priority) {
     struct proces *p = proces_find(pid);
     if (!p) return -1;
+    uint32_t f = irq_save();
+    int queued = (p->state == PROCES_READY);
+    if (queued) sched_dequeue(p, p->cpu);
     int old = p->priority;
     p->priority = priority;
     p->original_prio = priority;
     p->time_slice = time_slice_for(p);
-    if (p->state == PROCES_READY) {
-        sched_dequeue(p, p->cpu);
-        sched_enqueue(p);
-    }
+    if (queued) sched_enqueue(p);
+    irq_restore(f);
     return old;
 }
 
 int proces_set_sched_class(uint32_t pid, sched_class_t cls) {
     struct proces *p = proces_find(pid);
     if (!p) return -1;
+    uint32_t f = irq_save();
+    int queued = (p->state == PROCES_READY);
+    if (queued) sched_dequeue(p, p->cpu);
     p->sched_class = cls;
     p->time_slice = time_slice_for(p);
-    if (p->state == PROCES_READY) {
-        sched_dequeue(p, p->cpu);
-        sched_enqueue(p);
-    }
+    if (queued) sched_enqueue(p);
+    irq_restore(f);
     return 0;
 }
 
@@ -799,22 +790,22 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno) {
 void sched_enqueue(struct proces *p) {
     uint32_t cpu = p->cpu;
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
-    smp_spin_lock(&cpu_rq[cpu].lock);
+    uint32_t f = lock_irqsave(&cpu_rq[cpu].lock);
     runq_enqueue_locked(p);
-    smp_spin_unlock(&cpu_rq[cpu].lock);
+    unlock_irqrestore(&cpu_rq[cpu].lock, f);
 }
 
 void sched_dequeue(struct proces *p, uint32_t cpu) {
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
-    smp_spin_lock(&cpu_rq[cpu].lock);
+    uint32_t f = lock_irqsave(&cpu_rq[cpu].lock);
     runq_dequeue_locked(p, &cpu_rq[cpu]);
-    smp_spin_unlock(&cpu_rq[cpu].lock);
+    unlock_irqrestore(&cpu_rq[cpu].lock, f);
 }
 
 struct proces *sched_pick_next(uint32_t cpu) {
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
-    smp_spin_lock(&cpu_rq[cpu].lock);
+    uint32_t f = lock_irqsave(&cpu_rq[cpu].lock);
     struct proces *next = sched_pick_next_locked(cpu);
-    smp_spin_unlock(&cpu_rq[cpu].lock);
+    unlock_irqrestore(&cpu_rq[cpu].lock, f);
     return next;
 }
