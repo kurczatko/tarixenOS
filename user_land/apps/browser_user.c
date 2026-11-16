@@ -91,7 +91,6 @@ static int browser_pole_tekstowe_znak(char znak, uint8_t ctrl) {
     } else if (znak == '\n' || znak == '\r') {
         adres_focused = 0;
         if (adres_dlugosc < ADRES_MAKS - 7 && !strona[0]) {
-            // Prosty test - kopiujemy do statusu
             for (int i = 0; i < 63 && status[i]; i++) {}
             status[0] = 'L'; status[1] = 'a'; status[2] = 'd'; status[3] = 'u'; status[4] = 'j'; status[5] = 'e'; status[6] = 0;
         }
