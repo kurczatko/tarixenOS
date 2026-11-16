@@ -74,7 +74,7 @@ static int duszki_pozostalo_kropek = 0;
 
 static wróg_t wrogowie[MAX_WROGOW];
 
-static uint32_t duszki_rand_seed = 123456789;
+static uint32_t duszki_rand_seed = 192837452;
 
 static uint32_t duszki_rand(void)
 {
