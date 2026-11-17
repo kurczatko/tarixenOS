@@ -34,6 +34,13 @@
 #define SCHED_CACHE_BONUS_COLD 32U
 #define SCHED_CACHE_HOT_TICKS 16U
 
+/* Model energii (tryb EAS): koszt energii na jednostke pracy, P-core = 1024 (1.0).
+ * Wartosci domyslne dla E-core ~ 1/3 energii na instrukcje; mozna nadpisac cpu_set_energy(). */
+#define SCHED_EPU_PERF 1024U
+#define SCHED_EPU_EFF 320U
+#define SCHED_EFF_LEAN_PENALTY 256U        /* zadanie o util >= EFF_TASK_UTIL woli P-core, chyba ze ten jest zajety */
+#define SCHED_OVERCOMMIT_COST 2048U        /* kara za przekroczenie ~80% pojemnosci rdzenia po dolozeniu zadania */
+
 #define NO_CPU 0xFFFFFFFFU
 #define PRIO_WORDS ((NR_PRIORITIES + 31) / 32)
 
@@ -87,11 +94,13 @@ struct cpu_meta_t {
     uint32_t capacity;
     uint32_t util;
     uint32_t idle_ticks;
+    uint32_t inv_cap;      /* (1<<20)/capacity: dzielenie przez pojemnosc zamienione na mnozenie */
+    uint32_t epu;          /* koszt energii na jednostke pracy (1024 = P-core) */
 } __attribute__((aligned(64)));
 
 struct proces_ext {
     uint32_t affinity;
-    uint32_t util;
+    uint32_t util;         /* util niezalezne od rdzenia: skalowane pojemnoscia CPU (jak PELT w Linuxie) */
     uint64_t util_stamp;
     uint32_t on_cpu;       /* 1 = zadanie jest/bylo jeszcze wykonywane na jakims CPU (przelaczenie niedokonczone) */
     uint32_t rq_cpu;       /* w ktorej kolejce siedzi (NO_CPU = w zadnej); zmieniane pod blokada kolejki */
@@ -105,6 +114,8 @@ static struct runqueue cpu_rq[SMP_MAX_CPUS];
 static struct cpu_meta_t cpu_meta[SMP_MAX_CPUS];
 static struct proces_ext proc_ext[MAX_PROCESSES];
 static uint32_t cpu_parked_mask = 0;
+static uint32_t rq_busy_mask = 0;      /* bit c = kolejka c ma zadania (aktualizowane pod blokada kolejki) */
+static uint32_t cpu_over_mask = 0;     /* bit c = CPU przeciazony (tryb EAS wylaczony, wraca klasyczne rownowazenie) */
 static uint32_t max_cap = SCHED_CAP_PERF;
 static struct proces *last_prev[SMP_MAX_CPUS] = {0};
 
@@ -197,6 +208,10 @@ static inline uint32_t cap_of(uint32_t c) {
     return cpu_meta[c].capacity ? cpu_meta[c].capacity : SCHED_CAP_PERF;
 }
 
+static inline uint32_t epu_of(uint32_t c) {
+    return cpu_meta[c].epu ? cpu_meta[c].epu : SCHED_EPU_PERF;
+}
+
 static inline int cpu_is_idle(uint32_t c) {
     return idle_task[c] && current_cpu[c] == idle_task[c] && !cpu_rq[c].nr_running;
 }
@@ -239,9 +254,11 @@ static uint32_t cpu_weight(uint32_t c) {
     return w;
 }
 
+/* w * 1024 / pojemnosc, ale mnozeniem przez odwrotnosc (bez drogiego div w goracej sciezce). */
 static inline uint32_t weight_to_load(uint32_t w, uint32_t c) {
+    uint32_t inv = cpu_meta[c].inv_cap ? cpu_meta[c].inv_cap : ((1U << 20) / SCHED_CAP_PERF);
     if (w > (1U << 21)) w = 1U << 21;
-    return (w * 1024U) / cap_of(c);
+    return (uint32_t)(((uint64_t)w * inv) >> 10);
 }
 
 static inline uint32_t cpu_load_norm(uint32_t c) {
@@ -267,6 +284,15 @@ static inline int prio_find_highest(struct runqueue *rq) {
     return -1;
 }
 
+/* Wersja bez blokady (do szybkich sciezek): wynik moze byc o tick nieaktualny, co jest bezpieczne. */
+static inline int prio_peek_highest(struct runqueue *rq) {
+    for (int i = 0; i < (int)PRIO_WORDS; i++) {
+        uint32_t b = __atomic_load_n(&rq->prio_bitmap[i], __ATOMIC_RELAXED);
+        if (b) return i * 32 + __builtin_ctz(b);
+    }
+    return -1;
+}
+
 /* Wolajacy trzyma blokade cpu_rq[cpu]. */
 static void runq_enqueue_locked(struct proces *p, uint32_t cpu) {
     struct proces_ext *e = ext_of(p);
@@ -286,6 +312,7 @@ static void runq_enqueue_locked(struct proces *p, uint32_t cpu) {
 
     prio_bitmap_set(rq, prio);
     rq->nr_running++;
+    __atomic_fetch_or(&rq_busy_mask, 1U << cpu, __ATOMIC_RELAXED);
 
     e->rq_cpu = cpu;
     e->qprio = prio;
@@ -306,6 +333,7 @@ static void runq_dequeue_locked(struct proces *p, struct runqueue *rq) {
     p->run_prev = 0;
     if (!rq->prio_head[prio]) prio_bitmap_clear(rq, prio);
     if (rq->nr_running > 0) rq->nr_running--;
+    if (!rq->nr_running) __atomic_fetch_and(&rq_busy_mask, ~(1U << (uint32_t)(rq - cpu_rq)), __ATOMIC_RELAXED);
     rq->util_sum = rq->util_sum >= e->qutil ? rq->util_sum - e->qutil : 0;
     rq->nr_perf = rq->nr_perf >= e->qperf ? rq->nr_perf - e->qperf : 0;
     e->rq_cpu = NO_CPU;
@@ -409,6 +437,12 @@ static void util_decay(struct proces *p) {
 /* Wybor CPU (energy / capacity aware)                                       */
 /* ------------------------------------------------------------------------- */
 
+/* Dwa tryby:
+ *  - EAS (zaden CPU nie jest przeciazony): wygrywa rdzen o najnizszym koszcie ENERGII
+ *    (E-core dla malych zadan, P-core dla duzych), lekki skladnik obciazenia rozprasza zadania
+ *    w obrebie tego samego typu rdzeni.
+ *  - przeciazenie (cpu_over_mask != 0): klasyczne rownowazenie obciazenia znormalizowanego
+ *    do pojemnosci, zeby nie trzymac pracy na oszczednych rdzeniach kosztem przepustowosci. */
 static uint32_t select_cpu_excl(struct proces *p, uint32_t excl) {
     struct proces_ext *e = ext_of(p);
     uint32_t online = cpu_online_mask & mask_cpus();
@@ -419,24 +453,35 @@ static uint32_t select_cpu_excl(struct proces *p, uint32_t excl) {
     uint32_t parked = parked_mask();
     int want_perf = task_wants_perf(p);
     int want_eff = !want_perf && task_wants_eff(p);
+    int eas = !want_perf && !__atomic_load_n(&cpu_over_mask, __ATOMIC_RELAXED);
     uint32_t tw = e->util + SCHED_MIN_WEIGHT;
     uint64_t now = global_ticks;
     uint32_t best_cpu = (uint32_t)__builtin_ctz(allowed);
     uint32_t best_cost = 0xFFFFFFFFU;
 
-    for (uint32_t c = 0; c < ncpus(); c++) {
-        if (!(allowed & (1U << c))) continue;
+    for (uint32_t m = allowed; m; m &= m - 1U) {
+        uint32_t c = (uint32_t)__builtin_ctz(m);
+        uint32_t cap = cap_of(c);
+        uint32_t w = cpu_weight(c) + tw;
+        uint32_t load = weight_to_load(w, c);     /* obciazenie CPU PO dolozeniu tego zadania */
+        int is_eff = cpu_meta[c].type == SCHED_CPU_EFF;
+        uint32_t cost;
 
-        /* koszt = obciazenie CPU PO dolozeniu tego zadania, znormalizowane do pojemnosci */
-        uint32_t cost = weight_to_load(cpu_weight(c) + tw, c);
+        if (eas) {
+            cost = (tw * epu_of(c)) >> 10;
+            cost += load >> 3;
+            if (is_eff && !want_eff) cost += SCHED_EFF_LEAN_PENALTY;
+            if ((uint64_t)w * 1280U > (uint64_t)cap * 1024U) cost += SCHED_OVERCOMMIT_COST;
+        } else {
+            cost = load;
+            if (!is_eff) {
+                if (want_eff) cost += 384U;
+                else if (!want_perf) cost += 48U;
+            }
+        }
 
         if (!fits_cpu(p, c)) cost += 1000000U;
-        if (cpu_meta[c].type == SCHED_CPU_PERF) {
-            if (want_eff) cost += 384U;
-            else if (!want_perf) cost += 48U;
-        } else if (want_perf) {
-            cost += 500000U;
-        }
+        if (want_perf && is_eff) cost += 500000U;
         if (parked & (1U << c)) cost += SCHED_WAKE_PARKED_COST;
         if (cpu_is_idle(c)) cost = cost > SCHED_IDLE_BONUS ? cost - SCHED_IDLE_BONUS : 0U;
         if (c == p->cpu) {
@@ -510,13 +555,18 @@ static struct proces *balance_pull(uint32_t cpu) {
     uint32_t usable = usable_mask();
     if (!((usable >> cpu) & 1U)) return 0;
 
+    /* Szybka sciezka O(1): jesli zadna inna kolejka nie ma zadan, nie ma czego ciagnac.
+     * Bezczynne rdzenie nie skanuja juz wszystkich CPU co tick. */
+    uint32_t busy = __atomic_load_n(&rq_busy_mask, __ATOMIC_RELAXED) & usable & ~(1U << cpu);
+    if (!busy) return 0;
+
     /* 1) rdzen wydajny sciaga zadania "misfit" z rdzeni energooszczednych */
     if (cpu_meta[cpu].type == SCHED_CPU_PERF) {
-        for (uint32_t i = 0; i < ncpus(); i++) {
-            if (i == cpu || !((usable >> i) & 1U)) continue;
+        for (uint32_t m = busy; m; m &= m - 1U) {
+            uint32_t i = (uint32_t)__builtin_ctz(m);
             if (cpu_meta[i].type != SCHED_CPU_EFF) continue;
-            struct proces *m = pull_from(i, cpu, 1);
-            if (m) return m;
+            struct proces *t = pull_from(i, cpu, 1);
+            if (t) return t;
         }
     }
 
@@ -525,9 +575,8 @@ static struct proces *balance_pull(uint32_t cpu) {
     uint32_t mine = cpu_load_norm(cpu);
     uint32_t best = idle_now ? mine : mine + SCHED_IMBALANCE_MARGIN;
     uint32_t victim = cpu;
-    for (uint32_t i = 0; i < ncpus(); i++) {
-        if (i == cpu || !((usable >> i) & 1U)) continue;
-        if (!cpu_rq[i].nr_running) continue;
+    for (uint32_t m = busy; m; m &= m - 1U) {
+        uint32_t i = (uint32_t)__builtin_ctz(m);
         uint32_t l = cpu_load_norm(i);
         if (l > best) {
             best = l;
@@ -553,8 +602,9 @@ static void misfit_check(uint32_t cpu, struct proces *cur) {
 
     uint32_t target = NO_CPU;
     uint32_t target_cap = 0;
-    for (uint32_t c = 0; c < ncpus(); c++) {
-        if (!(cand & (1U << c)) || !cpu_is_idle(c)) continue;
+    for (uint32_t m = cand; m; m &= m - 1U) {
+        uint32_t c = (uint32_t)__builtin_ctz(m);
+        if (!cpu_is_idle(c)) continue;
         uint32_t cap = cap_of(c);
         if (up) {
             if (cap <= cap_of(cpu)) continue;
@@ -659,12 +709,27 @@ static inline void cpuid_raw(uint32_t leaf, uint32_t sub, uint32_t *a, uint32_t 
     __asm__ volatile("cpuid" : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) : "a"(leaf), "c"(sub));
 }
 
+/* Jedno miejsce ustawiajace metadane rdzenia (typ, pojemnosc, odwrotnosc, koszt energii). */
+static void cpu_apply_meta(uint32_t cpu, uint32_t type, uint32_t cap) {
+    if (!cap) cap = SCHED_CAP_PERF;
+    if (cap > (1U << 20)) cap = 1U << 20;
+    cpu_meta[cpu].type = type;
+    cpu_meta[cpu].capacity = cap;
+    cpu_meta[cpu].inv_cap = (1U << 20) / cap;
+    cpu_meta[cpu].epu = type == SCHED_CPU_EFF ? SCHED_EPU_EFF : SCHED_EPU_PERF;
+    sched_update_maxcap();
+}
+
 /* Pozwala kodowi platformy (ACPI/CPPC/kalibracja) nadpisac typ i pojemnosc rdzenia. */
 void cpu_set_topology(uint32_t cpu, uint32_t type, uint32_t capacity) {
     if (cpu >= SMP_MAX_CPUS) return;
-    cpu_meta[cpu].type = type;
-    cpu_meta[cpu].capacity = capacity ? capacity : SCHED_CAP_PERF;
-    sched_update_maxcap();
+    cpu_apply_meta(cpu, type, capacity);
+}
+
+/* Nadpisanie kosztu energii na jednostke pracy (1024 = P-core), np. z kalibracji lub tablic EM. */
+void cpu_set_energy(uint32_t cpu, uint32_t epu) {
+    if (cpu >= SMP_MAX_CPUS || !epu) return;
+    cpu_meta[cpu].epu = epu;
 }
 
 void sched_register_this_cpu(void) {
@@ -685,9 +750,7 @@ void sched_register_this_cpu(void) {
             }
         }
     }
-    cpu_meta[cpu].type = type;
-    cpu_meta[cpu].capacity = cap;
-    sched_update_maxcap();
+    cpu_apply_meta(cpu, type, cap);
 }
 
 uint32_t sched_cpu_util(uint32_t cpu) {
@@ -801,25 +864,39 @@ static void schedule_cpu(uint32_t cpu, int yield) {
         if (req < ncpus() && req != cpu && ((ce->affinity >> req) & 1U)) mig = req;
     }
 
-    tlock_lock(&rq->lock);
+    /* Szybka sciezka (wiekszosc tickow): zadanie dziala dalej, a w kolejce nie ma nikogo
+     * o wyzszym priorytecie - wracamy bez brania blokady kolejki. Nieaktualny odczyt
+     * kosztuje co najwyzej jeden tick opoznienia (dodatkowo budzi IPI z sched_enqueue). */
+    if (cur_runnable && !cur_is_idle && mig == NO_CPU && !expired) {
+        int hp = prio_peek_highest(rq);
+        if (hp < 0 || hp >= prio_clamp(cur->priority)) return;
+    }
 
     struct proces *next = 0;
-    int limit;
-    if (!cur_runnable || cur_is_idle || mig != NO_CPU) {
-        limit = (int)NR_PRIORITIES - 1;
+
+    if (cur_is_idle && !__atomic_load_n(&rq->nr_running, __ATOMIC_RELAXED)) {
+        /* bezczynny rdzen z pusta kolejka: bez blokady, od razu proba sciagniecia pracy */
+        if (cur_runnable && expired && cur->time_slice == 0) cur->time_slice = time_slice_for(cur);
     } else {
-        int cp = prio_clamp(cur->priority);
-        limit = expired ? cp : cp - 1;
-    }
-    if (limit >= 0) next = rq_pop_best_locked(rq, limit);
+        tlock_lock(&rq->lock);
 
-    if (cur_runnable && expired && cur->time_slice == 0) cur->time_slice = time_slice_for(cur);
+        int limit;
+        if (!cur_runnable || cur_is_idle || mig != NO_CPU) {
+            limit = (int)NR_PRIORITIES - 1;
+        } else {
+            int cp = prio_clamp(cur->priority);
+            limit = expired ? cp : cp - 1;
+        }
+        if (limit >= 0) next = rq_pop_best_locked(rq, limit);
 
-    if (next && cur_runnable && !cur_is_idle && mig == NO_CPU) {
-        cur->state = PROCES_READY;
-        runq_enqueue_locked(cur, cpu);        /* affinity sprawdzone wyzej, jeszcze pod blokada */
+        if (cur_runnable && expired && cur->time_slice == 0) cur->time_slice = time_slice_for(cur);
+
+        if (next && cur_runnable && !cur_is_idle && mig == NO_CPU) {
+            cur->state = PROCES_READY;
+            runq_enqueue_locked(cur, cpu);        /* affinity sprawdzone wyzej, jeszcze pod blokada */
+        }
+        tlock_unlock(&rq->lock);
     }
-    tlock_unlock(&rq->lock);
 
     if (!next && (!cur_runnable || cur_is_idle || mig != NO_CPU)) {
         next = balance_pull(cpu);
@@ -997,6 +1074,8 @@ void proces_init(void) {
     waitq_lock.all = 0;
     table_lock.all = 0;
     cpu_parked_mask = 0;
+    rq_busy_mask = 0;
+    cpu_over_mask = 0;
     current_process = 0;
     next_pid = 1;
     process_count = 0;
@@ -1100,10 +1179,25 @@ void proces_tick(void) {
         cur->vruntime += TICK_NS;
         if (cur->time_slice > 0) cur->time_slice--;
         if (busy) {
+            /* util niezalezne od rdzenia: dazy do pojemnosci biezacego CPU, a nie do 1024.
+             * Zadanie, ktore calkowicie zapelnia E-core, ma util ~512 i zostaje uznane za misfit. */
             struct proces_ext *e = ext_of(cur);
-            e->util += (1024U - e->util) >> 5;
+            int32_t d = (int32_t)cap_of(cpu) - (int32_t)e->util;
+            e->util = (uint32_t)((int32_t)e->util + (d >> 5));
             e->util_stamp = now;
         }
+    }
+
+    /* Znacznik przeciazenia CPU: >80% pojemnosci i (to maly rdzen LUB ktos czeka w kolejce).
+     * Pojedyncze zadanie zajmujace caly P-core nie wylacza trybu EAS. Zapis tylko przy zmianie. */
+    {
+        uint32_t bit = 1U << cpu;
+        uint32_t ccap = cap_of(cpu);
+        int over = ((uint64_t)cpu_weight(cpu) * 1280U > (uint64_t)ccap * 1024U) &&
+                   (ccap < max_cap || cpu_rq[cpu].nr_running > 0);
+        uint32_t om = __atomic_load_n(&cpu_over_mask, __ATOMIC_RELAXED);
+        if (over && !(om & bit)) __atomic_fetch_or(&cpu_over_mask, bit, __ATOMIC_RELAXED);
+        else if (!over && (om & bit)) __atomic_fetch_and(&cpu_over_mask, ~bit, __ATOMIC_RELAXED);
     }
 
     if (cpu == 0 && (((uint32_t)now) & (SCHED_ENERGY_INTERVAL - 1U)) == 0U) energy_manage();
@@ -1389,8 +1483,14 @@ void sched_enqueue(struct proces *p) {
     uint32_t f = tlock_irqsave(&cpu_rq[cpu].lock);
     runq_enqueue_locked(p, cpu);
     tlock_irqrestore(&cpu_rq[cpu].lock, f);
-    if (smp_send_resched_ipi && idle_task[cpu] && cpu != cpu_id() && current_cpu[cpu] == idle_task[cpu]) {
-        smp_send_resched_ipi(cpu);
+
+    /* IPI, gdy docelowy rdzen jest bezczynny LUB wykonuje zadanie o nizszym priorytecie
+     * (wywlaszczenie przy wybudzeniu - nie czekamy do konca kwantu / nastepnego ticku). */
+    if (smp_send_resched_ipi && cpu != cpu_id()) {
+        struct proces *rc = current_cpu[cpu];
+        if (rc && (rc == idle_task[cpu] || prio_clamp(p->priority) < prio_clamp(rc->priority))) {
+            smp_send_resched_ipi(cpu);
+        }
     }
 }
 
