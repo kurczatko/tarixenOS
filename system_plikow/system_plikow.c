@@ -231,6 +231,25 @@ int write_file(const char *name, const char *data, uint32_t size) {
 
 int create_dir(const char *name) { char sector[512]; uint32_t sector_number; struct fat32_entry *entry = find_entry(name, current_dir, sector, &sector_number); if (entry) return -1; entry = new_entry(name, 0x10, sector); if (!entry || !entry->cluster_low) return -1; write_sector(cluster_sector(current_dir), sector); return 0; }
 
+int delete_file(const char *name) {
+    char sector[512];
+    uint32_t sector_number;
+    struct fat32_entry *entry = find_entry(name, current_dir, sector, &sector_number);
+    if (!entry) return -1;
+    uint32_t cluster = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low;
+    if ((entry->attributes & 0x10) && cluster >= 2) {
+        uint32_t next;
+        while (cluster < FAT32_EOC) {
+            next = fat_entry(cluster);
+            set_fat_entry(cluster, FAT32_FREE);
+            cluster = next;
+        }
+    }
+    entry->name[0] = 0xE5;
+    write_sector(cluster_sector(current_dir), sector);
+    return 0;
+}
+
 int ls(const char *dir) {
     char sector[512]; uint32_t sector_number, directory = current_dir;
     if (dir) { struct fat32_entry *entry = find_entry(dir, current_dir, sector, &sector_number); if (!entry || !(entry->attributes & 0x10)) return -1; directory = ((uint32_t)entry->cluster_high << 16) | entry->cluster_low; }

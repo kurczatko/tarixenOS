@@ -40,6 +40,7 @@ void fs_write_sector(uint32_t sector, const char *buffer);
 uint32_t fs_cluster_sector(uint32_t cluster);
 struct fat32_entry *fs_find_entry(const char *name, char *sector, uint32_t *sector_number);
 uint32_t fs_alloc_cluster(void);
+int delete_file(const char *name);
 
 void fs_set_device_floppy(int use_floppy);
 int fs_is_floppy(void);
