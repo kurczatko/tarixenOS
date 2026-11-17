@@ -59,6 +59,8 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
     rysuj_tekst_chicago(x + 100, y + 20, "TXT+", 0x00FFFFFF);
     rysuj_prostokat(x + 168, y + 14, 56, 20, 0x00334155);
     rysuj_tekst_chicago(x + 184, y + 20, "WROC", 0x00FFFFFF);
+    rysuj_prostokat(x + 228, y + 14, 56, 20, 0x00334155);
+    rysuj_tekst_chicago(x + 240, y + 20, "USUN", 0x00FFFFFF);
 
     if (tryb_tworz) {
         rysuj_tekst_chicago(x, y + 40, "NAZWA:", 0x00000000);
@@ -125,6 +127,10 @@ static void obsluz_klik_plikow(int x, int y)
         if (x >= 16 && x < 94) tryb_tworz = 1;
         else if (x >= 100 && x < 178) tryb_tworz = 2;
         else if (x >= 184 && x < 224) fs_parent_directory();
+        else if (x >= 228 && x < 284 && wybrany_element >= 0 && wybrany_element < liczba_plikow) {
+            delete_file(lista_plikow[wybrany_element].name);
+            wybrany_element = -1;
+        }
         nazwa_nowego[0] = 0;
         dlugosc_nazwy = 0;
         wybrany_element = -1;
@@ -233,51 +239,56 @@ void eksplorator_plikow(void)
 
 void eksplorator_plikow_obsluz_klawiature_znak(char znak)
 {
-    if (!tryb_tworz || !okno_czy_aktywne(&pliki)) return;
-    if (znak == '\b') {
-        if (dlugosc_nazwy > 0) nazwa_nowego[--dlugosc_nazwy] = 0;
-    } else if (znak == '\n' || znak == '\r') {
-        if (dlugosc_nazwy > 0) {
-            if (tryb_tworz == 1) {
-                const char *status = create_dir(nazwa_nowego) == 0 ? "OK" : "BLAD";
-                int j = 0;
-                while (status[j]) { status_plikow[j] = status[j]; j++; }
-                status_plikow[j] = 0;
-            } else if (tryb_tworz == 2) {
-                char nazwa_pliku[13];
-                int i;
-                for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
-                nazwa_pliku[i++] = '.';
-                nazwa_pliku[i++] = 'T';
-                nazwa_pliku[i++] = 'X';
-                nazwa_pliku[i++] = 'T';
-                nazwa_pliku[i] = 0;
-                const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
-                int j = 0;
-                while (status[j]) { status_plikow[j] = status[j]; j++; }
-                status_plikow[j] = 0;
-            } else if (tryb_tworz == 3) {
-                char nazwa_pliku[13];
-                int i;
-                for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
-                nazwa_pliku[i++] = '.';
-                nazwa_pliku[i++] = 'C';
-                nazwa_pliku[i] = 0;
-                const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
-                int j = 0;
-                while (status[j]) { status_plikow[j] = status[j]; j++; }
-                status_plikow[j] = 0;
+    if (!okno_czy_aktywne(&pliki)) return;
+    if (tryb_tworz) {
+        if (znak == '\b') {
+            if (dlugosc_nazwy > 0) nazwa_nowego[--dlugosc_nazwy] = 0;
+        } else if (znak == '\n' || znak == '\r') {
+            if (dlugosc_nazwy > 0) {
+                if (tryb_tworz == 1) {
+                    const char *status = create_dir(nazwa_nowego) == 0 ? "OK" : "BLAD";
+                    int j = 0;
+                    while (status[j]) { status_plikow[j] = status[j]; j++; }
+                    status_plikow[j] = 0;
+                } else if (tryb_tworz == 2) {
+                    char nazwa_pliku[13];
+                    int i;
+                    for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
+                    nazwa_pliku[i++] = '.';
+                    nazwa_pliku[i++] = 'T';
+                    nazwa_pliku[i++] = 'X';
+                    nazwa_pliku[i++] = 'T';
+                    nazwa_pliku[i] = 0;
+                    const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
+                    int j = 0;
+                    while (status[j]) { status_plikow[j] = status[j]; j++; }
+                    status_plikow[j] = 0;
+                } else if (tryb_tworz == 3) {
+                    char nazwa_pliku[13];
+                    int i;
+                    for (i = 0; i < dlugosc_nazwy; i++) nazwa_pliku[i] = nazwa_nowego[i];
+                    nazwa_pliku[i++] = '.';
+                    nazwa_pliku[i++] = 'C';
+                    nazwa_pliku[i] = 0;
+                    const char *status = create_file(nazwa_pliku, 0) == 0 ? "OK" : "BLAD";
+                    int j = 0;
+                    while (status[j]) { status_plikow[j] = status[j]; j++; }
+                    status_plikow[j] = 0;
+                }
+            }
+            tryb_tworz = 0;
+            dlugosc_nazwy = 0;
+            nazwa_nowego[0] = 0;
+        } else {
+            if (znak >= 'A' && znak <= 'Z') znak += 'a' - 'A';
+            if (((znak >= 'a' && znak <= 'z') || (znak >= '0' && znak <= '9')) && dlugosc_nazwy < 8) {
+                nazwa_nowego[dlugosc_nazwy++] = znak;
+                nazwa_nowego[dlugosc_nazwy] = 0;
             }
         }
-        tryb_tworz = 0;
-        dlugosc_nazwy = 0;
-        nazwa_nowego[0] = 0;
-    } else {
-        if (znak >= 'A' && znak <= 'Z') znak += 'a' - 'A';
-        if (((znak >= 'a' && znak <= 'z') || (znak >= '0' && znak <= '9')) && dlugosc_nazwy < 8) {
-            nazwa_nowego[dlugosc_nazwy++] = znak;
-            nazwa_nowego[dlugosc_nazwy] = 0;
-        }
+    } else if (znak == 'd' && wybrany_element >= 0 && wybrany_element < liczba_plikow) {
+        delete_file(lista_plikow[wybrany_element].name);
+        wybrany_element = -1;
     }
     okno_narysuj(&pliki);
 }
