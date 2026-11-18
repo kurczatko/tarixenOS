@@ -5,5 +5,6 @@
 
 void timer_init(uint32_t frequency);
 void timer_handler(void);
+uint32_t timer_ticks_get(void);
 
 #endif

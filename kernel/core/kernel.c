@@ -31,6 +31,7 @@
 #include <graphics/pulpit.h>
 #include <drivers/sound/intel_hd.h>
 #include <drivers/audio/alc650.h>
+#include <drivers/gsm/gsm.h>
 #include <net/net.h>
 #include <drivers/storage/floppy.h>
 #include <drivers/storage/plyty.h>
@@ -274,6 +275,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("usb_keyboard", usb_keyboard_init, 0, 0, 4);
     driver_manager_register("intel_hda", init_intel_hda, 0, 0, 4);
     driver_manager_register("alc650", alc650_init, alc650_shutdown, 0, 4);
+    driver_manager_register("gsm", gsm_init, 0, gsm_poll, 2);
     tapeta_wczytaj();
     syscall_install();
     bluetooth_ui_init();

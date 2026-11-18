@@ -8,8 +8,15 @@
 #include <kernel/sys/timer.h>
 #include <kernel/core/proces.h>
 
+static uint32_t g_timer_ticks = 0;
+
 void timer_handler(void) {
+    g_timer_ticks++;
     proces_tick();
+}
+
+uint32_t timer_ticks_get(void) {
+    return g_timer_ticks;
 }
 
 void timer_init(uint32_t frequency) {
