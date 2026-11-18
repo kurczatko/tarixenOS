@@ -33,6 +33,12 @@
 
 struct okno okno_terminal;
 static uint8_t terminal_otwarty = 0;
+static uint8_t terminal_tryb_edycji = 0;
+static char terminal_nazwa_pliku[32];
+static char terminal_edytor_linie[64][256];
+static int terminal_edytor_liczba_linii = 0;
+static int terminal_edytor_biezaca_linia = 0;
+static int terminal_edytor_zmieniony = 0;
 static char linie_wyjscia[TERMINAL_LINII_MAKS][TERMINAL_LINIA_DLUGOSC + 1];
 static int liczba_linii = 0;
 static char linia_wejscia[TERMINAL_LINIA_DLUGOSC + 1];
@@ -107,6 +113,114 @@ static int terminal_ma_rozszerzenie(const char *nazwa, const char *rozszerzenie)
     return 1;
 }
 
+static void terminal_edytor_wczytaj_plik(const char *nazwa)
+{
+    char buf[4096];
+    fs_reset_directory();
+    int bajty = read_file(nazwa, buf, sizeof(buf) - 1);
+    if (bajty < 0) {
+        terminal_dodaj_linie("Blad odczytu pliku");
+        return;
+    }
+    buf[bajty] = 0;
+
+    terminal_edytor_liczba_linii = 0;
+    terminal_edytor_biezaca_linia = 0;
+    terminal_edytor_zmieniony = 0;
+
+    int linia = 0;
+    int pos = 0;
+    int start = 0;
+    while (buf[pos] && linia < 64) {
+        if (buf[pos] == '\n' || buf[pos] == '\r') {
+            int len = pos - start;
+            if (len > 255) len = 255;
+            for (int i = 0; i < len; i++) terminal_edytor_linie[linia][i] = buf[start + i];
+            terminal_edytor_linie[linia][len] = 0;
+            linia++;
+            if (buf[pos] == '\r' && buf[pos + 1] == '\n') pos++;
+            pos++;
+            start = pos;
+            continue;
+        }
+        pos++;
+    }
+    if (start < pos && linia < 64) {
+        int len = pos - start;
+        if (len > 255) len = 255;
+        for (int i = 0; i < len; i++) terminal_edytor_linie[linia][i] = buf[start + i];
+        terminal_edytor_linie[linia][len] = 0;
+        linia++;
+    }
+    if (linia == 0) {
+        terminal_edytor_linie[0][0] = 0;
+        linia = 1;
+    }
+    terminal_edytor_liczba_linii = linia;
+
+    int d = 0;
+    while (nazwa[d]) { terminal_nazwa_pliku[d] = nazwa[d]; d++; }
+    terminal_nazwa_pliku[d] = 0;
+}
+
+static void terminal_edytor_zapisz_plik(void)
+{
+    char buf[4096];
+    int pos = 0;
+    for (int i = 0; i < terminal_edytor_liczba_linii; i++) {
+        int len = 0;
+        while (terminal_edytor_linie[i][len]) len++;
+        for (int j = 0; j < len; j++) buf[pos++] = terminal_edytor_linie[i][j];
+        if (i < terminal_edytor_liczba_linii - 1) buf[pos++] = '\n';
+        if (pos > 4000) break;
+    }
+    buf[pos] = 0;
+    fs_reset_directory();
+    create_file(terminal_nazwa_pliku, (uint32_t)pos);
+    if (write_file(terminal_nazwa_pliku, buf, (uint32_t)pos) == 0) {
+        terminal_dodaj_linie("Plik zapisany");
+        terminal_edytor_zmieniony = 0;
+    } else {
+        terminal_dodaj_linie("Blad zapisu pliku");
+    }
+}
+
+static void terminal_edytor_dodaj_znak(char znak)
+{
+    if (terminal_edytor_biezaca_linia >= terminal_edytor_liczba_linii) return;
+    char *linia = terminal_edytor_linie[terminal_edytor_biezaca_linia];
+    int len = 0;
+    while (linia[len]) len++;
+    if (len >= 255) return;
+    for (int i = len; i >= 0; i--) linia[i + 1] = linia[i];
+    linia[0] = znak;
+    terminal_edytor_zmieniony = 1;
+}
+
+static void terminal_edytor_usun_znak(void)
+{
+    if (terminal_edytor_biezaca_linia >= terminal_edytor_liczba_linii) return;
+    char *linia = terminal_edytor_linie[terminal_edytor_biezaca_linia];
+    int len = 0;
+    while (linia[len]) len++;
+    if (len == 0) return;
+    for (int i = 0; i < len - 1; i++) linia[i] = linia[i + 1];
+    linia[len - 1] = 0;
+    terminal_edytor_zmieniony = 1;
+}
+
+static void terminal_edytor_nowa_linia(void)
+{
+    if (terminal_edytor_liczba_linii >= 64) return;
+    for (int i = terminal_edytor_liczba_linii; i > terminal_edytor_biezaca_linia + 1; i--) {
+        for (int j = 0; j < 256; j++) terminal_edytor_linie[i][j] = terminal_edytor_linie[i - 1][j];
+    }
+    terminal_edytor_linie[terminal_edytor_biezaca_linia + 1][0] = 0;
+    terminal_edytor_liczba_linii++;
+    terminal_edytor_biezaca_linia++;
+    terminal_edytor_zmieniony = 1;
+}
+
 static void terminal_wykonaj_komende(const char *komenda)
 {
     terminal_dodaj_linie(komenda);
@@ -132,6 +246,7 @@ static void terminal_wykonaj_komende(const char *komenda)
         terminal_dodaj_linie("  malowanie          - otworz malowanie");
         terminal_dodaj_linie("  zadania            - otworz zarzadzanie zadaniami");
         terminal_dodaj_linie("  duszki             - otworz duszki");
+        terminal_dodaj_linie("  edit [plik]        - edytuj plik .c/.txt w terminalu");
         terminal_dodaj_linie("  exit / quit        - zamknij terminal");
     } else if (terminal_starts_with(komenda, "clear")) {
         liczba_linii = 0;
@@ -219,14 +334,16 @@ static void terminal_wykonaj_komende(const char *komenda)
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             if (terminal_ma_rozszerzenie(arg, ".C") || terminal_ma_rozszerzenie(arg, ".TXT")) {
-                notatnik_otworz_plik(arg);
+                terminal_edytor_wczytaj_plik(arg);
+                terminal_tryb_edycji = 1;
+                okno_narysuj(&okno_terminal);
             } else {
                 terminal_dodaj_linie("Tylko pliki .c i .txt");
             }
         } else {
             terminal_dodaj_linie("Uzycie: edit [plik.c / plik.txt]");
         }
-    } else if (terminal_starts_with(komenda, "notatnik ")) {
+    } else if (terminal_starts_with(komenda, "notatnik")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             notatnik_otworz_plik(arg);
@@ -257,6 +374,54 @@ static void terminal_narysuj(int x, int y, int szerokosc, int wysokosc)
 {
     rysuj_prostokat(x, y, szerokosc, wysokosc, 0x00000000);
 
+    if (terminal_tryb_edycji) {
+        rysuj_tekst_chicago(x + TERMINAL_PADDING_X, y + TERMINAL_PADDING_Y,
+            "EDYCJA: ", 0x0000FF00);
+        rysuj_tekst_chicago(x + TERMINAL_PADDING_X + 64, y + TERMINAL_PADDING_Y,
+            terminal_nazwa_pliku, 0x00FFFFFF);
+        rysuj_tekst_chicago(x + TERMINAL_PADDING_X, y + TERMINAL_PADDING_Y + 16,
+            terminal_edytor_zmieniony ? " [zmieniono]" : "", 0x00FF0000);
+        rysuj_tekst_chicago(x + TERMINAL_PADDING_X, y + TERMINAL_PADDING_Y + 32,
+            "Strzalki gora/dol | Ctrl+X zapisz | Ctrl+Q wyjdz", 0x00888888);
+
+        int linia_y = y + TERMINAL_PADDING_Y + 48;
+        int wysok_linii = TERMINAL_CZIONKA_WYSOKOSC + 2;
+        int limit_dol = y + wysokosc - 24;
+        int poczatek = terminal_edytor_biezaca_linia > 10 ? terminal_edytor_biezaca_linia - 10 : 0;
+        int koniec = poczatek + 20;
+        if (koniec > terminal_edytor_liczba_linii) koniec = terminal_edytor_liczba_linii;
+
+        for (int i = poczatek; i < koniec; i++) {
+            if (linia_y + TERMINAL_CZIONKA_WYSOKOSC > limit_dol) break;
+            char numer[8];
+            int n = i + 1;
+            numer[0] = '0' + n / 100 % 10;
+            numer[1] = '0' + n / 10 % 10;
+            numer[2] = '0' + n % 10;
+            numer[3] = ':';
+            numer[4] = ' ';
+            numer[5] = 0;
+            rysuj_tekst_chicago(x + TERMINAL_PADDING_X, linia_y, numer, 0x0000FF00);
+            uint32_t kolor = (i == terminal_edytor_biezaca_linia) ? 0x00FFFFFF : 0x00888888;
+            rysuj_tekst_chicago(x + TERMINAL_PADDING_X + 40, linia_y, terminal_edytor_linie[i], kolor);
+            linia_y += wysok_linii;
+        }
+
+        int input_y = y + wysokosc - 24;
+        rysuj_prostokat(x, input_y, szerokosc, 24, 0x00111111);
+        rysuj_tekst_chicago(x + TERMINAL_PADDING_X, input_y + 4, "> ", 0x0000FF00);
+        rysuj_tekst_chicago(x + TERMINAL_PADDING_X + 16, input_y + 4,
+            terminal_edytor_linie[terminal_edytor_biezaca_linia], 0x00FFFFFF);
+
+        if (okno_terminal.w_polu_tekstowym && kursor_tekstowy_widoczny()) {
+            int len = 0;
+            while (terminal_edytor_linie[terminal_edytor_biezaca_linia][len]) len++;
+            int cursor_x = x + TERMINAL_PADDING_X + 16 + len * 8;
+            rysuj_prostokat(cursor_x, input_y + 4, 2, 12, 0x00FFFFFF);
+        }
+        return;
+    }
+
     int linia_y = y + TERMINAL_PADDING_Y;
     int wysok_linii = TERMINAL_CZIONKA_WYSOKOSC + 2;
 
@@ -281,12 +446,48 @@ static void terminal_narysuj(int x, int y, int szerokosc, int wysokosc)
 static void terminal_pole_tekstowe_enter(struct okno *okno)
 {
     (void)okno;
+    if (terminal_tryb_edycji) {
+        terminal_edytor_nowa_linia();
+        okno_narysuj(&okno_terminal);
+        return;
+    }
     terminal_wykonaj_komende(linia_wejscia);
 }
 
 static int terminal_pole_tekstowe_znak(struct okno *okno, char znak, uint8_t ctrl)
 {
     (void)okno;
+    if (terminal_tryb_edycji) {
+        if (ctrl) {
+            if (znak == 'x') {
+                terminal_edytor_zapisz_plik();
+                terminal_tryb_edycji = 0;
+                okno_narysuj(&okno_terminal);
+                return 1;
+            }
+            if (znak == 'q') {
+                terminal_tryb_edycji = 0;
+                okno_narysuj(&okno_terminal);
+                return 1;
+            }
+            return 1;
+        }
+        if (znak == '\b') {
+            terminal_edytor_usun_znak();
+        } else if (znak == '\n' || znak == '\r') {
+            terminal_edytor_nowa_linia();
+        } else if (znak >= 32 && znak <= 126) {
+            terminal_edytor_dodaj_znak(znak);
+        } else if (znak == 'w' && terminal_edytor_biezaca_linia > 0) {
+            terminal_edytor_biezaca_linia--;
+        } else if (znak == 's' && terminal_edytor_biezaca_linia < terminal_edytor_liczba_linii - 1) {
+            terminal_edytor_biezaca_linia++;
+        } else {
+            return 1;
+        }
+        okno_narysuj(&okno_terminal);
+        return 1;
+    }
     (void)ctrl;
     if (znak == '\b') {
         if (dlugosc_wejscia > 0) {
@@ -350,6 +551,21 @@ void terminal_obsluz_klawiature_znak(char znak)
     if (!terminal_otwarty) return;
     if (!okno_terminal.otwarte) {
         terminal_otwarty = 0;
+        return;
+    }
+    if (terminal_tryb_edycji) {
+        if (!okno_czy_aktywne(&okno_terminal)) return;
+        if (znak == '\n' || znak == '\r') {
+            okno_wejdz_do_pola_tekstowego(&okno_terminal);
+        }
+        if (znak == 'w' && terminal_edytor_biezaca_linia > 0) {
+            terminal_edytor_biezaca_linia--;
+            okno_narysuj(&okno_terminal);
+        }
+        if (znak == 's' && terminal_edytor_biezaca_linia < terminal_edytor_liczba_linii - 1) {
+            terminal_edytor_biezaca_linia++;
+            okno_narysuj(&okno_terminal);
+        }
         return;
     }
     if (okno_terminal.w_polu_tekstowym) return;
