@@ -38,6 +38,7 @@
 #define SYSCALL_OKNO_RUCH 40
 #define SYSCALL_KLAWIATURA_GETCHAR 41
 #define SYSCALL_PROCES_URUCHOM_ELF 42
+#define SYSCALL_SHUTDOWN 43
 
 static inline uint32_t syscall0(uint32_t num)
 {

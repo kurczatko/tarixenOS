@@ -46,6 +46,9 @@
 // Load and run ELF from filesystem
 #define SYSCALL_PROCES_URUCHOM_ELF 42
 
+// Shutdown the system
+#define SYSCALL_SHUTDOWN 43
+
 void syscall_install(void);
 struct rejestry {
     uint32_t eax, ebx, ecx, edx, esi, edi;

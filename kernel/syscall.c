@@ -16,6 +16,7 @@
 #include <drivers/keyboard.h>
 #include <drivers/mouse.h>
 #include <kernel/loader.h>
+#include <kernel/shutdown.h>
 #include <user_land/tapeta.h>
 
 struct rejestry biezace_rejestry;
@@ -446,6 +447,10 @@ uint32_t syscall_handler(void)
             int pid = proces_zaladuj_elf((const char *)ebx);
             if (pid <= 0) return 0xFFFFFFFF;
             return pid;
+        }
+        case SYSCALL_SHUTDOWN: {
+            shutdown();
+            return 0;
         }
         default:
             return 0xFFFFFFFF;
