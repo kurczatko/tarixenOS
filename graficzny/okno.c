@@ -39,37 +39,45 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
         okno->rysuj_zawartosc(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
         return;
     }
-    int cien_x = okno->x + 4;
-    int cien_y = okno->y + 4;
-    if (cien_x < EKRAN_SZEROKOSC && cien_y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) {
-        int cien_w = okno->szerokosc - 4;
-        int cien_h = okno->wysokosc - 4;
-        if (cien_x + cien_w > EKRAN_SZEROKOSC) cien_w = EKRAN_SZEROKOSC - cien_x;
-        if (cien_y + cien_h > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) cien_h = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - cien_y;
-        if (cien_w > 0 && cien_h > 0) {
-            rysuj_prostokat_polprzezroczysty(cien_x, cien_y, cien_w, cien_h, 0x00000000, 45);
+    if (!okno->pelnoekranowy) {
+        rozmyj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
+        rysuj_prostokat_polprzezroczysty(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI, 60);
+        rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
+                        okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 85);
+        rozmyj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24);
+        rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA, 70);
+        rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
+        rysuj_prostokat(okno->x + okno->szerokosc - 64, okno->y + 4, 16, 16, 0x004A5D6E);
+        rysuj_prostokat(okno->x + okno->szerokosc - 60, okno->y + 10, 8, 2, 0x00FFFFFF);
+        rysuj_prostokat(okno->x + okno->szerokosc - 42, okno->y + 4, 16, 16, 0x004A5D6E);
+        if (!okno->zmaksymalizowane) {
+            rysuj_prostokat(okno->x + okno->szerokosc - 38, okno->y + 8, 8, 8, 0x00FFFFFF);
+        } else {
+            rysuj_prostokat(okno->x + okno->szerokosc - 40, okno->y + 6, 8, 8, 0x00FFFFFF);
+            rysuj_prostokat(okno->x + okno->szerokosc - 34, okno->y + 12, 8, 8, 0x00FFFFFF);
+        }
+        rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
+        rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
+        if (okno->rysuj_zawartosc)
+            okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
+
+        int cien_prawy_x = okno->x + okno->szerokosc;
+        int cien_prawy_y = okno->y + 4;
+        int cien_prawy_w = 4;
+        int cien_prawy_h = okno->wysokosc - 4;
+        if (cien_prawy_x < EKRAN_SZEROKOSC && cien_prawy_w > 0 && cien_prawy_h > 0) {
+            if (cien_prawy_x + cien_prawy_w > EKRAN_SZEROKOSC) cien_prawy_w = EKRAN_SZEROKOSC - cien_prawy_x;
+            rysuj_prostokat_polprzezroczysty(cien_prawy_x, cien_prawy_y, cien_prawy_w, cien_prawy_h, 0x00000000, 55);
+        }
+        int cien_dol_x = okno->x + 4;
+        int cien_dol_y = okno->y + okno->wysokosc;
+        int cien_dol_w = okno->szerokosc - 4;
+        int cien_dol_h = 4;
+        if (cien_dol_y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC && cien_dol_w > 0 && cien_dol_h > 0) {
+            if (cien_dol_x + cien_dol_w > EKRAN_SZEROKOSC) cien_dol_w = EKRAN_SZEROKOSC - cien_dol_x;
+            rysuj_prostokat_polprzezroczysty(cien_dol_x, cien_dol_y, cien_dol_w, cien_dol_h, 0x00000000, 55);
         }
     }
-    rozmyj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
-    rysuj_prostokat_polprzezroczysty(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI, 60);
-    rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
-                    okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 85);
-    rozmyj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24);
-    rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA, 70);
-    rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
-    rysuj_prostokat(okno->x + okno->szerokosc - 64, okno->y + 4, 16, 16, 0x004A5D6E);
-    rysuj_prostokat(okno->x + okno->szerokosc - 60, okno->y + 10, 8, 2, 0x00FFFFFF);
-    rysuj_prostokat(okno->x + okno->szerokosc - 42, okno->y + 4, 16, 16, 0x004A5D6E);
-    if (!okno->zmaksymalizowane) {
-        rysuj_prostokat(okno->x + okno->szerokosc - 38, okno->y + 8, 8, 8, 0x00FFFFFF);
-    } else {
-        rysuj_prostokat(okno->x + okno->szerokosc - 40, okno->y + 6, 8, 8, 0x00FFFFFF);
-        rysuj_prostokat(okno->x + okno->szerokosc - 34, okno->y + 12, 8, 8, 0x00FFFFFF);
-    }
-    rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
-    rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
-    if (okno->rysuj_zawartosc)
-        okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
 }
 
 static void okno_przenies_na_wierzch(struct okno *okno)
