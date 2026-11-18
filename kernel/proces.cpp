@@ -9,6 +9,37 @@
 #include <kernel/timer.h>
 #include <kernel/idt.h>
 
+#define OOM_ADJ_MIN    (-1000)
+#define OOM_ADJ_MAX    (1000)
+#define OOM_ADJ_IMMUNE (-1000)
+
+typedef uint32_t (*oom_shrinker_fn)(uint32_t want_pages, void *ctx);
+
+typedef void (*oom_log_fn)(const char *name, uint32_t pid, uint32_t score_permille,
+                           uint32_t rss_pages, const char *reason);
+
+struct oom_stats {
+    uint32_t kills;
+    uint32_t proactive_kills;
+    uint32_t alloc_failures;
+    uint32_t shrinker_saves;
+    uint32_t last_pid;
+    uint32_t last_score;
+    uint64_t last_tick;
+};
+
+void oom_account(struct proces *p, int32_t delta_pages);
+void oom_account_current(int32_t delta_pages);
+void *oom_alloc_frame(void);
+int oom_kill_for_memory(uint32_t want_pages, const char *reason);
+int oom_register_shrinker(oom_shrinker_fn fn, void *ctx);
+void oom_set_logger(oom_log_fn fn);
+void oom_set_watermarks(uint32_t low_permille, uint32_t min_permille);
+void oom_get_stats(struct oom_stats *out);
+int proces_set_oom_adj(uint32_t pid, int32_t adj);
+int32_t proces_get_oom_adj(uint32_t pid);
+uint32_t proces_get_oom_score(uint32_t pid);
+
 /* ------------------------------------------------------------------------- */
 /* Stale                                                                     */
 /* ------------------------------------------------------------------------- */
@@ -41,6 +72,24 @@
 #define SCHED_EFF_LEAN_PENALTY 256U        /* zadanie o util >= EFF_TASK_UTIL woli P-core, chyba ze ten jest zajety */
 #define SCHED_OVERCOMMIT_COST 2048U        /* kara za przekroczenie ~80% pojemnosci rdzenia po dolozeniu zadania */
 
+#define SCHED_SMT_PENALTY 160U
+
+#define SCHED_VRUNTIME_CREDIT (2ULL * (uint64_t)TICK_NS)
+#define SCHED_VRUNTIME_MAXLAG (16ULL * (uint64_t)TICK_NS)
+
+/* OOM killer */
+#define OOM_CHECK_INTERVAL 16U
+#define OOM_LOW_PERMILLE 20U
+#define OOM_MIN_PERMILLE 8U
+#define OOM_PRESSURE_SAMPLES 3U
+#define OOM_VICTIM_TIMEOUT_TICKS 500ULL
+#define OOM_COOLDOWN_TICKS 50ULL
+#define OOM_PT_PAGES 3U
+#define OOM_MAX_SHRINKERS 8U
+#define OOM_ALLOC_RETRIES 4U
+#define OOM_WAIT_SPINS 50000U
+#define OOM_FALLBACK_TOTAL_PAGES 32768U
+
 #define NO_CPU 0xFFFFFFFFU
 #define PRIO_WORDS ((NR_PRIORITIES + 31) / 32)
 
@@ -49,11 +98,27 @@ static_assert(SMP_MAX_CPUS <= 32, "maski CPU sa 32-bitowe");
 void sched_enqueue(struct proces *p);
 void sched_dequeue(struct proces *p, uint32_t cpu);
 void sched_finish_switch(uint32_t cpu);
+static void oom_init(void);
+static void oom_tick(uint64_t now);
+static void oom_reap_current(uint32_t cpu);
 extern void smp_send_resched_ipi(uint32_t cpu) __attribute__((weak));
 
 /* ------------------------------------------------------------------------- */
 /* Dane globalne                                                             */
 /* ------------------------------------------------------------------------- */
+
+struct cl_u64 { volatile uint64_t v; } __attribute__((aligned(64)));
+struct cl_u32 { uint32_t v; } __attribute__((aligned(64)));
+struct cl_ptr { struct proces *v; } __attribute__((aligned(64)));
+
+static struct cl_u64 g_ticks;
+static struct cl_u32 g_busy;
+static struct cl_u32 g_over;
+static struct cl_u32 g_parked;
+#define global_ticks    (g_ticks.v)
+#define rq_busy_mask    (g_busy.v)    /* bit c = kolejka c ma zadania (aktualizowane pod blokada kolejki) */
+#define cpu_over_mask   (g_over.v)    /* bit c = CPU przeciazony (tryb EAS wylaczony, wraca klasyczne rownowazenie) */
+#define cpu_parked_mask (g_parked.v)
 
 struct proces process_table[MAX_PROCESSES];
 struct proces *current_cpu[SMP_MAX_CPUS] = {0};
@@ -62,7 +127,6 @@ struct proces *current_process = 0;
 static uint32_t next_pid = 1;
 static uint32_t process_count = 0;
 static uint32_t kernel_page_dir_phys = 0;
-static volatile uint64_t global_ticks = 0;
 uint32_t smp_cpu_count = 1;
 uint32_t cpu_online_mask = 1;
 uint32_t smp_this_cpu = 0;
@@ -86,16 +150,19 @@ struct runqueue {
     uint32_t nr_running;
     uint32_t util_sum;     /* suma util zadan w kolejce (bez biezacego) */
     uint32_t nr_perf;      /* ile zadan w kolejce zada wydajnosci (util >= PERF_DEMAND) */
+    uint64_t min_vruntime;
     tlock_t lock;
 } __attribute__((aligned(64)));
 
 struct cpu_meta_t {
     uint32_t type;
     uint32_t capacity;
-    uint32_t util;
-    uint32_t idle_ticks;
     uint32_t inv_cap;      /* (1<<20)/capacity: dzielenie przez pojemnosc zamienione na mnozenie */
     uint32_t epu;          /* koszt energii na jednostke pracy (1024 = P-core) */
+    uint32_t core_tag;
+    uint32_t smt_mask;
+    uint32_t util __attribute__((aligned(64)));
+    uint32_t idle_ticks;
 } __attribute__((aligned(64)));
 
 struct proces_ext {
@@ -108,16 +175,18 @@ struct proces_ext {
     uint32_t qutil;        /* util zapamietane przy wstawieniu do kolejki */
     uint32_t qperf;
     int32_t qprio;
+    uint32_t *reap_pd;
+    int32_t oom_adj;
+    uint32_t rss_pages;
+    uint32_t oom_doomed;
+    uint32_t oom_skip;
 };
 
 static struct runqueue cpu_rq[SMP_MAX_CPUS];
 static struct cpu_meta_t cpu_meta[SMP_MAX_CPUS];
 static struct proces_ext proc_ext[MAX_PROCESSES];
-static uint32_t cpu_parked_mask = 0;
-static uint32_t rq_busy_mask = 0;      /* bit c = kolejka c ma zadania (aktualizowane pod blokada kolejki) */
-static uint32_t cpu_over_mask = 0;     /* bit c = CPU przeciazony (tryb EAS wylaczony, wraca klasyczne rownowazenie) */
 static uint32_t max_cap = SCHED_CAP_PERF;
-static struct proces *last_prev[SMP_MAX_CPUS] = {0};
+static struct cl_ptr last_prev_s[SMP_MAX_CPUS];
 
 static struct proces *wait_head = 0;
 static struct proces *wait_tail = 0;
@@ -216,6 +285,13 @@ static inline int cpu_is_idle(uint32_t c) {
     return idle_task[c] && current_cpu[c] == idle_task[c] && !cpu_rq[c].nr_running;
 }
 
+static inline int smt_sibling_busy(uint32_t c) {
+    for (uint32_t m = __atomic_load_n(&cpu_meta[c].smt_mask, __ATOMIC_RELAXED); m; m &= m - 1U) {
+        if (!cpu_is_idle((uint32_t)__builtin_ctz(m))) return 1;
+    }
+    return 0;
+}
+
 static inline int task_wants_perf(struct proces *p) {
     return p->sched_class == SCHED_REALTIME || p->sched_class == SCHED_CRITICAL || p->sched_class == SCHED_INTERACTIVE;
 }
@@ -293,6 +369,17 @@ static inline int prio_peek_highest(struct runqueue *rq) {
     return -1;
 }
 
+static inline int vruntime_managed(struct proces *p) {
+    return p->sched_class != SCHED_REALTIME && p->sched_class != SCHED_CRITICAL && p->sched_class != SCHED_IDLE;
+}
+
+static inline void rq_update_min_vruntime(struct runqueue *rq, struct proces *a, struct proces *b) {
+    uint64_t v = ~0ULL;
+    if (a && vruntime_managed(a) && a->vruntime < v) v = a->vruntime;
+    if (b && vruntime_managed(b) && b->vruntime < v) v = b->vruntime;
+    if (v != ~0ULL && v > rq->min_vruntime) rq->min_vruntime = v;
+}
+
 /* Wolajacy trzyma blokade cpu_rq[cpu]. */
 static void runq_enqueue_locked(struct proces *p, uint32_t cpu) {
     struct proces_ext *e = ext_of(p);
@@ -300,6 +387,14 @@ static void runq_enqueue_locked(struct proces *p, uint32_t cpu) {
     if (cpu >= SMP_MAX_CPUS) cpu = 0;
     struct runqueue *rq = &cpu_rq[cpu];
     int prio = prio_clamp(p->priority);
+
+    if (vruntime_managed(p)) {
+        uint64_t mv = rq->min_vruntime;
+        uint64_t lo = mv > SCHED_VRUNTIME_CREDIT ? mv - SCHED_VRUNTIME_CREDIT : 0ULL;
+        uint64_t hi = mv + SCHED_VRUNTIME_MAXLAG;
+        if (p->vruntime < lo) p->vruntime = lo;
+        else if (p->vruntime > hi) p->vruntime = hi;
+    }
 
     struct proces *after = rq->prio_tail[prio];
     if (p->sched_class != SCHED_REALTIME && p->sched_class != SCHED_CRITICAL) {
@@ -454,6 +549,15 @@ static uint32_t select_cpu_excl(struct proces *p, uint32_t excl) {
     int want_perf = task_wants_perf(p);
     int want_eff = !want_perf && task_wants_eff(p);
     int eas = !want_perf && !__atomic_load_n(&cpu_over_mask, __ATOMIC_RELAXED);
+
+    uint32_t prev = p->cpu;
+    if (prev < SMP_MAX_CPUS && ((allowed >> prev) & 1U) && !((parked >> prev) & 1U) &&
+        cpu_is_idle(prev) && fits_cpu(p, prev) && !smt_sibling_busy(prev)) {
+        int prev_eff = cpu_meta[prev].type == SCHED_CPU_EFF;
+        int ok = want_perf ? !prev_eff : (want_eff ? prev_eff : (!prev_eff || !eas));
+        if (ok) return prev;
+    }
+
     uint32_t tw = e->util + SCHED_MIN_WEIGHT;
     uint64_t now = global_ticks;
     uint32_t best_cpu = (uint32_t)__builtin_ctz(allowed);
@@ -483,6 +587,7 @@ static uint32_t select_cpu_excl(struct proces *p, uint32_t excl) {
         if (!fits_cpu(p, c)) cost += 1000000U;
         if (want_perf && is_eff) cost += 500000U;
         if (parked & (1U << c)) cost += SCHED_WAKE_PARKED_COST;
+        if (smt_sibling_busy(c)) cost += SCHED_SMT_PENALTY;
         if (cpu_is_idle(c)) cost = cost > SCHED_IDLE_BONUS ? cost - SCHED_IDLE_BONUS : 0U;
         if (c == p->cpu) {
             uint32_t b = (now - p->exec_start) <= SCHED_CACHE_HOT_TICKS ? SCHED_CACHE_BONUS_HOT : SCHED_CACHE_BONUS_COLD;
@@ -574,6 +679,7 @@ static struct proces *balance_pull(uint32_t cpu) {
     int idle_now = cpu_is_idle(cpu);
     uint32_t mine = cpu_load_norm(cpu);
     uint32_t best = idle_now ? mine : mine + SCHED_IMBALANCE_MARGIN;
+    if (idle_now && smt_sibling_busy(cpu)) best += SCHED_SMT_PENALTY;
     uint32_t victim = cpu;
     for (uint32_t m = busy; m; m &= m - 1U) {
         uint32_t i = (uint32_t)__builtin_ctz(m);
@@ -608,7 +714,11 @@ static void misfit_check(uint32_t cpu, struct proces *cur) {
         uint32_t cap = cap_of(c);
         if (up) {
             if (cap <= cap_of(cpu)) continue;
-            if (cap > target_cap) { target = c; target_cap = cap; }
+            if (cap > target_cap || (cap == target_cap && target != NO_CPU &&
+                                     smt_sibling_busy(target) && !smt_sibling_busy(c))) {
+                target = c;
+                target_cap = cap;
+            }
         } else {
             if (cpu_meta[c].type != SCHED_CPU_EFF) continue;
             target = c;
@@ -667,8 +777,17 @@ static void energy_manage(void) {
         for (uint32_t c = 1; c < n && cap < need; c++) {
             if (!((online >> c) & 1U) || ((desired >> c) & 1U)) continue;
             if (cpu_meta[c].type != want_type) continue;
+            if (pass == 1 && (cpu_meta[c].smt_mask & desired)) continue;
             desired |= (1U << c);
             cap += cap_of(c);
+        }
+        if (pass == 1 && cap < need) {
+            for (uint32_t c = 1; c < n && cap < need; c++) {
+                if (!((online >> c) & 1U) || ((desired >> c) & 1U)) continue;
+                if (cpu_meta[c].type != SCHED_CPU_PERF) continue;
+                desired |= (1U << c);
+                cap += cap_of(c);
+            }
         }
     }
 
@@ -720,10 +839,27 @@ static void cpu_apply_meta(uint32_t cpu, uint32_t type, uint32_t cap) {
     sched_update_maxcap();
 }
 
+static void cpu_apply_core(uint32_t cpu, uint32_t core) {
+    uint32_t tag = core + 1U;
+    uint32_t sib = 0;
+    __atomic_store_n(&cpu_meta[cpu].core_tag, tag, __ATOMIC_RELAXED);
+    for (uint32_t c = 0; c < SMP_MAX_CPUS; c++) {
+        if (c == cpu || __atomic_load_n(&cpu_meta[c].core_tag, __ATOMIC_RELAXED) != tag) continue;
+        sib |= 1U << c;
+        __atomic_fetch_or(&cpu_meta[c].smt_mask, 1U << cpu, __ATOMIC_RELAXED);
+    }
+    __atomic_fetch_or(&cpu_meta[cpu].smt_mask, sib, __ATOMIC_RELAXED);
+}
+
 /* Pozwala kodowi platformy (ACPI/CPPC/kalibracja) nadpisac typ i pojemnosc rdzenia. */
 void cpu_set_topology(uint32_t cpu, uint32_t type, uint32_t capacity) {
     if (cpu >= SMP_MAX_CPUS) return;
     cpu_apply_meta(cpu, type, capacity);
+}
+
+void cpu_set_core(uint32_t cpu, uint32_t core) {
+    if (cpu >= SMP_MAX_CPUS) return;
+    cpu_apply_core(cpu, core);
 }
 
 /* Nadpisanie kosztu energii na jednostke pracy (1024 = P-core), np. z kalibracji lub tablic EM. */
@@ -738,6 +874,7 @@ void sched_register_this_cpu(void) {
     uint32_t a, b, c, d;
     uint32_t type = SCHED_CPU_PERF;
     uint32_t cap = SCHED_CAP_PERF;
+    uint32_t core = cpu;
     cpuid_raw(0, 0, &a, &b, &c, &d);
     uint32_t maxleaf = a;
     if (maxleaf >= 7U) {
@@ -750,7 +887,12 @@ void sched_register_this_cpu(void) {
             }
         }
     }
+    if (maxleaf >= 0xBU) {
+        cpuid_raw(0xB, 0, &a, &b, &c, &d);
+        if ((((c >> 8) & 0xFFU) == 1U) && (b & 0xFFFFU)) core = d >> (a & 0x1FU);
+    }
     cpu_apply_meta(cpu, type, cap);
+    cpu_apply_core(cpu, core);
 }
 
 uint32_t sched_cpu_util(uint32_t cpu) {
@@ -830,16 +972,28 @@ static uint32_t time_slice_for(struct proces *p) {
 /* Rdzen schedulera                                                          */
 /* ------------------------------------------------------------------------- */
 
+static void proces_free_user_space(uint32_t *pd) {
+    if (!pd || pd == (uint32_t *)kernel_page_dir_phys) return;
+    uint32_t *user_pt = (uint32_t *)(pd[1] & ~0xFFF);
+    uint32_t *fb_pt = (uint32_t *)(pd[0xFD000000 >> 22] & ~0xFFF);
+    paging_free_frame(fb_pt);
+    paging_free_frame(user_pt);
+    paging_free_frame(pd);
+}
+
 /* Zwalnia zadanie wylaczone z CPU w POPRZEDNIM przelaczeniu. Wolac:
  *  - na poczatku schedule_cpu (fallback), oraz
  *  - najlepiej zaraz po faktycznym przelaczeniu kontekstu (kod asm / powrot z IRQ),
  *    zeby inny CPU mogl od razu przejac zadanie. */
 void sched_finish_switch(uint32_t cpu) {
     if (cpu >= SMP_MAX_CPUS) return;
-    struct proces *prev = last_prev[cpu];
+    struct proces *prev = last_prev_s[cpu].v;
     if (!prev) return;
-    last_prev[cpu] = 0;
-    __atomic_store_n(&ext_of(prev)->on_cpu, 0U, __ATOMIC_RELEASE);
+    last_prev_s[cpu].v = 0;
+    struct proces_ext *e = ext_of(prev);
+    __atomic_store_n(&e->on_cpu, 0U, __ATOMIC_SEQ_CST);
+    uint32_t *pd = __atomic_exchange_n(&e->reap_pd, (uint32_t *)0, __ATOMIC_SEQ_CST);
+    if (pd) proces_free_user_space(pd);
 }
 
 /* Wolane z wylaczonymi przerwaniami. */
@@ -889,6 +1043,8 @@ static void schedule_cpu(uint32_t cpu, int yield) {
         }
         if (limit >= 0) next = rq_pop_best_locked(rq, limit);
 
+        rq_update_min_vruntime(rq, next, (cur_runnable && !cur_is_idle) ? cur : 0);
+
         if (cur_runnable && expired && cur->time_slice == 0) cur->time_slice = time_slice_for(cur);
 
         if (next && cur_runnable && !cur_is_idle && mig == NO_CPU) {
@@ -912,7 +1068,7 @@ static void schedule_cpu(uint32_t cpu, int yield) {
         }
         if (cur) {
             cur->ctx_switches++;
-            if (!cur_is_idle) last_prev[cpu] = cur;
+            if (!cur_is_idle) last_prev_s[cpu].v = cur;
         }
         __atomic_store_n(&ext_of(next)->on_cpu, 1U, __ATOMIC_RELEASE);
         current_cpu[cpu] = next;
@@ -932,7 +1088,9 @@ static struct proces *proces_claim_slot(void) {
     struct proces *p = 0;
     uint32_t f = tlock_irqsave(&table_lock);
     for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
-        if (process_table[i].state == PROCES_TERMINATED || process_table[i].pid == 0) {
+        if ((process_table[i].state == PROCES_TERMINATED || process_table[i].pid == 0) &&
+            !__atomic_load_n(&proc_ext[i].on_cpu, __ATOMIC_ACQUIRE) &&
+            !__atomic_load_n(&proc_ext[i].reap_pd, __ATOMIC_ACQUIRE)) {
             p = &process_table[i];
             p->pid = next_pid++;
             p->state = PROCES_READY;
@@ -1008,6 +1166,10 @@ static void proces_init_common(struct proces *p, uint32_t entry_point, uint32_t 
     e->qutil = 0;
     e->qperf = 0;
     e->qprio = 0;
+    e->oom_adj = 0;
+    e->rss_pages = 0;
+    e->oom_doomed = 0;
+    e->oom_skip = 0;
 
     proces_copy_name(p, name);
     for (uint32_t i = 0; i < MAX_OKNA_PROCESU; i++) p->okna_uzyte[i] = 0;
@@ -1038,12 +1200,13 @@ void proces_init(void) {
         cpu_rq[i].nr_running = 0;
         cpu_rq[i].util_sum = 0;
         cpu_rq[i].nr_perf = 0;
+        cpu_rq[i].min_vruntime = 0;
         cpu_rq[i].lock.all = 0;
         cpu_meta[i].util = 0;
         cpu_meta[i].idle_ticks = 0;
         current_cpu[i] = 0;
         idle_task[i] = 0;
-        last_prev[i] = 0;
+        last_prev_s[i].v = 0;
     }
     for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
         struct proces *p = &process_table[i];
@@ -1066,6 +1229,11 @@ void proces_init(void) {
         proc_ext[i].qutil = 0;
         proc_ext[i].qperf = 0;
         proc_ext[i].qprio = 0;
+        proc_ext[i].reap_pd = 0;
+        proc_ext[i].oom_adj = 0;
+        proc_ext[i].rss_pages = 0;
+        proc_ext[i].oom_doomed = 0;
+        proc_ext[i].oom_skip = 0;
     }
     wait_head = 0;
     wait_tail = 0;
@@ -1073,6 +1241,7 @@ void proces_init(void) {
     sleep_tail = 0;
     waitq_lock.all = 0;
     table_lock.all = 0;
+    oom_init();
     cpu_parked_mask = 0;
     rq_busy_mask = 0;
     cpu_over_mask = 0;
@@ -1123,18 +1292,27 @@ void proces_zakoncz(uint32_t pid) {
         wait_remove_any_locked(p);
         tlock_unlock(&waitq_lock);
     }
+    uint32_t *pd = p->page_directory;
+    p->page_directory = 0;
     p->state = PROCES_TERMINATED;
     p->pid = 0;
     __atomic_fetch_sub(&process_count, 1U, __ATOMIC_SEQ_CST);
 
-    if (p->page_directory && p->page_directory != (uint32_t *)kernel_page_dir_phys) {
-        uint32_t *user_pt = (uint32_t *)(p->page_directory[1] & ~0xFFF);
-        uint32_t *fb_pt = (uint32_t *)(p->page_directory[0xFD000000 >> 22] & ~0xFFF);
-        paging_free_frame(fb_pt);
-        paging_free_frame(user_pt);
-        paging_free_frame(p->page_directory);
-        p->page_directory = 0;
+    if (pd && pd != (uint32_t *)kernel_page_dir_phys) {
+        struct proces_ext *e = ext_of(p);
+        __atomic_store_n(&e->reap_pd, pd, __ATOMIC_SEQ_CST);
+        if (!__atomic_load_n(&e->on_cpu, __ATOMIC_SEQ_CST)) {
+            uint32_t *mine = __atomic_exchange_n(&e->reap_pd, (uint32_t *)0, __ATOMIC_SEQ_CST);
+            if (mine) proces_free_user_space(mine);
+        }
     }
+
+    if (smp_send_resched_ipi && !was_current) {
+        for (uint32_t c = 0; c < ncpus(); c++) {
+            if (c != cpu && current_cpu[c] == p) smp_send_resched_ipi(c);
+        }
+    }
+
     if (was_current) schedule_cpu(cpu, 0);
     irq_restore(f);
 }
@@ -1146,8 +1324,8 @@ void proces_tick(void) {
     if (cpu == 0) global_ticks += 1ULL;
     uint64_t now = global_ticks;
 
-    if (sleep_head && sleep_head->sleep_until <= now) {
-        tlock_lock(&waitq_lock);
+    struct proces *sh = __atomic_load_n(&sleep_head, __ATOMIC_RELAXED);
+    if (sh && sh->sleep_until <= now && tlock_trylock(&waitq_lock)) {
         while (sleep_head && sleep_head->sleep_until <= now) {
             struct proces *w = sleep_head;
             sleep_remove_locked(w);
@@ -1162,6 +1340,9 @@ void proces_tick(void) {
         }
         tlock_unlock(&waitq_lock);
     }
+
+    if (cpu == 0 && (((uint32_t)now) & (OOM_CHECK_INTERVAL - 1U)) == 0U) oom_tick(now);
+    oom_reap_current(cpu);
 
     struct proces *cur = current_cpu[cpu];
     int busy = cur && cur != idle_task[cpu] && cur->state == PROCES_RUNNING;
@@ -1350,7 +1531,7 @@ int proces_get_stats(uint32_t pid, struct proces *out) {
 }
 
 uint32_t *proces_klonuj_page_directory(void) {
-    uint32_t *new_dir = (uint32_t *)paging_alloc_frame();
+    uint32_t *new_dir = (uint32_t *)oom_alloc_frame();
     if (!new_dir) return 0;
     uint32_t *kernel_dir = (uint32_t *)kernel_page_dir_phys;
 
@@ -1358,7 +1539,7 @@ uint32_t *proces_klonuj_page_directory(void) {
 
     for (int i = 0; i < 256; i++) new_dir[i] = kernel_dir[i];
 
-    uint32_t *user_pt = (uint32_t *)paging_alloc_frame();
+    uint32_t *user_pt = (uint32_t *)oom_alloc_frame();
     if (!user_pt) { paging_free_frame(new_dir); return 0; }
     for (int i = 0; i < 1024; i++) user_pt[i] = 0;
 
@@ -1368,7 +1549,7 @@ uint32_t *proces_klonuj_page_directory(void) {
 
     new_dir[1] = ((uint32_t)user_pt | PAGE_PRESENT | PAGE_READWRITE | PAGE_USER);
 
-    uint32_t *fb_pt = (uint32_t *)paging_alloc_frame();
+    uint32_t *fb_pt = (uint32_t *)oom_alloc_frame();
     if (!fb_pt) { paging_free_frame(user_pt); paging_free_frame(new_dir); return 0; }
     for (int i = 0; i < 1024; i++) fb_pt[i] = 0;
     for (int i = 0; i < 1024; i++) {
@@ -1518,4 +1699,328 @@ struct proces *sched_pick_next(uint32_t cpu) {
     struct proces *next = sched_pick_next_locked(cpu);
     tlock_irqrestore(&cpu_rq[cpu].lock, f);
     return next;
+}
+
+/* ------------------------------------------------------------------------- */
+/* OOM killer                                                                */
+/* ------------------------------------------------------------------------- */
+
+
+extern uint32_t paging_free_frame_count(void) __attribute__((weak));
+extern uint32_t paging_total_frame_count(void) __attribute__((weak));
+
+struct oom_shrinker_slot {
+    oom_shrinker_fn fn;
+    void *ctx;
+};
+
+static struct oom_shrinker_slot oom_shrinkers[OOM_MAX_SHRINKERS];
+static uint32_t oom_shrinker_count = 0;
+static oom_log_fn oom_logger = 0;
+static tlock_t oom_lock;
+static uint32_t oom_victim_pid = 0;
+static uint64_t oom_victim_deadline = 0;
+static uint64_t oom_cooldown_until = 0;
+static uint32_t oom_pressure = 0;
+static uint32_t oom_low_pm = OOM_LOW_PERMILLE;
+static uint32_t oom_min_pm = OOM_MIN_PERMILLE;
+static struct oom_stats oom_stat;
+
+static void oom_init(void) {
+    oom_lock.all = 0;
+    oom_victim_pid = 0;
+    oom_victim_deadline = 0;
+    oom_cooldown_until = 0;
+    oom_pressure = 0;
+}
+
+static uint32_t oom_total_pages(void) {
+    uint32_t t = paging_total_frame_count ? paging_total_frame_count() : 0U;
+    if (!t) t = OOM_FALLBACK_TOTAL_PAGES;
+    return t > 4000000U ? 4000000U : t;
+}
+
+static int oom_task_running(struct proces *p) {
+    for (uint32_t c = 0; c < ncpus(); c++) {
+        if (current_cpu[c] == p) return 1;
+    }
+    return 0;
+}
+
+static uint32_t oom_badness(struct proces *p, uint32_t total) {
+    struct proces_ext *e = ext_of(p);
+    if (p->pid == 0 || p->state == PROCES_TERMINATED) return 0;
+    if (p->is_driver) return 0;
+    if (p->sched_class == SCHED_REALTIME || p->sched_class == SCHED_CRITICAL) return 0;
+    if (!p->page_directory || p->page_directory == (uint32_t *)kernel_page_dir_phys) return 0;
+    if (e->oom_adj <= OOM_ADJ_IMMUNE || e->oom_skip) return 0;
+    for (uint32_t c = 0; c < SMP_MAX_CPUS; c++) {
+        if (idle_task[c] == p) return 0;
+    }
+
+    if (total > (1U << 20)) total = 1U << 20;
+    uint32_t rss = e->rss_pages > (1U << 20) ? (1U << 20) : e->rss_pages;
+    int32_t pages = (int32_t)(rss + OOM_PT_PAGES);
+    int32_t pts = pages + (e->oom_adj * (int32_t)total) / 1000;
+    if (p->sched_class == SCHED_BACKGROUND || p->sched_class == SCHED_IDLE) pts += pages >> 2;
+    else if (p->sched_class == SCHED_INTERACTIVE) pts -= pages >> 2;
+    return pts < 1 ? 1U : (uint32_t)pts;
+}
+
+static uint32_t oom_points_to_permille(uint32_t pts) {
+    uint32_t total = oom_total_pages();
+    if (total > (1U << 20)) total = 1U << 20;
+    if (pts > total) pts = total;
+    return (pts * 1000U) / total;
+}
+
+static int oom_kill_one(uint32_t want_pages, const char *reason, int *self_killed) {
+    (void)want_pages;
+    if (self_killed) *self_killed = 0;
+    if (!tlock_trylock(&oom_lock)) return -1;
+
+    uint64_t now = global_ticks;
+    if (oom_victim_pid) {
+        struct proces *pv = proces_find(oom_victim_pid);
+        if (pv && now < oom_victim_deadline) {
+            tlock_unlock(&oom_lock);
+            return -1;
+        }
+        if (pv) ext_of(pv)->oom_skip = 1;
+        oom_victim_pid = 0;
+    }
+
+    uint32_t total = oom_total_pages();
+    uint32_t best_pts = 0, best_pid = 0, best_rss = 0;
+    char name[32];
+    name[0] = 0;
+
+    uint32_t f = tlock_irqsave(&table_lock);
+    for (uint32_t i = 0; i < MAX_PROCESSES; i++) {
+        struct proces *p = &process_table[i];
+        uint32_t pts = oom_badness(p, total);
+        if (pts && (pts > best_pts || (pts == best_pts && p->pid > best_pid))) {
+            best_pts = pts;
+            best_pid = p->pid;
+            best_rss = proc_ext[i].rss_pages;
+            for (uint32_t k = 0; k < 32; k++) name[k] = p->name[k];
+        }
+    }
+    tlock_irqrestore(&table_lock, f);
+
+    if (!best_pid) {
+        tlock_unlock(&oom_lock);
+        return 0;
+    }
+
+    struct proces *v = proces_find(best_pid);
+    if (!v) {
+        tlock_unlock(&oom_lock);
+        return 1;
+    }
+
+    uint32_t me = cpu_id();
+    struct proces_ext *ve = ext_of(v);
+    if (oom_task_running(v)) {
+        __atomic_store_n(&ve->oom_doomed, 1U, __ATOMIC_RELEASE);
+        for (uint32_t c = 0; c < ncpus(); c++) {
+            if (current_cpu[c] != v) continue;
+            if (c == me) { if (self_killed) *self_killed = 1; }
+            else if (smp_send_resched_ipi) smp_send_resched_ipi(c);
+        }
+    } else {
+        proces_zakoncz(best_pid);
+    }
+
+    oom_victim_pid = best_pid;
+    oom_victim_deadline = now + OOM_VICTIM_TIMEOUT_TICKS;
+    oom_cooldown_until = now + OOM_COOLDOWN_TICKS;
+    oom_stat.kills++;
+    oom_stat.last_pid = best_pid;
+    oom_stat.last_score = oom_points_to_permille(best_pts);
+    oom_stat.last_tick = now;
+    uint32_t score = oom_stat.last_score;
+    oom_log_fn lg = oom_logger;
+    tlock_unlock(&oom_lock);
+
+    if (lg) lg(name, best_pid, score, best_rss, reason);
+    return 1;
+}
+
+static uint32_t oom_run_shrinkers(uint32_t want) {
+    uint32_t n = __atomic_load_n(&oom_shrinker_count, __ATOMIC_ACQUIRE);
+    if (n > OOM_MAX_SHRINKERS) n = OOM_MAX_SHRINKERS;
+    uint32_t freed = 0;
+    for (uint32_t i = 0; i < n && freed < want; i++) {
+        oom_shrinker_fn fn = __atomic_load_n(&oom_shrinkers[i].fn, __ATOMIC_ACQUIRE);
+        if (fn) freed += fn(want - freed, oom_shrinkers[i].ctx);
+    }
+    return freed;
+}
+
+static void oom_tick(uint64_t now) {
+    if (oom_victim_pid) {
+        struct proces *pv = proces_find(oom_victim_pid);
+        if (!pv) {
+            oom_victim_pid = 0;
+        } else if (__atomic_load_n(&ext_of(pv)->oom_doomed, __ATOMIC_ACQUIRE) && !oom_task_running(pv)) {
+            ext_of(pv)->oom_doomed = 0;
+            proces_zakoncz(oom_victim_pid);
+        }
+    }
+
+    if (!paging_free_frame_count) return;
+
+    uint32_t total = oom_total_pages();
+    uint32_t freep = paging_free_frame_count();
+    uint32_t low = (total * oom_low_pm) / 1000U;
+    uint32_t min = (total * oom_min_pm) / 1000U;
+    if (!min) min = 1U;
+    if (low < min) low = min;
+
+    if (freep >= low) {
+        oom_pressure = 0;
+        return;
+    }
+    oom_pressure++;
+
+    uint32_t want = low - freep;
+    if (oom_run_shrinkers(want)) {
+        freep = paging_free_frame_count();
+        if (freep >= low) {
+            oom_pressure = 0;
+            __atomic_fetch_add(&oom_stat.shrinker_saves, 1U, __ATOMIC_RELAXED);
+            return;
+        }
+    }
+
+    if (oom_victim_pid || now < oom_cooldown_until) return;
+    int critical = freep < min;
+    if (critical || oom_pressure >= OOM_PRESSURE_SAMPLES) {
+        if (oom_kill_one(want, critical ? "critical-watermark" : "low-watermark", 0) > 0) {
+            __atomic_fetch_add(&oom_stat.proactive_kills, 1U, __ATOMIC_RELAXED);
+            oom_pressure = 0;
+        }
+    }
+}
+
+static void oom_reap_current(uint32_t cpu) {
+    struct proces *c = current_cpu[cpu];
+    if (!c || c == idle_task[cpu]) return;
+    struct proces_ext *e = ext_of(c);
+    if (!__atomic_load_n(&e->oom_doomed, __ATOMIC_ACQUIRE)) return;
+    uint32_t pid = c->pid;
+    e->oom_doomed = 0;
+    if (pid) proces_zakoncz(pid);
+}
+
+void *oom_alloc_frame(void) {
+    void *f = paging_alloc_frame();
+    if (f) return f;
+    __atomic_fetch_add(&oom_stat.alloc_failures, 1U, __ATOMIC_RELAXED);
+
+    uint32_t cpu = cpu_id();
+    struct proces *me = current_cpu[cpu];
+    if (me && __atomic_load_n(&ext_of(me)->oom_doomed, __ATOMIC_ACQUIRE)) return 0;
+
+    for (uint32_t attempt = 0; attempt < OOM_ALLOC_RETRIES; attempt++) {
+        sched_finish_switch(cpu);
+
+        if (oom_run_shrinkers(1U)) {
+            f = paging_alloc_frame();
+            if (f) {
+                __atomic_fetch_add(&oom_stat.shrinker_saves, 1U, __ATOMIC_RELAXED);
+                return f;
+            }
+        }
+
+        int self = 0;
+        int r = oom_kill_one(1U, "alloc-failure", &self);
+        if (self) return 0;
+        if (r == 0) break;
+
+        for (uint32_t s = 0; s < OOM_WAIT_SPINS; s++) {
+            if ((s & 63U) == 0U) {
+                f = paging_alloc_frame();
+                if (f) return f;
+            }
+            __builtin_ia32_pause();
+        }
+    }
+    return paging_alloc_frame();
+}
+
+int oom_kill_for_memory(uint32_t want_pages, const char *reason) {
+    return oom_kill_one(want_pages, reason ? reason : "manual", 0);
+}
+
+void oom_account(struct proces *p, int32_t delta_pages) {
+    if (!p) return;
+    struct proces_ext *e = ext_of(p);
+    if (delta_pages >= 0) {
+        __atomic_fetch_add(&e->rss_pages, (uint32_t)delta_pages, __ATOMIC_RELAXED);
+        return;
+    }
+    uint32_t d = (uint32_t)(-delta_pages);
+    uint32_t old = __atomic_load_n(&e->rss_pages, __ATOMIC_RELAXED);
+    uint32_t nw;
+    do {
+        nw = old >= d ? old - d : 0U;
+    } while (!__atomic_compare_exchange_n(&e->rss_pages, &old, nw, 0, __ATOMIC_RELAXED, __ATOMIC_RELAXED));
+}
+
+void oom_account_current(int32_t delta_pages) {
+    oom_account(current_cpu[cpu_id()], delta_pages);
+}
+
+int oom_register_shrinker(oom_shrinker_fn fn, void *ctx) {
+    if (!fn) return -1;
+    uint32_t idx = __atomic_fetch_add(&oom_shrinker_count, 1U, __ATOMIC_SEQ_CST);
+    if (idx >= OOM_MAX_SHRINKERS) {
+        __atomic_fetch_sub(&oom_shrinker_count, 1U, __ATOMIC_SEQ_CST);
+        return -1;
+    }
+    oom_shrinkers[idx].ctx = ctx;
+    __atomic_store_n(&oom_shrinkers[idx].fn, fn, __ATOMIC_RELEASE);
+    return 0;
+}
+
+void oom_set_logger(oom_log_fn fn) {
+    oom_logger = fn;
+}
+
+void oom_set_watermarks(uint32_t low_permille, uint32_t min_permille) {
+    if (low_permille > 1000U) low_permille = 1000U;
+    if (min_permille > low_permille) min_permille = low_permille;
+    oom_low_pm = low_permille;
+    oom_min_pm = min_permille;
+}
+
+void oom_get_stats(struct oom_stats *out) {
+    if (!out) return;
+    uint32_t f = tlock_irqsave(&oom_lock);
+    *out = oom_stat;
+    tlock_irqrestore(&oom_lock, f);
+}
+
+int proces_set_oom_adj(uint32_t pid, int32_t adj) {
+    struct proces *p = proces_find(pid);
+    if (!p) return -1;
+    if (adj < OOM_ADJ_MIN) adj = OOM_ADJ_MIN;
+    if (adj > OOM_ADJ_MAX) adj = OOM_ADJ_MAX;
+    ext_of(p)->oom_adj = adj;
+    return 0;
+}
+
+int32_t proces_get_oom_adj(uint32_t pid) {
+    struct proces *p = proces_find(pid);
+    if (!p) return OOM_ADJ_MIN - 1;
+    return ext_of(p)->oom_adj;
+}
+
+uint32_t proces_get_oom_score(uint32_t pid) {
+    struct proces *p = proces_find(pid);
+    if (!p) return 0;
+    uint32_t pts = oom_badness(p, oom_total_pages());
+    return pts ? oom_points_to_permille(pts) : 0U;
 }
