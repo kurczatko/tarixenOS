@@ -10,15 +10,15 @@
 #include <graphics/rysowanie.h>
 #include <graphics/okno.h>
 #include <drivers/input/mouse.h>
-#include <kernel/shutdown.h>
-#include <kernel/notatnik.h>
+#include <kernel/sys/shutdown.h>
+#include <kernel/apps/notatnik.h>
 #include <graphics/eksplorator_plikow.h>
-#include <kernel/browser.h>
-#include <kernel/kalkulator.h>
+#include <kernel/apps/browser.h>
+#include <kernel/apps/kalkulator.h>
 #include <kernel/apps/gra.h>
 #include <kernel/apps/duszki.h>
-#include <kernel/malowanie.h>
-#include <kernel/zadania.h>
+#include <kernel/apps/malowanie.h>
+#include <kernel/core/zadania.h>
 #include <graphics/terminal.h>
 
 #define START_X 0

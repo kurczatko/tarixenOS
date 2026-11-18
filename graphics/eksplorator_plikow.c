@@ -11,13 +11,13 @@
 #include <graphics/czcionka.h>
 #include <fs/system_plikow.h>
 #include <kernel/apps/installer.h>
-#include <kernel/notatnik.h>
+#include <kernel/apps/notatnik.h>
 #include <drivers/input/keyboard.h>
 #include <tools/cc_os.h>
 #include <drivers/storage/floppy.h>
 #include <drivers/storage/plyty.h>
-#include <kernel/proces.h>
-#include <kernel/loader.h>
+#include <kernel/core/proces.h>
+#include <kernel/loader/loader.h>
 
 struct okno pliki;
 static int wybrany_element = -1;

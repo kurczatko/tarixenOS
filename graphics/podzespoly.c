@@ -9,7 +9,7 @@
 #include <graphics/czcionka.h>
 #include <graphics/okno.h>
 #include <graphics/rysowanie.h>
-#include <kernel/driver_manager.h>
+#include <kernel/drivers/driver_manager.h>
 #include <include/printf/types.h>
 
 #define PODZESPOLY_SZEROKOSC 560

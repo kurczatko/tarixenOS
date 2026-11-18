@@ -11,7 +11,7 @@ extern "C" {
  *Obsluguje wykrycie urzadzenia na PCI, mapowanie MMIO, odczyt adresu MAC,
  *wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX.
  *Integracja ze stosem sieciowym (drivers/net.c) przez funkcje send/receive,
- *wiec przegladarka (kernel/browser.c) korzysta z tej karty automatycznie
+ *wiec przegladarka (kernel/apps/browser.c) korzysta z tej karty automatycznie
  *gdy jest dostepna i zainicjowana.*/
 
 int rtl8188ce_init(void);

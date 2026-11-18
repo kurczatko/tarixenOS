@@ -12,7 +12,7 @@
 #include <graphics/okno.h>
 #include <graphics/czcionka.h>
 #include <include/printf/types.h>
-#include <kernel/proces.h>
+#include <kernel/core/proces.h>
 
 extern uint32_t *obraz;
 

@@ -10,16 +10,16 @@
 #include <graphics/okno.h>
 #include <graphics/rysowanie.h>
 #include <fs/system_plikow.h>
-#include <kernel/notatnik.h>
+#include <kernel/apps/notatnik.h>
 #include <graphics/eksplorator_plikow.h>
-#include <kernel/kalkulator.h>
-#include <kernel/browser.h>
+#include <kernel/apps/kalkulator.h>
+#include <kernel/apps/browser.h>
 #include <kernel/apps/gra.h>
-#include <kernel/malowanie.h>
-#include <kernel/zadania.h>
+#include <kernel/apps/malowanie.h>
+#include <kernel/core/zadania.h>
 #include <kernel/apps/duszki.h>
-#include <kernel/proces.h>
-#include <kernel/loader.h>
+#include <kernel/core/proces.h>
+#include <kernel/loader/loader.h>
 #include <tools/cc_os.h>
 
 #define TERMINAL_SZEROKOSC 700

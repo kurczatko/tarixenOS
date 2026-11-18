@@ -6,7 +6,7 @@
 */
 
 #include <user/okno_user.h>
-#include <kernel/syscall.h>
+#include <kernel/sys/syscall.h>
 
 #define KALKULATOR_SZEROKOSC 320
 #define KALKULATOR_WYSOKOSC 420

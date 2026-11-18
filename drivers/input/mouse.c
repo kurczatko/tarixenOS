@@ -12,7 +12,7 @@
 #include <graphics/okno.h>
 #include <graphics/menu_start.h>
 #include <graphics/pulpit.h>
-#include <kernel/browser.h>
+#include <kernel/apps/browser.h>
 #include <drivers/bluetooth/bluetooth.h>
 
 #define MOUSE_DATA_PORT 0x60

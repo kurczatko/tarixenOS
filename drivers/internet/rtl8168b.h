@@ -9,7 +9,7 @@ extern "C" {
 
 /* Realtek RTL8168B / RTL8111B family PCIe Gigabit Ethernet driver.
  * Provides the same send/receive interface used by the network stack
- * (drivers/net.c) so the browser (kernel/browser.c) can use it via
+ * (drivers/net.c) so the browser (kernel/apps/browser.c) can use it via
  * net_ready() / net_http_get(). */
 
 int rtl8168b_init(void);

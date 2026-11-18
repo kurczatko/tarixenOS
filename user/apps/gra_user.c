@@ -6,7 +6,7 @@
 */
 
 #include <user/okno_user.h>
-#include <kernel/syscall.h>
+#include <kernel/sys/syscall.h>
 
 #define GRA_MAP_W 16
 #define GRA_MAP_H 16

@@ -6,7 +6,7 @@ wszystkie nazwy sa po polsku, poza nazewnictwem technicznym i plikami.
 
 ## uruchomienie systemu
 
-system uruchamia sie z boot.asm. boot.asm laduje jadro z dysku, przechodzi w tryb chroniony i skacze do `kernel_main` w `kernel/kernel.c`.
+system uruchamia sie z boot.asm. boot.asm laduje jadro z dysku, przechodzi w tryb chroniony i skacze do `kernel_main` w `kernel/core/kernel.c`.
 
 kompilacja:
 
@@ -18,7 +18,7 @@ qemu-system-x86_64 -m 2G -boot c -drive file=tarixenOS.img,format=raw -machine p
 
 musisz miec qemu.
 
-## jadro - kernel/kernel.c
+## jadro - kernel/core/kernel.c
 
 `kernel_main` to punkt wejscia jadra. robi nastepujące rzeczy:
 
@@ -47,9 +47,9 @@ uruchamia pierwszy proces uzytkownika. ustawia TSS (esp0, cr3), pobiera rejestry
 void proces_uruchom_pierwszy(struct proces *p)
 ```
 
-## zaawansowany harmonogram procesow - kernel/proces.cpp
+## zaawansowany harmonogram procesow - kernel/core/proces.cpp
 
-sterownik harmonogramu procesow (scheduler) napisany w C++ zastępuje uproszczony round-robin z kernel/proces.c. implementuje wielopoziomowa kolejke z opinia zwrotna (MLFQ), sprawiedliwe dzielenie CPU w stylu CFS (Completely Fair Scheduler), stale priorytety dla procesow czasu rzeczywistego, kolejki oczekiwania, dziedziczenie priorytetu, obudzenie po czasie, statystyki per-proces oraz dynamiczne dostosowanie kwantumu czasu. harmonogram dziala w trybie wywlaszczajacym (preempcyjnym) wywolywany z obslugi przerwania timera (timer_handler -> proces_tick). kontekst sprzetowy (rejestry, CR3, TSS esp0) jest przelaczany przez `kernel/timer_entry.S` na podstawie wskaznika `current_process` wybranego przez `proces_tick`.
+sterownik harmonogramu procesow (scheduler) napisany w C++ zastępuje uproszczony round-robin z kernel/proces.c. implementuje wielopoziomowa kolejke z opinia zwrotna (MLFQ), sprawiedliwe dzielenie CPU w stylu CFS (Completely Fair Scheduler), stale priorytety dla procesow czasu rzeczywistego, kolejki oczekiwania, dziedziczenie priorytetu, obudzenie po czasie, statystyki per-proces oraz dynamiczne dostosowanie kwantumu czasu. harmonogram dziala w trybie wywlaszczajacym (preempcyjnym) wywolywany z obslugi przerwania timera (timer_handler -> proces_tick). kontekst sprzetowy (rejestry, CR3, TSS esp0) jest przelaczany przez `kernel/arch/timer_entry.S` na podstawie wskaznika `current_process` wybranego przez `proces_tick`.
 
 klasy planowania:
 - SCHED_CRITICAL - najwyzszy priorytet, procesy krytyczne systemu, kwantum 2 tiki, FIFO w ramach priorytetu.
@@ -212,7 +212,7 @@ void proces_rejestruj_okno(const char *nazwa, struct okno *okno)
 | run_next / run_prev | struct proces * | lacza kolejki gotowosci |
 | wait_next / wait_prev | struct proces * | lacza kolejke oczekiwania |
 
-## stronicowanie - kernel/paging.c
+## stronicowanie - kernel/memory/paging.c
 
 ### paging_init
 
@@ -232,7 +232,7 @@ void map_page(uint32_t *table, uint32_t vaddr, uint32_t paddr, uint32_t flags)
 
 flagi: PAGE_PRESENT (0x1), PAGE_READWRITE (0x2), PAGE_USER (0x4).
 
-## przerwania i syscall - kernel/syscall.c
+## przerwania i syscall - kernel/sys/syscall.c
 
 ### syscall_handler
 
@@ -296,7 +296,7 @@ zapisuje aktualne rejestry do struktury biezace_rejestry.
 void syscall_zapisz_rejestry(uint32_t eax, uint32_t ebx, uint32_t ecx, uint32_t edx, uint32_t esi, uint32_t edi)
 ```
 
-## timer - kernel/timer.c
+## timer - kernel/sys/timer.c
 
 ### timer_init
 
@@ -314,7 +314,7 @@ obsluguje przerwanie timera, wywoluje proces_tick.
 void timer_handler(void)
 ```
 
-## IDT - kernel/idt.c
+## IDT - kernel/memory/idt.c
 
 ### idt_install
 
@@ -332,7 +332,7 @@ ustawia brame przerwania o danym numerze, adresie, selektorze i flagach.
 void idt_set_gate(uint8_t num, uint32_t base, uint16_t sel, uint8_t flags)
 ```
 
-## GDT - kernel/gdt.c
+## GDT - kernel/memory/gdt.c
 
 ### gdt_install
 
@@ -366,7 +366,7 @@ zwraca wierzcholek stosu jadra.
 uint32_t gdt_kernel_stack_top(void)
 ```
 
-## panika - kernel/panika.c
+## panika - kernel/security/panika.c
 
 ### panika
 
@@ -376,11 +376,11 @@ wyswietla ekran paniki z podanym powodem i zatrzymuje system.
 void panika(const char *powod)
 ```
 
-## wyjatki - kernel/wyjatki.c
+## wyjatki - kernel/memory/wyjatki.c
 
 obsluguje wyjatki procesora (dzielenie przez zero, page fault itp.).
 
-## zegar - kernel/zegar.c
+## zegar - kernel/sys/zegar.c
 
 ### zegar_init
 
@@ -406,7 +406,7 @@ synchronizuje czas przez HTTP z podanej odpowiedzi.
 int zegar_synchronizuj_http(const char *response, uint32_t length)
 ```
 
-## konfiguracja - kernel/konfiguracja.c
+## konfiguracja - kernel/config/konfiguracja.c
 
 ### konfiguracja
 
@@ -416,7 +416,7 @@ wyswietla ekran powitalny systemu. inicjalizuje klawiature i VGA, wyswietla teks
 void konfiguracja()
 ```
 
-## loader - kernel/loader.c
+## loader - kernel/loader/loader.c
 
 ### userspace_load_elf
 
@@ -442,11 +442,11 @@ laduje ELF jako proces uzytkownika.
 int proces_zaladuj_elf(const char *path)
 ```
 
-## terminal - kernel/terminal.c
+## terminal - kernel/apps/terminal.c
 
 obsluguje terminal systemowy.
 
-## notatnik - kernel/notatnik.c
+## notatnik - kernel/apps/notatnik.c
 
 ### notatnik_otworz
 
@@ -472,7 +472,7 @@ obsluguje klawiatura w notatniku.
 void notatnik_obsluz_klawiature(void)
 ```
 
-## kalkulator - kernel/kalkulator.c
+## kalkulator - kernel/apps/kalkulator.c
 
 ### kalkulator_otworz
 
@@ -490,7 +490,7 @@ obsluguje klawiatura w kalkulatorze.
 void kalkulator_obsluz_klawiature(void)
 ```
 
-## przegladarka - kernel/browser.c
+## przegladarka - kernel/apps/browser.c
 
 ### browser_open
 
@@ -1945,7 +1945,7 @@ void net_tcp_close(struct net_tcp_connection *connection)
 
 ## sterownik RTL8168B - drivers/internet/rtl8168b.cpp
 
-sterownik karty sieciowej Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet) napisany w C++. obsluguje wysylanie i odbieranie ramek ethernet, integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna.
+sterownik karty sieciowej Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet) napisany w C++. obsluguje wysylanie i odbieranie ramek ethernet, integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/apps/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna.
 
 ### rtl8168b_init
 
@@ -2017,7 +2017,7 @@ struktura `rtl8168b_stats` zawiera:
 
 ## sterownik Realtek RTL8111F - drivers/internet/rtl8111f.cpp
 
-sterownik karty sieciowej Realtek RTL8111F (PCIe Gigabit Ethernet) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x10EC, urzadzenia 0x8168/0x8167/0x8169/0x8171/0x8172), mapowanie MMIO, soft-reset chipa, odczyt adresu MAC, dostep do rejestrow PHY, auto-negocjacje, monitorowanie lacza (link status), predkosc i tryb duplex, bufor odbiorczy z deskryptorami nadawczymi (8 deskryptorow TX), wysylanie i odbieranie ramek ethernet w trybie polling, statystyki TX/RX z licznikami bledow (underrun, aborted, carrier), test petli (loopback), konfiguracja multicast, wylaczenie sterownika oraz resetowanie statystyk. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed RTL8111E/RTL8168B, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
+sterownik karty sieciowej Realtek RTL8111F (PCIe Gigabit Ethernet) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x10EC, urzadzenia 0x8168/0x8167/0x8169/0x8171/0x8172), mapowanie MMIO, soft-reset chipa, odczyt adresu MAC, dostep do rejestrow PHY, auto-negocjacje, monitorowanie lacza (link status), predkosc i tryb duplex, bufor odbiorczy z deskryptorami nadawczymi (8 deskryptorow TX), wysylanie i odbieranie ramek ethernet w trybie polling, statystyki TX/RX z licznikami bledow (underrun, aborted, carrier), test petli (loopback), konfiguracja multicast, wylaczenie sterownika oraz resetowanie statystyk. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed RTL8111E/RTL8168B, co oznacza ze przegladarka (`kernel/apps/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
 
 ### rtl8111f_init
 
@@ -2165,7 +2165,7 @@ void rtl8111f_shutdown(void)
 
 ## sterownik RTL8188CE - drivers/internet/rtl8188ce.cpp
 
-sterownik karty sieciowej Realtek RTL8188CE (PCIe 802.11n WiFi) napisany w C++. obsluguje wykrycie urzadzenia na PCI, mapowanie MMIO, odczyt adresu MAC, inicjalizacje modulu WiFi (kontroler, kanal, interwal beaconow), wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna i zainicjowana.
+sterownik karty sieciowej Realtek RTL8188CE (PCIe 802.11n WiFi) napisany w C++. obsluguje wykrycie urzadzenia na PCI, mapowanie MMIO, odczyt adresu MAC, inicjalizacje modulu WiFi (kontroler, kanal, interwal beaconow), wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/apps/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna i zainicjowana.
 
 ### rtl8188ce_init
 
@@ -2237,7 +2237,7 @@ struktura `rtl8188ce_stats` zawiera:
 
 ## sterownik MediaTek MT7921 - drivers/internet/mt7921.cpp
 
-zaawansowany sterownik karty sieciowej MediaTek MT7921 (PCIe WiFi 6, 802.11ax, 2x2 MU-MIMO, pasma 2.4 GHz i 5 GHz) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x14C3, urzadznia 0x0616/0x7916), mapowanie MMIO, soft-reset chipa, odczyt adresu MAC, wlaczenie radia WiFi, wybór pasma i kanalu, skanowanie SSID, autoryzację/asocjację, odczyt mocy sygnaly (RSSI), wysylanie i odbieranie ramek ethernet za pomocą wielu deskryptorów TX/RX (8 TX, 16 RX), tryb polling (bez przerwan), monitorowanie lacza, statystyki TX/RX z licznikami bledow, test petli (loopback), \filtr multicast, reset statystyk oraz wylaczenie sterownika. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive`, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
+zaawansowany sterownik karty sieciowej MediaTek MT7921 (PCIe WiFi 6, 802.11ax, 2x2 MU-MIMO, pasma 2.4 GHz i 5 GHz) napisany w C++. obsluguje wykrycie urzadzenia na PCI (vendor 0x14C3, urzadznia 0x0616/0x7916), mapowanie MMIO, soft-reset chipa, odczyt adresu MAC, wlaczenie radia WiFi, wybór pasma i kanalu, skanowanie SSID, autoryzację/asocjację, odczyt mocy sygnaly (RSSI), wysylanie i odbieranie ramek ethernet za pomocą wielu deskryptorów TX/RX (8 TX, 16 RX), tryb polling (bez przerwan), monitorowanie lacza, statystyki TX/RX z licznikami bledow, test petli (loopback), \filtr multicast, reset statystyk oraz wylaczenie sterownika. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive`, co oznacza ze przegladarka (`kernel/apps/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
 
 ### mt7921_init
 
@@ -2426,7 +2426,7 @@ void mt7921_poll(void)
 
 ## sterownik intel 82578dc wifi - rust/drivers/wifi/intel_82578dc.rs
 
-sterownik karty sieciowej Intel 82578DC (PCIe Gigabit Ethernet / WiFi) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenie 0x1502), mapowanie MMIO, soft-reset chipa, konfiguracje adresu MAC, deskryptory nadawcze i odbiorcze (TX/RX), przerwania, odbiornik i nadajnik, monitorowanie lacza, wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. napisany w Rust z `#[no_std]` i `#[no_main]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/wifi/*.rs)`) i linkowany do jadra. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed Realtek/E1000, co oznacza ze przegladarka (`kernel/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
+sterownik karty sieciowej Intel 82578DC (PCIe Gigabit Ethernet / WiFi) napisany w Rust. obsluguje wykrycie urzadzenia na PCI (vendor 0x8086, urzadzenie 0x1502), mapowanie MMIO, soft-reset chipa, konfiguracje adresu MAC, deskryptory nadawcze i odbiorcze (TX/RX), przerwania, odbiornik i nadajnik, monitorowanie lacza, wysylanie i odbieranie ramek ethernet oraz statystyki TX/RX. napisany w Rust z `#[no_std]` i `#[no_main]`, kompilowany przez makefile (wildcard `$(wildcard rust/drivers/wifi/*.rs)`) i linkowany do jadra. integracja ze stosem sieciowym (`drivers/net.c`) jako pierwszy priorytet przed Realtek/E1000, co oznacza ze przegladarka (`kernel/apps/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana.
 
 ### intel_82578dc_driver_init
 
@@ -4408,7 +4408,7 @@ void radeon_6790_context_get(struct radeon_6790_context *out);
 int radeon_6790_3d_available(void)
 ```
 
-## menedzer sterownikow - kernel/driver_manager.cpp
+## menedzer sterownikow - kernel/drivers/driver_manager.cpp
 
 menedzer sterownikow odpowiedzialny za rejestracje, wykrywanie sprzetu, tworzenie procesow sterownikow oraz ich cykl zycia. kazdy sterownik jest rejestrowany za pomoca `driver_manager_register()` i tworzony jako osobny proces ring-0 przy wykryciu wspieranego sprzetu. sterowniki sa harmonogramowane przez `proces_tick()` razem z procesami uzytkownika i mozna je zakonczyc przez menedzer zadan (`zadania.c`).
 
@@ -6234,7 +6234,7 @@ void poll(void);
 
 ## sterownik plyty glownej ASUS P4P800 - drivers/plyty_glowne/asus_p4p800.cpp
 
-Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/kernel.c przez `p4p_init()`.
+Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). Obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset, ACPI, SMBus, AGP, audio AC'97, ethernet Intel 82562ET, IDE z DMA, USB UHCI/EHCI, stację dyskowetek, RTC/CMOS oraz monitorowanie sprzętowe (HWMON). Sterownik jest napisany w C++, eksportuje interfejs C przez naglwek asus_p4p800.h i jest inicjalizowany z kernel/core/kernel.c przez `p4p_init()`.
 
 ### Inicjalizacja i stan
 
@@ -6396,17 +6396,17 @@ Zaawansowany sterownik plyty glownej ASUS P4P800 (chipset Intel i848P + ICH4). O
 
 ### Integracja z jądrem
 
-Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `intel_uhd_init()`:
+Sterownik jest inicjalizowany w `kernel/core/kernel.c` w funkcji `kernel_main`, zaraz po `intel_uhd_init()`:
 
 ```
 p4p_init();
 ```
 
-Nagłówek `drivers/plyty_glowne/asus_p4p800.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra.
+Nagłówek `drivers/plyty_glowne/asus_p4p800.h` jest dołączany w `kernel/core/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra.
 
 ## sterownik plyty glownej Intel 915 - drivers/plyty_glowne/intel_915.cpp
 
-Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915GV/915GL + ICH6). Sterownik jest napisany w C++ i obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset MCH/ICH6, pamieci RAM (PAM, DRB, DRA, TOLUD, GME, stolen memory), ACPI, SMBus, AGP, graficzne Intel GMA 900 z framebufferem, blitterem, kursorem sprzetowym i overlayem, AC'97 audio, IDE z PIO i DMA, SATA, USB UHCI x3 + EHCI, TCO watchdog, GPIO, PIRQ routing, SMI, RTC/CMOS, FWH/BIOS lock, monitorowanie sprzetowe (HWMON) oraz obsluge przerwan IRQ. Eksportuje interfejs C przez naglwek intel_915.h i jest inicjalizowany z kernel/kernel.c przez `i915_init()`.
+Zaawansowany sterownik plyty glownej Intel 915 (chipset MCH 82915G/915P/915X/915GV/915GL + ICH6). Sterownik jest napisany w C++ i obsluguje wszystkie wbudowane kontrolery plyty: PCI, chipset MCH/ICH6, pamieci RAM (PAM, DRB, DRA, TOLUD, GME, stolen memory), ACPI, SMBus, AGP, graficzne Intel GMA 900 z framebufferem, blitterem, kursorem sprzetowym i overlayem, AC'97 audio, IDE z PIO i DMA, SATA, USB UHCI x3 + EHCI, TCO watchdog, GPIO, PIRQ routing, SMI, RTC/CMOS, FWH/BIOS lock, monitorowanie sprzetowe (HWMON) oraz obsluge przerwan IRQ. Eksportuje interfejs C przez naglwek intel_915.h i jest inicjalizowany z kernel/core/kernel.c przez `i915_init()`.
 
 ### Inicjalizacja i stan
 
@@ -6702,17 +6702,17 @@ Struktura `i915_stats` zawiera:
 
 ### Integracja z jądrem
 
-Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `p4p_init()`:
+Sterownik jest inicjalizowany w `kernel/core/kernel.c` w funkcji `kernel_main`, zaraz po `p4p_init()`:
 
 ```
 i915_init();
 ```
 
-Nagłówek `drivers/plyty_glowne/intel_915.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/plyty_glowne/intel_915.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/plyty_glowne/*.cpp)`).
+Nagłówek `drivers/plyty_glowne/intel_915.h` jest dołączany w `kernel/core/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/plyty_glowne/intel_915.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/plyty_glowne/*.cpp)`).
 
 ## karta graficzna - drivers/karty_graficzne/radeon_rx_9070_xt.cpp
 
-Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16GB GDDR6 (architektura RDNA 4 / Navi 48) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP GFX, CP COMPUTE, CP DMA), ray tracing (RT), mesh shaders, variable rate shading (VRS), delta color compression (DCC), przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami i kompresja (ASTC, DXT), shadery (vertex, pixel, geometry, compute, ray gen, any hit, closest hit, miss, callable, intersection, mesh, amplification), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, HDR, triple buffer). Sterownik zarządza 16 GB pamięci GDDR6 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_rx_9070_xt.h i jest inicjalizowany z kernel/kernel.c przez `rx_9070_xt_init()`.
+Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16GB GDDR6 (architektura RDNA 4 / Navi 48) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP GFX, CP COMPUTE, CP DMA), ray tracing (RT), mesh shaders, variable rate shading (VRS), delta color compression (DCC), przezroczystosc (alpha blending, alpha to coverage), tekstury z mipmapami i kompresja (ASTC, DXT), shadery (vertex, pixel, geometry, compute, ray gen, any hit, closest hit, miss, callable, intersection, mesh, amplification), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, HDR, triple buffer). Sterownik zarządza 16 GB pamięci GDDR6 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_rx_9070_xt.h i jest inicjalizowany z kernel/core/kernel.c przez `rx_9070_xt_init()`.
 
 ### Inicjalizacja i stan
 
@@ -6928,17 +6928,17 @@ Zaawansowany sterownik karty graficznej Gigabyte Radeon RX 9070 XT GAMING OC 16G
 
 ### Integracja z jądrem
 
-Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `radeon_hd_8370d_init()`:
+Sterownik jest inicjalizowany w `kernel/core/kernel.c` w funkcji `kernel_main`, zaraz po `radeon_hd_8370d_init()`:
 
 ```
 rx_9070_xt_init();
 ```
 
-Nagłówek `drivers/karty_graficzne/radeon_rx_9070_xt.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_rx_9070_xt.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+Nagłówek `drivers/karty_graficzne/radeon_rx_9070_xt.h` jest dołączany w `kernel/core/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_rx_9070_xt.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
 ## karta graficzna - drivers/karty_graficzne/radeon_hd_6870.cpp
 
-Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Northern Islands / Cayman, VLIW4) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT), shadery (vertex, pixel, geometry, compute), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync). Sterownik zarządza pamiecia GDDR5 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_hd_6870.h i jest inicjalizowany z kernel/kernel.c przez `radeon_6870_init()`.
+Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Northern Islands / Cayman, VLIW4) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT), shadery (vertex, pixel, geometry, compute), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync). Sterownik zarządza pamiecia GDDR5 (VRAM allocator), taktowaniem GPU i pamięci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_hd_6870.h i jest inicjalizowany z kernel/core/kernel.c przez `radeon_6870_init()`.
 
 ### Inicjalizacja i stan
 
@@ -7122,13 +7122,13 @@ Zaawansowany sterownik karty graficznej AMD Radeon HD 6870 (architektura Norther
 
 ### Integracja z jądrem
 
-Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`, zaraz po `rx_9070_xt_init()`:
+Sterownik jest inicjalizowany w `kernel/core/kernel.c` w funkcji `kernel_main`, zaraz po `rx_9070_xt_init()`:
 
 ```
 radeon_6870_init();
 ```
 
-Nagłówek `drivers/karty_graficzne/radeon_hd_6870.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_hd_6870.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+Nagłówek `drivers/karty_graficzne/radeon_hd_6870.h` jest dołączany w `kernel/core/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_hd_6870.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
 ## konwencja pisania kodu
 
@@ -7176,11 +7176,11 @@ PHY jest dostępny przez rejestr `REG_PHYAR` (bit 31 = zajęty, bit 30 = zapis, 
 
 integracja z przegladarka:
 
-`drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
+`drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/apps/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
 
 ## karta graficzna - drivers/karty_graficzne/radeon_8500.cpp
 
-Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarządza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_8500.h i jest inicjalizowany z kernel/kernel.c przez `radeon_8500_init()`.
+Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarządza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_8500.h i jest inicjalizowany z kernel/core/kernel.c przez `radeon_8500_init()`.
 
 ### Inicjalizacja i stan
 
@@ -7369,13 +7369,13 @@ Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, Dire
 
 ### Integracja z jądrem
 
-Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
+Sterownik jest inicjalizowany w `kernel/core/kernel.c` w funkcji `kernel_main`:
 
 ```
 radeon_8500_init();
 ```
 
-Nagłówek `drivers/karty_graficzne/radeon_8500.h` jest dołączany w `kernel/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_8500.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
+Nagłówek `drivers/karty_graficzne/radeon_8500.h` jest dołączany w `kernel/core/kernel.c`. Wszystkie funkcje eksportowane sa jako C (`extern "C"`), wiec moga byc wywoływane z kodu C jadra. Plik zrodlowy `drivers/karty_graficzne/radeon_8500.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/karty_graficzne/*.cpp)`).
 
 ## sterownik 3dfx Voodoo2 - rust/drivers/karty_graficzne/3dfx/voodoo2.rs
 
@@ -7508,7 +7508,7 @@ uint32_t voodoo2_get_status(void);
 
 ### Integracja z jądrem
 
-Sterownik jest inicjalizowany w `kernel/kernel.c` w funkcji `kernel_main`:
+Sterownik jest inicjalizowany w `kernel/core/kernel.c` w funkcji `kernel_main`:
 
 ```
 voodoo2_init();
@@ -7601,7 +7601,7 @@ void plyty_close_tray(void);
 
 ### Integracja z menedzerem plikow
 
-Sterownik jest rejestrowany w `kernel/kernel.c` w funkcji `kernel_main`:
+Sterownik jest rejestrowany w `kernel/core/kernel.c` w funkcji `kernel_main`:
 
 ```
 driver_manager_register("plyty", plyty_init, 0, 0, 4);
@@ -7618,7 +7618,7 @@ Gdy urzadzenie cdrom jest aktywne, funkcje `read_sector`, `read_file`, `fs_list_
 
 Eksplorator plikow (`graficzny/eksplorator_plikow.c`) wyswietla opcje "CD-ROM" / "PLYTA OPTYCZNA" obok "DYSKIETKA" / "DYSK TWARDY" gdy naped plyty jest wykryty. Po wyborze plyty optycznej zostaje ona ustawiona jako aktywne urzadzenie systemu plikow, a zawartosc plyty jest wyswietlana w liscie plikow. Mozna entonces otwierac pliki .TXT, .C, .TSI oraz nawigowac po katalogach.
 
-Nagłówek `drivers/plyty.h` jest dołączany w `kernel/kernel.c`. Plik zrodlowy `drivers/plyty.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/*.cpp)`).
+Nagłówek `drivers/plyty.h` jest dołączany w `kernel/core/kernel.c`. Plik zrodlowy `drivers/plyty.cpp` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard drivers/*.cpp)`).
 
 ## karta graficzna - rust/drivers/karty_graficzne/nvidia/gtx_1060.rs
 
@@ -7770,7 +7770,7 @@ zwraca rozmiar bufora komend w bajtach.
 
 zwraca liczbe bledow sterownika (licznik bledow inicjalizacji i operacji MMIO).
 
-sterownik jest rejestrowany w `kernel/kernel.c` w funkcji `kernel_main`:
+sterownik jest rejestrowany w `kernel/core/kernel.c` w funkcji `kernel_main`:
 
 ```
 driver_manager_register("gtx_1060", nvidia_gtx_1060_driver_init, 0, 0, 4);
@@ -7783,7 +7783,7 @@ bool nvidia_gtx_1060_driver_init(void);
 bool nvidia_gtx_1060_driver_detected(void);
 ```
 
-Plik zrodlowy `rust/drivers/karty_graficzne/nvidia/gtx_1060.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra. Gdy `rustc` jest dostepny, silne symbole z obiektu Rust nadpisuja weak definicje C w `kernel/kernel.c`.
+Plik zrodlowy `rust/drivers/karty_graficzne/nvidia/gtx_1060.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra. Gdy `rustc` jest dostepny, silne symbole z obiektu Rust nadpisuja weak definicje C w `kernel/core/kernel.c`.
 
 ## karta graficzna - rust/drivers/karty_graficzne/nvidia/gtx_1070.rs
 
@@ -7916,7 +7916,7 @@ uint32_t gtx_1070_get_status(void);
 
 ### Integracja z jądrem
 
-Sterownik jest rejestrowany w `kernel/kernel.c` w funkcji `kernel_main`:
+Sterownik jest rejestrowany w `kernel/core/kernel.c` w funkcji `kernel_main`:
 
 ```
 driver_manager_register("gtx_1070", gtx_1070_driver_init, 0, 0, 4);
@@ -7929,7 +7929,7 @@ bool gtx_1070_driver_init(void);
 bool gtx_1070_driver_detected(void);
 ```
 
-Plik zrodlowy `rust/drivers/karty_graficzne/nvidia/gtx_1070.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra. Gdy `rustc` jest dostepny, silne symbole z obiektu Rust nadpisuja weak definicje C w `kernel/kernel.c`.
+Plik zrodlowy `rust/drivers/karty_graficzne/nvidia/gtx_1070.rs` jest kompilowany automatycznie przez makefile (wildcard `$(wildcard rust/drivers/karty_graficzne/nvidia/*.rs)`) i linkowany do jadra. Gdy `rustc` jest dostepny, silne symbole z obiektu Rust nadpisuja weak definicje C w `kernel/core/kernel.c`.
 
 ## pasek zadan - zaawansowane rozmycie gaussowskie (aero) - graficzny/rysowanie.c
 
@@ -8638,7 +8638,7 @@ Sterownik definiuje stale dla:
 - `gtx_1000_driver_init()` -> bool - eksportowana funkcja C (`#[no_mangle]`, `extern "C"`), wywolywana przez `driver_manager_register` w jadrze. Inicjalizuje instancję GPU i wywoluje `init()`.
 - `gtx_1000_driver_detected()` -> bool - eksportowana funkcja C, sprawdza wykrycie karty.
 - `gtx_1000_is_ready()` -> bool - zwraca 1 gdy sterownik jest zainicjowany i gotowy.
-- `driver_manager_register("gtx_1000", gtx_1000_driver_init, 0, 0, 4)` - rejestracja sterownika w `kernel/kernel.c:124`, uruchamiana automatycznie przy starcie systemu.
+- `driver_manager_register("gtx_1000", gtx_1000_driver_init, 0, 0, 4)` - rejestracja sterownika w `kernel/core/kernel.c:124`, uruchamiana automatycznie przy starcie systemu.
 
 ### operacje MMIO
 
@@ -8718,7 +8718,7 @@ Sterownik definiuje stale dla:
 
 ## sterownik ekranu dotykowego - rust/drivers/ekrany_dotykowe/
 
-Zaawansowany sterownik ekranów dotykowych napisany w Rust (`#[no_std]`), kompilowany przez makefile (wildcard `$(wildcard rust/drivers/ekrany_dotykowe/*.rs)`) i linkowany do jadra. obsluguje wykrycie urzadzenia na magistrali PCI/MMIO, soft-reset, konfiguracje magistrali, kolejke zdarzen dotykowych, kalibracje affine (macierz 2D), obsluge wielodotykowa (max 10 punktow jednoczesnie), gesty (tap, double tap, swipe, pinch zoom, rotate, long press, edge swipe), tryb polling i przerwania, statystyki zdarzen i bledow. eksponuje pelne API przez strukture `TouchDriverApi` oraz funkcje `#[no_mangle]` dla integracji ze stosem C (`kernel/kernel.c` rejestruje go przez `driver_manager_register`). caly kod jest wolny od komentarzy w zrodle.
+Zaawansowany sterownik ekranów dotykowych napisany w Rust (`#[no_std]`), kompilowany przez makefile (wildcard `$(wildcard rust/drivers/ekrany_dotykowe/*.rs)`) i linkowany do jadra. obsluguje wykrycie urzadzenia na magistrali PCI/MMIO, soft-reset, konfiguracje magistrali, kolejke zdarzen dotykowych, kalibracje affine (macierz 2D), obsluge wielodotykowa (max 10 punktow jednoczesnie), gesty (tap, double tap, swipe, pinch zoom, rotate, long press, edge swipe), tryb polling i przerwania, statystyki zdarzen i bledow. eksponuje pelne API przez strukture `TouchDriverApi` oraz funkcje `#[no_mangle]` dla integracji ze stosem C (`kernel/core/kernel.c` rejestruje go przez `driver_manager_register`). caly kod jest wolny od komentarzy w zrodle.
 
 ### struktury danych
 
@@ -8922,7 +8922,7 @@ const struct TouchDriverApi *touch_driver_api(void);
 
 ### integracja z jadrem
 
-sterownik jest rejestrowany w `kernel/kernel.c` przez:
+sterownik jest rejestrowany w `kernel/core/kernel.c` przez:
 
 ```
 driver_manager_register("ekran_dotykowy", touch_driver_init, 0, 0, 4);
@@ -9082,7 +9082,7 @@ void kamera_ui_toggle(void);
 
 ### integracja z jadrem
 
-sterownik jest rejestrowany w `kernel/kernel.c` przez:
+sterownik jest rejestrowany w `kernel/core/kernel.c` przez:
 
 ```
 driver_manager_register("kamera_quickcam", quickcam_driver_init, quickcam_driver_shutdown, quickcam_driver_poll, 5);
@@ -11324,7 +11324,7 @@ wszystkie funkcje z prefixem `gtx3070_` otaczaja metody klasy `Gtx3070` i maja l
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx3070", gtx3070_init, 0, 0, 4);
@@ -11510,7 +11510,7 @@ wszystkie funkcje z prefixem `gtx3080_` otaczaja metody klasy `Gtx3080` i maja l
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx3080", gtx3080_init, 0, 0, 4);
@@ -11713,7 +11713,7 @@ wszystkie funkcje z prefixem `gtx2010_` otaczaja metody klasy `Gtx2010` i maja l
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx2010", gtx2010_init, 0, 0, 4);
@@ -11918,7 +11918,7 @@ wszystkie funkcje z prefixem `gtx1010_` otaczaja metody klasy `Gtx1010` i maja l
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx1010", gtx1010_init, 0, 0, 4);
@@ -12216,7 +12216,7 @@ int gtx760_akceleracja_3d_dostepna(void)
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx760", gtx760_init, 0, 0, 4);
@@ -12514,7 +12514,7 @@ int gtx660_akceleracja_3d_dostepna(void)
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx660", gtx660_init, 0, 0, 4);
@@ -12812,7 +12812,7 @@ int gtx560_akceleracja_3d_dostepna(void)
 
 ### integracja z driver managerem
 
-sterownik jest rejestrowany przez `driver_manager_register` w `kernel/kernel.c`:
+sterownik jest rejestrowany przez `driver_manager_register` w `kernel/core/kernel.c`:
 
 ```
 driver_manager_register("gtx560", gtx560_init, 0, 0, 4);

@@ -6,7 +6,7 @@
 */
 
 #include <user/okno_user.h>
-#include <kernel/syscall.h>
+#include <kernel/sys/syscall.h>
 #include <lib/string.h>
 
 #define EKSPLORATOR_SZEROKOSC 500

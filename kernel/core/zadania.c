@@ -1,0 +1,138 @@
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
+
+#include <kernel/core/zadania.h>
+#include <graphics/czcionka.h>
+#include <graphics/okno.h>
+#include <graphics/rysowanie.h>
+#include <kernel/core/proces.h>
+#include <kernel/drivers/driver_manager.h>
+
+#define ZADANIA_SZEROKOSC 560
+#define ZADANIA_WYSOKOSC 420
+#define ZADANIA_WIERSZ_WYS 20
+#define ZADANIA_WIERSZ_POCZ 24
+#define ZADANIA_PRZYCISK_W 60
+#define ZADANIA_PRZYCISK_H 18
+#define ZADANIA_NAZWA_MAKS 14
+
+#define KOLOR_TEKST_ZADANIA 0x00334155
+#define KOLOR_PRZYCISKU_ZABIJ 0x00C0392B
+#define KOLOR_TEKST_PRZYCISKU 0x00FFFFFF
+#define KOLOR_WIERSZ_PARZYSTY 0x00EEF2F6
+
+static struct okno okno_zadania;
+
+static int zadania_przycisk_x(int szerokosc)
+{
+    return (szerokosc - 16) - ZADANIA_PRZYCISK_W - 4;
+}
+
+static void zadania_u32_do_tekstu(uint32_t v, char *buf)
+{
+    char tmp[12];
+    int i = 0;
+    int j = 0;
+    if (v == 0) {
+        buf[0] = '0';
+        buf[1] = 0;
+        return;
+    }
+    while (v > 0) {
+        tmp[i++] = (char)('0' + (v % 10));
+        v /= 10;
+    }
+    while (i > 0) {
+        buf[j++] = tmp[--i];
+    }
+    buf[j] = 0;
+}
+
+static void zadania_narysywaj(int x, int y, int szerokosc, int wysokosc)
+{
+    (void)wysokosc;
+    int bx = x + zadania_przycisk_x(szerokosc);
+    char buf[16];
+    char nazwa[ZADANIA_NAZWA_MAKS + 1];
+    char nazwa_pelna[ZADANIA_NAZWA_MAKS + 16];
+    int n;
+    int len;
+
+    rysuj_tekst_chicago(x + 4, y, "PID", KOLOR_TEKST_ZADANIA);
+    rysuj_tekst_chicago(x + 30, y, "NAZWA", KOLOR_TEKST_ZADANIA);
+    rysuj_tekst_chicago(x + 150, y, "STAN", KOLOR_TEKST_ZADANIA);
+    rysuj_tekst_chicago(x + 210, y, "TYP", KOLOR_TEKST_ZADANIA);
+
+    int wy = y + ZADANIA_WIERSZ_POCZ;
+    int numer = 0;
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        struct proces *p = &process_table[i];
+        if (p->pid == 0 || p->state == PROCES_TERMINATED) continue;
+        if (numer % 2 == 0) {
+            rysuj_prostokat(x, wy, szerokosc, ZADANIA_WIERSZ_WYS, KOLOR_WIERSZ_PARZYSTY);
+        }
+        zadania_u32_do_tekstu(p->pid, buf);
+        rysuj_tekst_chicago(x + 4, wy + 2, buf, KOLOR_TEKST_ZADANIA);
+        n = 0;
+        while (p->name[n] && n < ZADANIA_NAZWA_MAKS) {
+            nazwa[n] = p->name[n];
+            n++;
+        }
+        nazwa[n] = 0;
+        if (p->is_driver) {
+            for (len = 0; nazwa[len] && len < ZADANIA_NAZWA_MAKS; len++) {
+                nazwa_pelna[len] = nazwa[len];
+            }
+            const char *mark = " [STEROWNIK]";
+            int m = 0;
+            while (mark[m] && len + m < ZADANIA_NAZWA_MAKS + 15) {
+                nazwa_pelna[len + m] = mark[m];
+                m++;
+            }
+            nazwa_pelna[len + m] = 0;
+            rysuj_tekst_chicago(x + 30, wy + 2, nazwa_pelna, KOLOR_TEKST_ZADANIA);
+            rysuj_tekst_chicago(x + 210, wy + 2, "STEROWNIK", KOLOR_TEKST_ZADANIA);
+        } else {
+            rysuj_tekst_chicago(x + 30, wy + 2, nazwa, KOLOR_TEKST_ZADANIA);
+            rysuj_tekst_chicago(x + 210, wy + 2, "UZYTKOWNIK", KOLOR_TEKST_ZADANIA);
+        }
+        rysuj_prostokat(bx, wy + 1, ZADANIA_PRZYCISK_W, ZADANIA_PRZYCISK_H, KOLOR_PRZYCISKU_ZABIJ);
+        if (!p->is_driver) {
+            rysuj_tekst_chicago(bx + 8, wy + 4, "ZABIJ", KOLOR_TEKST_PRZYCISKU);
+        }
+        wy += ZADANIA_WIERSZ_WYS;
+        numer++;
+    }
+}
+
+static void zadania_klik(int x, int y)
+{
+    int bx = 8 + zadania_przycisk_x(okno_zadania.szerokosc);
+    int cy = y - 30;
+    int wy = ZADANIA_WIERSZ_POCZ;
+    for (int i = 0; i < MAX_PROCESSES; i++) {
+        struct proces *p = &process_table[i];
+        if (p->pid == 0 || p->state == PROCES_TERMINATED) continue;
+        if (cy >= wy && cy < wy + ZADANIA_WIERSZ_WYS &&
+            x >= bx && x < bx + ZADANIA_PRZYCISK_W) {
+            if (p->is_driver) continue;
+            if (p->window) okno_zamknij(p->window);
+            driver_manager_shutdown_by_pid(p->pid);
+            proces_zakoncz(p->pid);
+            okno_narysuj(&okno_zadania);
+            return;
+        }
+        wy += ZADANIA_WIERSZ_WYS;
+    }
+}
+
+void zadania_otworz(void)
+{
+    okno_stworz(&okno_zadania, 180, 120, ZADANIA_SZEROKOSC, ZADANIA_WYSOKOSC,
+                "ZARZADZANIE ZADANIAMI", zadania_narysywaj);
+    okno_ustaw_obsluge_klikniecia(&okno_zadania, zadania_klik);
+}

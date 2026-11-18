@@ -11,8 +11,8 @@
 #include <graphics/czcionka.h>
 #include <fs/system_plikow.h>
 #include <drivers/input/keyboard.h>
-#include <kernel/notatnik.h>
-#include <kernel/loader.h>
+#include <kernel/apps/notatnik.h>
+#include <kernel/loader/loader.h>
 
 extern void zainstaluj_pakiet_tsi(const char *nazwa_pliku);
 

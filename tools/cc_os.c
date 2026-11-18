@@ -9,7 +9,7 @@
 #include <tools/codegen_os.h>
 #include <include/printf/printf.h>
 #include <fs/system_plikow.h>
-#include <kernel/loader.h>
+#include <kernel/loader/loader.h>
 #include <include/printf/types.h>
 
 #define BASE_ADDR 0x00100000

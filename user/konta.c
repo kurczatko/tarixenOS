@@ -11,7 +11,7 @@
 #include <graphics/pulpit.h>
 #include <drivers/input/keyboard.h>
 #include <fs/system_plikow.h>
-#include <kernel/tls_crypto.h>
+#include <kernel/security/tls_crypto.h>
 #include <user/konta.h>
 
 static int konto_strlen(const char *s)
