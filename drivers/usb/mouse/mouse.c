@@ -7,7 +7,7 @@
 
 #include <drivers/usb/mouse/mouse.h>
 #include <drivers/usb/core/hid.h>
-#include <graficzny/rysowanie.h>
+#include <graphics/rysowanie.h>
 
 static int usb_mouse_x = 0;
 static int usb_mouse_y = 0;

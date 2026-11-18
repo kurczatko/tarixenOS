@@ -8,9 +8,9 @@
 #include <drivers/bluetooth/bluetooth.h>
 
 extern "C" {
-#include <graficzny/rysowanie.h>
-#include <graficzny/okno.h>
-#include <graficzny/czcionka.h>
+#include <graphics/rysowanie.h>
+#include <graphics/okno.h>
+#include <graphics/czcionka.h>
 }
 
 /*ikona bluetooth na pasku zadan - bitmapa 12x12*/

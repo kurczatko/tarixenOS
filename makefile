@@ -26,13 +26,13 @@ NASM := nasm
 
 export PATH := $(HOME)/.cargo/bin:$(HOME)/bin:$(PATH)
 
-CFLAGS32 := -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ilibc -Ikernel -Igraficzny_tryb -fno-stack-protector -Wno-incompatible-pointer-types
-CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector -mcmodel=kernel -mno-red-zone
-CXXFLAGS := -m32 -Os -ffreestanding -fno-exceptions -fno-rtti -nostdlib -nostdinc -Wall -Wextra -Werror -I. -Iinclude -Iinclude/printf -Ikernel -Igraficzny_tryb -fno-stack-protector
-LDFLAGS32 := -m elf_i386 -T linker.ld
+CFLAGS32 := -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ilib -Ikernel -Igraphics -fno-stack-protector -Wno-incompatible-pointer-types
+CFLAGS64 := -m64 -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -Iinclude -Iinclude/printf -Ikernel -Igraphics -fno-stack-protector -mcmodel=kernel -mno-red-zone
+CXXFLAGS := -m32 -Os -ffreestanding -fno-exceptions -fno-rtti -nostdlib -nostdinc -Wall -Wextra -Werror -I. -Iinclude -Iinclude/printf -Ikernel -Igraphics -fno-stack-protector
+LDFLAGS32 := -m elf_i386 -T boot/linker.ld
 LDFLAGS64 := -T linker64.ld
 
-KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/proces.cpp kernel/driver_manager.cpp kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscals/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/baterie/*.c) $(wildcard drivers/baterie/*.cpp) $(wildcard drivers/acpi/*.c) $(wildcard drivers/acpi/*.cpp) $(wildcard drivers/internet/*.c) $(wildcard drivers/internet/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard drivers/sound/*.cpp) drivers/karty_dzwiekowe/intel_raptorlake_cavs.cpp $(wildcard drivers/kontrolery/*.cpp) $(wildcard drivers/plyty_glowne/*.c) $(wildcard drivers/plyty_glowne/*.cpp) $(wildcard drivers/hid/touchpady/*.cpp) $(wildcard drivers/hid/kamerki/*.cpp) $(wildcard drivers/karty_graficzne/*.cpp) $(wildcard drivers/karty_graficzne/amd/*.cpp) $(wildcard drivers/karty_graficzne/nvidia/*.cpp) $(wildcard drivers/bluetooth/*.cpp) $(wildcard graficzny/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard system_plikow/*.c) $(wildcard scripts/*.c) kompilator/cc_os.c kompilator/lexer_os.c kompilator/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user_land/konta.c user_land/tapeta.c $(wildcard rust/drivers/karty_graficzne/amd/*.rs) $(wildcard rust/drivers/karty_graficzne/nvidia/*.rs) $(wildcard rust/drivers/karty_graficzne/3dfx/*.rs) $(wildcard rust/drivers/wifi/*.rs) rust/drivers/ekrany_dotykowe/lib.rs $(wildcard rust/drivers/kamerki/*.rs) libc/string.c libc/math.c libc/errno.c libc/signal.c libc/locale.c libc/ctype.c libc/assert.c
+KERNEL_SOURCES := $(wildcard kernel/*.c) kernel/proces.cpp kernel/driver_manager.cpp kernel/syscall_asm.S kernel/default_irq.S kernel/wyjatki_entry.S kernel/timer_entry.S $(wildcard kernel/apps/*.c) $(wildcard kernel/apps/*/*.c) $(wildcard kernel/syscalls/*.c) $(wildcard include/printf/*.c) include/blue.c $(wildcard drivers/*.c) $(wildcard drivers/*.cpp) $(wildcard drivers/baterie/*.c) $(wildcard drivers/baterie/*.cpp) $(wildcard drivers/acpi/*.c) $(wildcard drivers/acpi/*.cpp) $(wildcard drivers/internet/*.c) $(wildcard drivers/internet/*.cpp) $(wildcard drivers/usb/*.c) $(wildcard drivers/usb/*/*.c) $(wildcard drivers/*.S) $(wildcard drivers/usb/core/*.S) $(wildcard drivers/sound/*.c) $(wildcard drivers/sound/*.cpp) drivers/karty_dzwiekowe/intel_raptorlake_cavs.cpp $(wildcard drivers/kontrolery/*.cpp) $(wildcard drivers/plyty_glowne/*.c) $(wildcard drivers/plyty_glowne/*.cpp) $(wildcard drivers/hid/touchpady/*.cpp) $(wildcard drivers/hid/kamerki/*.cpp) $(wildcard drivers/karty_graficzne/*.cpp) $(wildcard drivers/karty_graficzne/amd/*.cpp) $(wildcard drivers/karty_graficzne/nvidia/*.cpp) $(wildcard drivers/bluetooth/*.cpp) $(wildcard drivers/audio/*.c) $(wildcard drivers/audio/*.cpp) $(wildcard drivers/core/*.c) $(wildcard drivers/core/*.cpp) $(wildcard drivers/network/*.c) $(wildcard drivers/network/*.cpp) $(wildcard drivers/storage/*.c) $(wildcard drivers/storage/*.cpp) $(wildcard drivers/input/*.c) $(wildcard drivers/input/*.cpp) $(wildcard drivers/video/*.c) $(wildcard drivers/video/*.cpp) $(wildcard graphics/*.c) $(wildcard graficzny_tryb/*.c) $(wildcard fs/*.c) $(wildcard scripts/*.c) tools/cc_os.c tools/lexer_os.c tools/codegen_os.c kernel/browser_css.cpp kernel/browser_js.cpp user/konta.c user/tapeta.c $(wildcard rust/drivers/karty_graficzne/amd/*.rs) $(wildcard rust/drivers/karty_graficzne/nvidia/*.rs) $(wildcard rust/drivers/karty_graficzne/3dfx/*.rs) $(wildcard rust/drivers/wifi/*.rs) rust/drivers/ekrany_dotykowe/lib.rs $(wildcard rust/drivers/kamerki/*.rs) lib/string.c lib/math.c lib/errno.c lib/signal.c lib/locale.c lib/ctype.c lib/assert.c net/net.c
 KERNEL_OBJECTS32 := $(patsubst %.c,$(BUILD_DIR)/%.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%.o,$(filter %.S,$(KERNEL_SOURCES))) $(patsubst %.rs,$(BUILD_DIR)/rust_%.o,$(filter %.rs,$(KERNEL_SOURCES)))
 KERNEL_OBJECTS64 := $(patsubst %.c,$(BUILD_DIR)/%64.o,$(filter %.c,$(KERNEL_SOURCES))) $(patsubst %.cpp,$(BUILD_DIR)/%64.o,$(filter %.cpp,$(KERNEL_SOURCES))) $(patsubst %.S,$(BUILD_DIR)/%64.o,$(filter %.S,$(KERNEL_SOURCES)))
 
@@ -49,66 +49,66 @@ iso: $(ISO_IMAGE)
 
 user_apps: $(addprefix $(BUILD_DIR)/,$(USER_APPS))
 
-$(BUILD_DIR)/NOTATNIK.ELF: user_land/apps/notatnik_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+$(BUILD_DIR)/NOTATNIK.ELF: user/apps/notatnik_user.c user/okno_user.c lib/string.c lib/stdio.c lib/stdlib.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
-	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
-	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
-	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c user/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c lib/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c lib/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c lib/stdlib.c -o $(BUILD_DIR)/stdlib.o
 	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/notatnik_user.o
 	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/notatnik_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
-$(BUILD_DIR)/EKSPLORATOR.ELF: user_land/apps/eksplorator_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+$(BUILD_DIR)/EKSPLORATOR.ELF: user/apps/eksplorator_user.c user/okno_user.c lib/string.c lib/stdio.c lib/stdlib.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
-	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
-	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
-	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c user/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c lib/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c lib/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c lib/stdlib.c -o $(BUILD_DIR)/stdlib.o
 	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/eksplorator_user.o
 	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/eksplorator_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
-$(BUILD_DIR)/BROWSER.ELF: user_land/apps/browser_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+$(BUILD_DIR)/BROWSER.ELF: user/apps/browser_user.c user/okno_user.c lib/string.c lib/stdio.c lib/stdlib.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
-	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
-	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
-	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c user/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c lib/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c lib/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c lib/stdlib.c -o $(BUILD_DIR)/stdlib.o
 	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/browser_user.o
 	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/browser_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
-$(BUILD_DIR)/KALKULATOR.ELF: user_land/apps/kalkulator_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+$(BUILD_DIR)/KALKULATOR.ELF: user/apps/kalkulator_user.c user/okno_user.c lib/string.c lib/stdio.c lib/stdlib.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
-	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
-	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
-	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c user/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c lib/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c lib/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c lib/stdlib.c -o $(BUILD_DIR)/stdlib.o
 	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/kalkulator_user.o
 	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/kalkulator_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
-$(BUILD_DIR)/GRA.ELF: user_land/apps/gra_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+$(BUILD_DIR)/GRA.ELF: user/apps/gra_user.c user/okno_user.c lib/string.c lib/stdio.c lib/stdlib.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
-	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
-	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
-	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c user/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c lib/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c lib/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c lib/stdlib.c -o $(BUILD_DIR)/stdlib.o
 	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/gra_user.o
 	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/gra_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
-$(BUILD_DIR)/KURSOR.ELF: user_land/apps/kursor_user.c user_land/okno_user.c libc/string.c libc/stdio.c libc/stdlib.c | $(BUILD_DIR)
+$(BUILD_DIR)/KURSOR.ELF: user/apps/kursor_user.c user/okno_user.c lib/string.c lib/stdio.c lib/stdlib.c | $(BUILD_DIR)
 	@mkdir -p $(dir $@)
-	$(CC32) $(CFLAGS32) -c user_land/okno_user.c -o $(BUILD_DIR)/okno_user.o
-	$(CC32) $(CFLAGS32) -c libc/string.c -o $(BUILD_DIR)/string.o
-	$(CC32) $(CFLAGS32) -c libc/stdio.c -o $(BUILD_DIR)/stdio.o
-	$(CC32) $(CFLAGS32) -c libc/stdlib.c -o $(BUILD_DIR)/stdlib.o
+	$(CC32) $(CFLAGS32) -c user/okno_user.c -o $(BUILD_DIR)/okno_user.o
+	$(CC32) $(CFLAGS32) -c lib/string.c -o $(BUILD_DIR)/string.o
+	$(CC32) $(CFLAGS32) -c lib/stdio.c -o $(BUILD_DIR)/stdio.o
+	$(CC32) $(CFLAGS32) -c lib/stdlib.c -o $(BUILD_DIR)/stdlib.o
 	$(CC32) $(CFLAGS32) -c $< -o $(BUILD_DIR)/kursor_user.o
 	$(LD32) -m elf_i386 -nostdlib -Ttext=0x00100000 -e main -o $@ $(BUILD_DIR)/kursor_user.o $(BUILD_DIR)/okno_user.o $(BUILD_DIR)/string.o $(BUILD_DIR)/stdio.o $(BUILD_DIR)/stdlib.o
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
-	mkdir -p $(BUILD_DIR)/kernel $(BUILD_DIR)/kernel/apps $(BUILD_DIR)/kernel/apps/appdownload $(BUILD_DIR)/drivers $(BUILD_DIR)/include/printf
+	mkdir -p $(BUILD_DIR)/kernel $(BUILD_DIR)/kernel/apps $(BUILD_DIR)/kernel/apps/appdownload $(BUILD_DIR)/kernel/syscalls $(BUILD_DIR)/drivers $(BUILD_DIR)/graphics $(BUILD_DIR)/user $(BUILD_DIR)/user/apps $(BUILD_DIR)/fs $(BUILD_DIR)/lib $(BUILD_DIR)/tools $(BUILD_DIR)/include/printf $(BUILD_DIR)/boot
 	mkdir -p $(ISO_DIR)
 
-$(BOOT_BIN32): boot.asm | $(BUILD_DIR)
+$(BOOT_BIN32): boot/boot.asm | $(BUILD_DIR)
 	$(NASM) -f bin $< -o $@
 
 $(UEFI_BIN): uefi64.asm | $(BUILD_DIR)
@@ -124,7 +124,7 @@ $(BUILD_DIR)/%.o: %.cpp | $(BUILD_DIR)
 
 $(BUILD_DIR)/rust_%.o: %.rs | $(BUILD_DIR)
 	mkdir -p $(dir $@)
-	rustc +nightly --target i686-unknown-linux-gnu -C opt-level=2 -C panic=abort -C link-arg=-ffreestanding -C link-arg=-nostdlib -C link-arg=-nostdinc -C link-arg=-nodefaultlibs -C link-arg=-fno-exceptions -C link-arg=-fno-rtti -C link-arg=-fno-stack-protector -C link-arg=-m32 -C link-arg=-nostdinc -C linker-flavor=ld -C link-arg=-melf_i386 --crate-type lib $< -o $@ 2>/dev/null || cc -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ilibc -Ikernel -Igraficzny_tryb -fno-stack-protector -Wno-incompatible-pointer-types -x c -c /dev/null -o $@
+	rustc +nightly --target i686-unknown-linux-gnu -C opt-level=2 -C panic=abort -C link-arg=-ffreestanding -C link-arg=-nostdlib -C link-arg=-nostdinc -C link-arg=-nodefaultlibs -C link-arg=-fno-exceptions -C link-arg=-fno-rtti -C link-arg=-fno-stack-protector -C link-arg=-m32 -C link-arg=-nostdinc -C linker-flavor=ld -C link-arg=-melf_i386 --crate-type lib $< -o $@ 2>/dev/null || cc -m32 -Os -ffreestanding -fno-pic -fno-pie -nostdlib -nostdinc -Wall -Wextra -I. -Iinclude -Iinclude/printf -Ilib -Ikernel -Igraphics -fno-stack-protector -Wno-incompatible-pointer-types -x c -c /dev/null -o $@
 
 $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
@@ -157,7 +157,7 @@ $(BUILD_DIR)/%64.o: %.cpp | $(BUILD_DIR)
 		touch $@; \
 	fi
 
-$(KERNEL_ELF32): $(KERNEL_OBJECTS32) linker.ld | $(BUILD_DIR)
+$(KERNEL_ELF32): $(KERNEL_OBJECTS32) boot/linker.ld | $(BUILD_DIR)
 	$(LD32) $(LDFLAGS32) -o $@ $(KERNEL_OBJECTS32)
 
 $(KERNEL_ELF64): $(KERNEL_OBJECTS64) linker64.ld | $(BUILD_DIR)

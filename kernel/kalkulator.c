@@ -6,10 +6,10 @@
 */
 
 #include <kernel/kalkulator.h>
-#include <drivers/keyboard.h>
-#include <graficzny/czcionka.h>
-#include <graficzny/okno.h>
-#include <graficzny/rysowanie.h>
+#include <drivers/input/keyboard.h>
+#include <graphics/czcionka.h>
+#include <graphics/okno.h>
+#include <graphics/rysowanie.h>
 #include <kernel/proces.h>
 
 #define KALKULATOR_SZEROKOSC 320

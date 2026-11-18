@@ -7,17 +7,17 @@
 
 #include <kernel/syscall.h>
 #include <kernel/paging.h>
-#include <graficzny/rysowanie.h>
-#include <graficzny/okno.h>
-#include <graficzny/czcionka.h>
+#include <graphics/rysowanie.h>
+#include <graphics/okno.h>
+#include <graphics/czcionka.h>
 #include <include/printf/printf.h>
-#include <system_plikow/system_plikow.h>
+#include <fs/system_plikow.h>
 #include <kernel/proces.h>
-#include <drivers/keyboard.h>
-#include <drivers/mouse.h>
+#include <drivers/input/keyboard.h>
+#include <drivers/input/mouse.h>
 #include <kernel/loader.h>
 #include <kernel/shutdown.h>
-#include <user_land/tapeta.h>
+#include <user/tapeta.h>
 
 struct rejestry biezace_rejestry;
 

@@ -1,1 +1,0 @@
-beda tu pliki .asm i ogolnie te miejsce jest dla nisopziomowych rzeczy w assemblerze

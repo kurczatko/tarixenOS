@@ -7,7 +7,7 @@
 
 #include <include/printf/printf.h>
 #include <include/printf/vga.h>
-#include <drivers/keyboard.h>
+#include <drivers/input/keyboard.h>
 
 void wyp() {
     vga_init();

@@ -6,7 +6,7 @@
 */
 
 #include <include/tarixen/mstuff.h>
-#include <libc/syscall.h>
+#include <lib/syscall.h>
 
 #define M_BLOCK_OFFSET 0
 #define M_HEAD_SIZE m_align_up(sizeof(struct m_block))

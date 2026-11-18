@@ -6,11 +6,11 @@
 */
 
 #include <kernel/notatnik.h>
-#include <drivers/keyboard.h>
-#include <graficzny/czcionka.h>
-#include <graficzny/okno.h>
-#include <graficzny/rysowanie.h>
-#include <system_plikow/system_plikow.h>
+#include <drivers/input/keyboard.h>
+#include <graphics/czcionka.h>
+#include <graphics/okno.h>
+#include <graphics/rysowanie.h>
+#include <fs/system_plikow.h>
 #include <kernel/proces.h>
 
 #define NOTATNIK_PLIK "NOTATKA.NTF"

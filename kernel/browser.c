@@ -7,11 +7,11 @@
 
 #include <kernel/browser.h>
 #include <kernel/tls_client.h>
-#include <drivers/net.h>
-#include <drivers/keyboard.h>
-#include <graficzny/okno.h>
-#include <graficzny/rysowanie.h>
-#include <graficzny/czcionka.h>
+#include <net/net.h>
+#include <drivers/input/keyboard.h>
+#include <graphics/okno.h>
+#include <graphics/rysowanie.h>
+#include <graphics/czcionka.h>
 #include <kernel/browser_css.h>
 #include <kernel/browser_js.h>
 #include <kernel/proces.h>

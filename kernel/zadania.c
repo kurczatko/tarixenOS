@@ -6,9 +6,9 @@
 */
 
 #include <kernel/zadania.h>
-#include <graficzny/czcionka.h>
-#include <graficzny/okno.h>
-#include <graficzny/rysowanie.h>
+#include <graphics/czcionka.h>
+#include <graphics/okno.h>
+#include <graphics/rysowanie.h>
 #include <kernel/proces.h>
 #include <kernel/driver_manager.h>
 

@@ -7,8 +7,8 @@
 
 #include <kernel/tls_client.h>
 #include <kernel/tls_crypto.h>
-#include <drivers/net.h>
-#include <kernel/syscals/random.h>
+#include <net/net.h>
+#include <kernel/syscalls/random.h>
 
 #define TLS_BUFFER_SIZE 16384
 #define TLS_RECORD_HANDSHAKE 22

@@ -8,10 +8,10 @@
 #include <drivers/hid/touchpady/pixa3848.h>
 
 extern "C" {
-#include <graficzny/rysowanie.h>
-#include <graficzny/okno.h>
-#include <graficzny/pulpit.h>
-#include <graficzny/menu_start.h>
+#include <graphics/rysowanie.h>
+#include <graphics/okno.h>
+#include <graphics/pulpit.h>
+#include <graphics/menu_start.h>
 }
 
 static inline uint8_t pixa3848_inb(uint16_t port)

@@ -9,7 +9,7 @@ extern "C" {
 
 #include <kernel/paging.h>
 #include <kernel/gdt.h>
-#include <graficzny/okno.h>
+#include <graphics/okno.h>
 
 #define MAX_PROCESSES 64
 #define MAX_OKNA_PROCESU 8

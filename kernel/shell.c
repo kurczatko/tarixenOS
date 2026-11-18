@@ -8,9 +8,9 @@
 #include <kernel/shell.h>
 #include <include/printf/printf.h>
 #include <include/printf/vga.h>
-#include <drivers/keyboard.h>
-#include <drivers/mouse.h>
-#include <graficzny/menu_start.h>
+#include <drivers/input/keyboard.h>
+#include <drivers/input/mouse.h>
+#include <graphics/menu_start.h>
 #include <kernel/apps/kaka.h>
 #include <kernel/apps/pakiet.h>
 #include <kernel/apps/calc.h>
@@ -20,9 +20,9 @@
 #include <kernel/panika.h>
 #include <scripts/mem.h>
 #include <include/blue.h>
-#include <user_land/konta.h>
-#include <system_plikow/system_plikow.h>
-#include <kernel/syscals/random.h>
+#include <user/konta.h>
+#include <fs/system_plikow.h>
+#include <kernel/syscalls/random.h>
 #include <kernel/shutdown.h>
 
 void shell() {

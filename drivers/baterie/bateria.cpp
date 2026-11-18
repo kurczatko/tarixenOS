@@ -659,8 +659,8 @@ void bateria_poll(void)
 }
 
 extern "C" {
-#include <graficzny/rysowanie.h>
-#include <graficzny/czcionka.h>
+#include <graphics/rysowanie.h>
+#include <graphics/czcionka.h>
 }
 
 #define BATERIA_IKONA_X (EKRAN_SZEROKOSC - 106)

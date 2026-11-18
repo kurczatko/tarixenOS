@@ -5,7 +5,7 @@
 * kurczatkojestslodkie@gmail.com
 */
 
-#include <system_plikow/system_plikow.h>
+#include <fs/system_plikow.h>
 #include <include/printf/types.h>
 #include <kernel/paging.h>
 #include <kernel/syscall.h>

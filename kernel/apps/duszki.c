@@ -6,11 +6,11 @@
 */
 
 #include "duszki.h"
-#include <drivers/keyboard.h>
-#include <drivers/mouse.h>
-#include <graficzny/rysowanie.h>
-#include <graficzny/okno.h>
-#include <graficzny/czcionka.h>
+#include <drivers/input/keyboard.h>
+#include <drivers/input/mouse.h>
+#include <graphics/rysowanie.h>
+#include <graphics/okno.h>
+#include <graphics/czcionka.h>
 #include <include/printf/types.h>
 #include <kernel/proces.h>
 
