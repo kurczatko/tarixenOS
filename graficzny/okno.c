@@ -39,6 +39,17 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
         okno->rysuj_zawartosc(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
         return;
     }
+    int cien_x = okno->x + 4;
+    int cien_y = okno->y + 4;
+    if (cien_x < EKRAN_SZEROKOSC && cien_y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) {
+        int cien_w = okno->szerokosc - 4;
+        int cien_h = okno->wysokosc - 4;
+        if (cien_x + cien_w > EKRAN_SZEROKOSC) cien_w = EKRAN_SZEROKOSC - cien_x;
+        if (cien_y + cien_h > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) cien_h = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - cien_y;
+        if (cien_w > 0 && cien_h > 0) {
+            rysuj_prostokat_polprzezroczysty(cien_x, cien_y, cien_w, cien_h, 0x00000000, 45);
+        }
+    }
     rozmyj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
     rysuj_prostokat_polprzezroczysty(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI, 60);
     rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,

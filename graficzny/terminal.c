@@ -19,6 +19,8 @@
 #include <kernel/zadania.h>
 #include <kernel/apps/duszki.h>
 #include <kernel/proces.h>
+#include <kernel/loader.h>
+#include <kompilator/cc_os.h>
 
 #define TERMINAL_SZEROKOSC 700
 #define TERMINAL_WYSOKOSC 500
@@ -81,6 +83,13 @@ static uint32_t terminal_parsuj_hex(const char *p)
     return v;
 }
 
+static const char *terminal_pobierz_argument(const char *komenda)
+{
+    while (*komenda && *komenda != ' ') komenda++;
+    while (*komenda == ' ') komenda++;
+    return *komenda ? komenda : 0;
+}
+
 static void terminal_wykonaj_komende(const char *komenda)
 {
     terminal_dodaj_linie(komenda);
@@ -89,6 +98,14 @@ static void terminal_wykonaj_komende(const char *komenda)
         terminal_dodaj_linie("Dostepne komendy:");
         terminal_dodaj_linie("  help               - ta pomoc");
         terminal_dodaj_linie("  clear              - wyczysc ekran terminala");
+        terminal_dodaj_linie("  ls                 - lista plikow");
+        terminal_dodaj_linie("  cd [dir]           - zmiana katalogu");
+        terminal_dodaj_linie("  pwd                - sciezka bieżąca");
+        terminal_dodaj_linie("  rm [plik]          - usun plik");
+        terminal_dodaj_linie("  touch [plik]       - utworz plik");
+        terminal_dodaj_linie("  mkdir [dir]        - utworz katalog");
+        terminal_dodaj_linie("  compile [plik.c]   - skompiluj plik .c");
+        terminal_dodaj_linie("  run [plik]         - uruchom plik");
         terminal_dodaj_linie("  tapeta_zmien XXXX  - zmiana tapety (kolor hex np. FF0000)");
         terminal_dodaj_linie("  notatnik           - otworz notatnik");
         terminal_dodaj_linie("  pliki              - otworz eksplorator plikow");
@@ -105,6 +122,66 @@ static void terminal_wykonaj_komende(const char *komenda)
         okno_zamknij(&okno_terminal);
         terminal_otwarty = 0;
         return;
+    } else if (terminal_porownaj(komenda, "ls")) {
+        struct fs_entry_info entries[24];
+        int count = fs_list_current(entries, 24);
+        for (int i = 0; i < count; i++) {
+            terminal_dodaj_linie(entries[i].name);
+        }
+        if (count == 0) terminal_dodaj_linie("(pusto)");
+    } else if (terminal_porownaj(komenda, "cd")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            if (cd(arg) == 0) terminal_dodaj_linie("OK");
+            else terminal_dodaj_linie("BLAD");
+        } else {
+            terminal_dodaj_linie("Uzycie: cd [katalog]");
+        }
+    } else if (terminal_porownaj(komenda, "pwd")) {
+        char buf[128];
+        fs_get_current_dir_name(buf);
+        terminal_dodaj_linie(buf);
+    } else if (terminal_porownaj(komenda, "rm")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            if (delete_file(arg) == 0) terminal_dodaj_linie("usunieto");
+            else terminal_dodaj_linie("BLAD");
+        } else {
+            terminal_dodaj_linie("Uzycie: rm [plik]");
+        }
+    } else if (terminal_porownaj(komenda, "touch")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            if (create_file(arg, 0) == 0) terminal_dodaj_linie("utworzono");
+            else terminal_dodaj_linie("BLAD");
+        } else {
+            terminal_dodaj_linie("Uzycie: touch [plik]");
+        }
+    } else if (terminal_porownaj(komenda, "mkdir")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            if (create_dir(arg) == 0) terminal_dodaj_linie("utworzono");
+            else terminal_dodaj_linie("BLAD");
+        } else {
+            terminal_dodaj_linie("Uzycie: mkdir [katalog]");
+        }
+    } else if (terminal_porownaj(komenda, "compile")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            int res = kompiluj_plik(arg, arg);
+            if (res == 0) terminal_dodaj_linie("skompilowano");
+            else terminal_dodaj_linie("blad kompilacji");
+        } else {
+            terminal_dodaj_linie("Uzycie: compile [plik.c]");
+        }
+    } else if (terminal_porownaj(komenda, "run")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            proces_zaladuj_elf(arg);
+            terminal_dodaj_linie("uruchomiono");
+        } else {
+            terminal_dodaj_linie("Uzycie: run [plik]");
+        }
     } else if (terminal_porownaj(komenda, "notatnik")) {
         notatnik_otworz();
     } else if (terminal_porownaj(komenda, "pliki") || terminal_porownaj(komenda, "eksplorator")) {
