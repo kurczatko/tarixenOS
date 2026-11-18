@@ -4809,7 +4809,7 @@ int https_request(struct https_connection *connection, const struct https_reques
     writer_text(&writer, " HTTP/1.1\r\nHost: ");
     writer_text(&writer, params->host);
     writer_text(&writer, "\r\nUser-Agent: ");
-    writer_text(&writer, params->user_agent ? params->user_agent : "Mozilla/5.0 (compatible; hobbyOS-https/1.0)");
+    writer_text(&writer, params->user_agent ? params->user_agent : "Mozilla/5.0 (compatible; tarixenOS/10)");
     writer_text(&writer, "\r\nAccept: */*\r\nAccept-Encoding: identity\r\n");
     if (params->body_length || params->method[0] == 'P') {
         writer_text(&writer, "Content-Length: ");
