@@ -58,12 +58,12 @@ static void terminal_dodaj_linie(const char *tekst)
     liczba_linii++;
 }
 
-static int terminal_porownaj(const char *a, const char *b)
+static int terminal_starts_with(const char *a, const char *b)
 {
-    while (*a && *b) {
+    while (*b) {
         if (*a++ != *b++) return 0;
     }
-    return *a == *b;
+    return 1;
 }
 
 static uint32_t terminal_parsuj_hex(const char *p)
@@ -90,11 +90,28 @@ static const char *terminal_pobierz_argument(const char *komenda)
     return *komenda ? komenda : 0;
 }
 
+static int terminal_ma_rozszerzenie(const char *nazwa, const char *rozszerzenie)
+{
+    int dlugosc = 0;
+    int rozszerzenie_dlugosc = 0;
+    while (nazwa[dlugosc]) dlugosc++;
+    while (rozszerzenie[rozszerzenie_dlugosc]) rozszerzenie_dlugosc++;
+    if (dlugosc < rozszerzenie_dlugosc) return 0;
+    for (int i = 0; i < rozszerzenie_dlugosc; i++) {
+        char znak = nazwa[dlugosc - rozszerzenie_dlugosc + i];
+        char oczekiwany = rozszerzenie[i];
+        if (znak >= 'a' && znak <= 'z') znak -= 'a' - 'A';
+        if (oczekiwany >= 'a' && oczekiwany <= 'z') oczekiwany -= 'a' - 'A';
+        if (znak != oczekiwany) return 0;
+    }
+    return 1;
+}
+
 static void terminal_wykonaj_komende(const char *komenda)
 {
     terminal_dodaj_linie(komenda);
 
-    if (terminal_porownaj(komenda, "help") || terminal_porownaj(komenda, "pomoc")) {
+    if (terminal_starts_with(komenda, "help") || terminal_starts_with(komenda, "pomoc")) {
         terminal_dodaj_linie("Dostepne komendy:");
         terminal_dodaj_linie("  help               - ta pomoc");
         terminal_dodaj_linie("  clear              - wyczysc ekran terminala");
@@ -116,20 +133,20 @@ static void terminal_wykonaj_komende(const char *komenda)
         terminal_dodaj_linie("  zadania            - otworz zarzadzanie zadaniami");
         terminal_dodaj_linie("  duszki             - otworz duszki");
         terminal_dodaj_linie("  exit / quit        - zamknij terminal");
-    } else if (terminal_porownaj(komenda, "clear")) {
+    } else if (terminal_starts_with(komenda, "clear")) {
         liczba_linii = 0;
-    } else if (terminal_porownaj(komenda, "exit") || terminal_porownaj(komenda, "quit")) {
+    } else if (terminal_starts_with(komenda, "exit") || terminal_starts_with(komenda, "quit")) {
         okno_zamknij(&okno_terminal);
         terminal_otwarty = 0;
         return;
-    } else if (terminal_porownaj(komenda, "ls")) {
+    } else if (terminal_starts_with(komenda, "ls")) {
         struct fs_entry_info entries[24];
         int count = fs_list_current(entries, 24);
         for (int i = 0; i < count; i++) {
             terminal_dodaj_linie(entries[i].name);
         }
         if (count == 0) terminal_dodaj_linie("(pusto)");
-    } else if (terminal_porownaj(komenda, "cd")) {
+    } else if (terminal_starts_with(komenda, "cd")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             if (cd(arg) == 0) terminal_dodaj_linie("OK");
@@ -137,11 +154,11 @@ static void terminal_wykonaj_komende(const char *komenda)
         } else {
             terminal_dodaj_linie("Uzycie: cd [katalog]");
         }
-    } else if (terminal_porownaj(komenda, "pwd")) {
+    } else if (terminal_starts_with(komenda, "pwd")) {
         char buf[128];
         fs_get_current_dir_name(buf);
         terminal_dodaj_linie(buf);
-    } else if (terminal_porownaj(komenda, "rm")) {
+    } else if (terminal_starts_with(komenda, "rm")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             if (delete_file(arg) == 0) terminal_dodaj_linie("usunieto");
@@ -149,7 +166,7 @@ static void terminal_wykonaj_komende(const char *komenda)
         } else {
             terminal_dodaj_linie("Uzycie: rm [plik]");
         }
-    } else if (terminal_porownaj(komenda, "touch")) {
+    } else if (terminal_starts_with(komenda, "touch")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             if (create_file(arg, 0) == 0) terminal_dodaj_linie("utworzono");
@@ -157,7 +174,7 @@ static void terminal_wykonaj_komende(const char *komenda)
         } else {
             terminal_dodaj_linie("Uzycie: touch [plik]");
         }
-    } else if (terminal_porownaj(komenda, "mkdir")) {
+    } else if (terminal_starts_with(komenda, "mkdir")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             if (create_dir(arg) == 0) terminal_dodaj_linie("utworzono");
@@ -165,7 +182,7 @@ static void terminal_wykonaj_komende(const char *komenda)
         } else {
             terminal_dodaj_linie("Uzycie: mkdir [katalog]");
         }
-    } else if (terminal_porownaj(komenda, "compile")) {
+    } else if (terminal_starts_with(komenda, "compile")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             int res = kompiluj_plik(arg, arg);
@@ -174,7 +191,7 @@ static void terminal_wykonaj_komende(const char *komenda)
         } else {
             terminal_dodaj_linie("Uzycie: compile [plik.c]");
         }
-    } else if (terminal_porownaj(komenda, "run")) {
+    } else if (terminal_starts_with(komenda, "run")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
             proces_zaladuj_elf(arg);
@@ -182,23 +199,41 @@ static void terminal_wykonaj_komende(const char *komenda)
         } else {
             terminal_dodaj_linie("Uzycie: run [plik]");
         }
-    } else if (terminal_porownaj(komenda, "notatnik")) {
+    } else if (terminal_starts_with(komenda, "notatnik")) {
         notatnik_otworz();
-    } else if (terminal_porownaj(komenda, "pliki") || terminal_porownaj(komenda, "eksplorator")) {
+    } else if (terminal_starts_with(komenda, "pliki") || terminal_starts_with(komenda, "eksplorator")) {
         eksplorator_plikow();
-    } else if (terminal_porownaj(komenda, "kalkulator")) {
+    } else if (terminal_starts_with(komenda, "kalkulator")) {
         kalkulator_otworz();
-    } else if (terminal_porownaj(komenda, "browser") || terminal_porownaj(komenda, "www")) {
+    } else if (terminal_starts_with(komenda, "browser") || terminal_starts_with(komenda, "www")) {
         browser_open();
-    } else if (terminal_porownaj(komenda, "gra")) {
+    } else if (terminal_starts_with(komenda, "gra")) {
         gra();
-    } else if (terminal_porownaj(komenda, "malowanie")) {
+    } else if (terminal_starts_with(komenda, "malowanie")) {
         malowanie_otworz();
-    } else if (terminal_porownaj(komenda, "zadania")) {
+    } else if (terminal_starts_with(komenda, "zadania")) {
         zadania_otworz();
-    } else if (terminal_porownaj(komenda, "duszki")) {
+    } else if (terminal_starts_with(komenda, "duszki")) {
         duszki();
-    } else if (terminal_porownaj(komenda, "tapeta_zmien")) {
+    } else if (terminal_starts_with(komenda, "edit ")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            if (terminal_ma_rozszerzenie(arg, ".C") || terminal_ma_rozszerzenie(arg, ".TXT")) {
+                notatnik_otworz_plik(arg);
+            } else {
+                terminal_dodaj_linie("Tylko pliki .c i .txt");
+            }
+        } else {
+            terminal_dodaj_linie("Uzycie: edit [plik.c / plik.txt]");
+        }
+    } else if (terminal_starts_with(komenda, "notatnik ")) {
+        const char *arg = terminal_pobierz_argument(komenda);
+        if (arg) {
+            notatnik_otworz_plik(arg);
+        } else {
+            notatnik_otworz();
+        }
+    } else if (terminal_starts_with(komenda, "tapeta_zmien")) {
         const char *p = komenda;
         while (*p && *p != ' ') p++;
         while (*p == ' ') p++;
