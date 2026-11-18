@@ -19,13 +19,14 @@
 #include <kernel/apps/duszki.h>
 #include <kernel/malowanie.h>
 #include <kernel/zadania.h>
+#include <graficzny/terminal.h>
 
 #define START_X 0
 #define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
 #define START_SZEROKOSC 72
 #define START_WYSOKOSC PASEK_ZADAN_WYSOKOSC
 
-#define LICZBA_POZYCJI 10
+#define LICZBA_POZYCJI 11
 #define POZYCJA_WYSOKOSC 38
 #define POZYCJA_ODSTEP 42
 #define MENU_MARGINES 12
@@ -368,6 +369,15 @@ static void ikona_duszki(int x, int y)
     ikona_kolo(x + 24, y + 17, 2, 0x00FFB3C8, 0x00FF8FB0);
 }
 
+static void ikona_terminal(int x, int y)
+{
+    ikona_cien(x + 1, y + 1, 30, 30, 3);
+    ikona_rect(x + 1, y + 1, 30, 30, 3, 0x00222222, 0x00111111);
+    rysuj_tekst_chicago(x + 6, y + 6, ">", 0x0000FF00);
+    rysuj_tekst_chicago(x + 14, y + 6, "_", 0x00FFFFFF);
+    rysuj_prostokat(x + 4, y + 24, 22, 4, 0x00333333);
+}
+
 static void (*const ikony_menu[LICZBA_POZYCJI])(int, int) = {
     ikona_notatnik,
     ikona_konta,
@@ -378,7 +388,8 @@ static void (*const ikony_menu[LICZBA_POZYCJI])(int, int) = {
     ikona_gra,
     ikona_malowanie,
     ikona_zadania,
-    ikona_duszki
+    ikona_duszki,
+    ikona_terminal
 };
 
 static const char *const nazwy_menu[LICZBA_POZYCJI] = {
@@ -391,7 +402,8 @@ static const char *const nazwy_menu[LICZBA_POZYCJI] = {
     "GRA",
     "MALOWANIE",
     "ZADANIA",
-    "DUSZKI"
+    "DUSZKI",
+    "TERMINAL"
 };
 
 void menu_start_rysuj_przycisk(void)
@@ -552,6 +564,9 @@ void menu_start_mouse_click(void)
         break;
     case 9:
         duszki();
+        break;
+    case 10:
+        terminal_otworz();
         break;
     }
 }
