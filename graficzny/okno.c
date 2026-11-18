@@ -60,23 +60,6 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
         rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
         if (okno->rysuj_zawartosc)
             okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
-
-        int cien_prawy_x = okno->x + okno->szerokosc;
-        int cien_prawy_y = okno->y + 4;
-        int cien_prawy_w = 4;
-        int cien_prawy_h = okno->wysokosc - 4;
-        if (cien_prawy_x < EKRAN_SZEROKOSC && cien_prawy_w > 0 && cien_prawy_h > 0) {
-            if (cien_prawy_x + cien_prawy_w > EKRAN_SZEROKOSC) cien_prawy_w = EKRAN_SZEROKOSC - cien_prawy_x;
-            rysuj_prostokat_polprzezroczysty(cien_prawy_x, cien_prawy_y, cien_prawy_w, cien_prawy_h, 0x00000000, 55);
-        }
-        int cien_dol_x = okno->x + 4;
-        int cien_dol_y = okno->y + okno->wysokosc;
-        int cien_dol_w = okno->szerokosc - 4;
-        int cien_dol_h = 4;
-        if (cien_dol_y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC && cien_dol_w > 0 && cien_dol_h > 0) {
-            if (cien_dol_x + cien_dol_w > EKRAN_SZEROKOSC) cien_dol_w = EKRAN_SZEROKOSC - cien_dol_x;
-            rysuj_prostokat_polprzezroczysty(cien_dol_x, cien_dol_y, cien_dol_w, cien_dol_h, 0x00000000, 55);
-        }
     }
 }
 
@@ -414,11 +397,6 @@ void okno_obsluz_ruch(int x, int y)
         aktywne_okno->y = ny;
         okno_odrysuj_scene(stare_x, stare_y, szerokosc, wysokosc,
                    nx, ny, szerokosc, wysokosc);
-
-        odtworz_fragment_tla_bufor(stare_x + szerokosc, stare_y + 4, 4, wysokosc - 4);
-        odtworz_fragment_tla_bufor(stare_x + 4, stare_y + wysokosc, szerokosc - 4, 4);
-        odswiez_fragment_widoku(stare_x + szerokosc, stare_y + 4, 4, wysokosc - 4);
-        odswiez_fragment_widoku(stare_x + 4, stare_y + wysokosc, szerokosc - 4, 4);
     }
 
     if (zmienianie_rozmiaru) {
@@ -439,11 +417,6 @@ void okno_obsluz_ruch(int x, int y)
         aktywne_okno->szerokosc = nowy_w;
         aktywne_okno->wysokosc = nowy_h;
         okno_odrysuj_scene(stare_x, stare_y, stare_w, stare_h, stare_x, stare_y, nowy_w, nowy_h);
-
-        odtworz_fragment_tla_bufor(stare_x + stare_w, stare_y + 4, 4, stare_h - 4);
-        odtworz_fragment_tla_bufor(stare_x + 4, stare_y + stare_h, stare_w - 4, 4);
-        odswiez_fragment_widoku(stare_x + stare_w, stare_y + 4, 4, stare_h - 4);
-        odswiez_fragment_widoku(stare_x + 4, stare_y + stare_h, stare_w - 4, 4);
     }
 }
 
