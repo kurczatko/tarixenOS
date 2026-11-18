@@ -409,6 +409,10 @@ void okno_obsluz_ruch(int x, int y)
         int stare_y = aktywne_okno->y;
         int szerokosc = aktywne_okno->szerokosc;
         int wysokosc = aktywne_okno->wysokosc;
+
+        odtworz_fragment_tla_bufor(stare_x + szerokosc, stare_y + 4, 4, wysokosc - 4);
+        odtworz_fragment_tla_bufor(stare_x + 4, stare_y + wysokosc, szerokosc - 4, 4);
+
         aktywne_okno->x = nx;
         aktywne_okno->y = ny;
         okno_odrysuj_scene(stare_x, stare_y, szerokosc, wysokosc,
@@ -429,6 +433,8 @@ void okno_obsluz_ruch(int x, int y)
         if (aktywne_okno->x + nowy_w > EKRAN_SZEROKOSC) nowy_w = EKRAN_SZEROKOSC - aktywne_okno->x;
         if (aktywne_okno->y + nowy_h > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) nowy_h = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->y;
         if (nowy_w == stare_w && nowy_h == stare_h) return;
+        odtworz_fragment_tla_bufor(stare_x + stare_w, stare_y + 4, 4, stare_h - 4);
+        odtworz_fragment_tla_bufor(stare_x + 4, stare_y + stare_h, stare_w - 4, 4);
         okno_odrysuj_scene(stare_x, stare_y, stare_w, stare_h, stare_x, stare_y, nowy_w, nowy_h);
         aktywne_okno->szerokosc = nowy_w;
         aktywne_okno->wysokosc = nowy_h;
