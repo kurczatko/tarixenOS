@@ -82,6 +82,11 @@
 #define SD_CTL_DMA_START (1 << 1)
 #define SD_CTL_IOCE (1 << 2)
 
+#define WIDGET_TYPE_OUTPUT 0x0
+#define WIDGET_TYPE_INPUT 0x1
+#define WIDGET_TYPE_MIXER 0x2
+#define WIDGET_TYPE_SELECTOR 0x3
+
 struct hda_codec_widget {
     uint8_t nid;
     uint8_t type;
@@ -218,6 +223,7 @@ private:
     uint32_t send_verb(uint32_t verb);
     uint32_t send_verb_nid(uint8_t nid, uint32_t verb_cmd, uint32_t payload);
     int find_codec_address(void);
+    int find_widget_by_nid(uint8_t nid);
     void discover_widgets(void);
     void parse_pin_configs(void);
     void setup_default_pins(void);
@@ -240,6 +246,8 @@ private:
     int ipc_wait_response(uint32_t timeout);
     void parse_components(void);
     void parse_pipelines(void);
+    void delay_us(uint32_t us);
+    void delay_ms(uint32_t ms);
 
     static HDAudioCodec* g_instance;
     volatile uint8_t* hda_base;

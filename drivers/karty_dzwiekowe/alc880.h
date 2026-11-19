@@ -376,7 +376,9 @@ private:
     struct alc880_widget widgets[ALC880_MAX_WIDGETS];
     uint8_t pin_count;
     uint8_t pin_nids[ALC880_MAX_PINS];
+    uint8_t dac_count;
     uint8_t dac_nids[ALC880_MAX_PINS];
+    uint8_t adc_count;
     uint8_t adc_nids[ALC880_MAX_PINS];
     uint8_t stream_count;
     struct alc880_stream streams[ALC880_MAX_STREAMS];

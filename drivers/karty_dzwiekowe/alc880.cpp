@@ -668,6 +668,7 @@ void ALC880::setup_default_pins(void)
 
         uint8_t device = (uint8_t)((cfg >> 20) & 0xF);
         uint8_t conn_type = (uint8_t)((cfg >> 16) & 0xF);
+        (void)conn_type;
         uint8_t port_conn = (uint8_t)((cfg >> 30) & 0x3);
 
         if (port_conn == PORT_CONNECTIVITY_JACK || port_conn == PORT_CONNECTIVITY_BOTH) {

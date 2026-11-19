@@ -121,7 +121,7 @@ HDAudioCodec::HDAudioCodec()
     for (int i = 0; i < HDA_CODEC_MAX_COMPONENTS; i++) {
         components[i].component_id = 0;
         components[i].type = 0;
-        components[i].pipeline_id = 0xFFFFFFFF;
+        components[i].pipeline_id = 0xFF;
         components[i].config = 0;
         components[i].active = 0;
     }
