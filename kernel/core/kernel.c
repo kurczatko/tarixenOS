@@ -70,6 +70,7 @@
 #include <graphics/eksplorator_plikow.h>
 #include <kernel/core/proces.h>
 #include <kernel/drivers/driver_manager.h>
+#include <graphics/hal_gfx.h>
 #include <kernel/sys/timer.h>
 #include <kernel/sys/pik.h>
 #include <drivers/video/qemu_vga.h>
@@ -304,6 +305,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     proces_init();
     printf("t");
     driver_manager_init_all();
+    hal_gfx_init();
     printf("y");
     if (!net_ready()) {
         printf("u");

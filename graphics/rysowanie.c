@@ -12,6 +12,7 @@
 #include <drivers/bluetooth/bluetooth.h>
 #include <drivers/baterie/bateria.h>
 #include <graphics/menu_start.h>
+#include <graphics/hal_gfx.h>
 
 #define CURSOR_W 12
 #define CURSOR_H 18
@@ -257,6 +258,10 @@ struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
 
 static void zapisz_piksel_framebuffera(int x, int y, uint32_t kolor)
 {
+    if (hal_gfx_mial_sterownik()) {
+        hal_gfx_putpixel((uint32_t)x, (uint32_t)y, kolor);
+        return;
+    }
     uint32_t czerwony = (kolor >> 16) & 0xFF;
     uint32_t zielony = (kolor >> 8) & 0xFF;
     uint32_t niebieski = kolor & 0xFF;
@@ -291,6 +296,17 @@ static int framebuffer_ma_szybki_format(void)
 
 void odswiez_fragment_widoku(int x, int y, int szerokosc, int wysokosc)
 {
+    if (hal_gfx_mial_sterownik()) {
+        for (int wiersz = 0; wiersz < wysokosc; wiersz++) {
+            for (int kolumna = 0; kolumna < szerokosc; kolumna++) {
+                int px = x + kolumna;
+                int py = y + wiersz;
+                if (px < 0 || px >= EKRAN_SZEROKOSC || py < 0 || py >= EKRAN_WYSOKOSC) continue;
+                hal_gfx_putpixel((uint32_t)px, (uint32_t)py, obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)px]);
+            }
+        }
+        return;
+    }
     if (x < 0) {
         szerokosc += x;
         x = 0;
@@ -324,6 +340,14 @@ static void narysuj_napis_systemowy(void)
 
 void odswiez_widok(void)
 {
+    if (hal_gfx_mial_sterownik()) {
+        for (int y = 0; y < EKRAN_WYSOKOSC; y++) {
+            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+            for (int x = 0; x < EKRAN_SZEROKOSC; x++)
+                hal_gfx_putpixel((uint32_t)x, (uint32_t)y, obraz[offset + x]);
+        }
+        return;
+    }
     if (framebuffer_ma_szybki_format()) {
         kopiuj_pamiec(pamiec_graficzna, obraz, EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4);
     } else {
@@ -378,11 +402,19 @@ void odtworz_fragment_tla(int x, int y, int szerokosc, int wysokosc)
 void rysuj_piksel(int x, int y, uint32_t kolor)
 {
     if (x < 0 || x >= EKRAN_SZEROKOSC || y < 0 || y >= EKRAN_WYSOKOSC) return;
+    if (hal_gfx_mial_sterownik()) {
+        hal_gfx_putpixel((uint32_t)x, (uint32_t)y, kolor);
+        return;
+    }
     obraz[y * EKRAN_SZEROKOSC + x] = kolor;
 }
 
 void rysuj_prostokat(int x, int y, int szerokosc, int wysokosc, uint32_t kolor)
 {
+    if (hal_gfx_mial_sterownik()) {
+        hal_gfx_fillrect((uint32_t)x, (uint32_t)y, (uint32_t)szerokosc, (uint32_t)wysokosc, kolor);
+        return;
+    }
     for (int pion = 0; pion < wysokosc; pion++) {
         int py = y + pion;
         if (py < 0 || py >= EKRAN_WYSOKOSC) continue;
@@ -622,8 +654,12 @@ void wypelnij_ekran(uint32_t kolor)
     kolor_tapety = kolor;
     tapeta_gradientowa = 0;
     tapeta_bitmapa_wczytana = 0;
-    for (uint32_t i = 0; i < EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
-        obraz[i] = kolor_tapety;
+    if (hal_gfx_mial_sterownik()) {
+        hal_gfx_fillrect(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC, kolor);
+    } else {
+        for (uint32_t i = 0; i < EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
+            obraz[i] = kolor_tapety;
+        }
     }
     narysuj_pasek_zadan();
     narysuj_napis_systemowy();

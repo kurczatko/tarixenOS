@@ -1,0 +1,1 @@
+/* za jakis czas dodam implementacje*/
