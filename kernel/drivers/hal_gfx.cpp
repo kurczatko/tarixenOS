@@ -347,7 +347,7 @@ static struct hal_gfx_driver hal_drv_gtx660 = {
     gtx660_putpixel,
     gtx660_fillrect,
     gtx660_blt,
-    gtx660_cursor_set,zależności
+    gtx660_cursor_set,
     gtx660_cursor_hide,
     gtx660_get_fb,
     gtx660_get_szerokosc,
