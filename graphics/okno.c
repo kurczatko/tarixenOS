@@ -15,11 +15,20 @@
 #define KOLOR_PASKA 0x00787C82
 #define KOLOR_PASKA_AKTYWNE 0x003B82F6
 #define KOLOR_OKNA  0x00FFFFFF
-#define KOLOR_X     0x00E74C3C
 #define OKNA_MAKS 8
 #define GENIE_KLATKI 14
 #define GENIE_ICON_W 24
 #define GENIE_ICON_SPACJE 4
+
+#define OKNO_PROMIEN 8
+#define KOLOR_BTN_ZAMKNIJ   0x00FF5F57
+#define KOLOR_BTN_MINIM     0x00FEBC2E
+#define KOLOR_BTN_MAKS      0x0028C840
+#define KOLOR_BTN_NIEAKTYW  0x00B4B4B4
+#define BTN_ROZMIAR 12
+#define BTN_X(i) (8 + 20 * (i))   /* 0 = czerwony, 1 = zolty, 2 = zielony */
+#define BTN_Y 6
+#define TYTUL_X 68
 
 struct okno *aktywne_okno;
 static struct okno *okna[OKNA_MAKS];
@@ -32,6 +41,57 @@ static int kierunek_zmiany;
 static char schowek[512];
 static int schowek_dlugosc;
 
+/* ile pikseli odciac z danego wiersza rogu (i = 0 to najwyzszy wiersz) */
+static int inset_rogu(int promien, int i)
+{
+    if (i >= promien) return 0;
+    int d = 2 * (promien - i) - 1;
+    int lim = 4 * promien * promien - d * d;
+    int s = 0;
+    while ((s + 1) * (s + 1) * 4 <= lim) s++;
+    return promien - s;
+}
+
+/* alfa < 0 = rozmycie, alfa >= 100 = pelny kolor, inaczej polprzezroczysty */
+static void wypelnij_pas(int x, int y, int w, int h, uint32_t kolor, int alfa)
+{
+    if (w <= 0 || h <= 0) return;
+    if (alfa < 0) rozmyj_prostokat(x, y, w, h);
+    else if (alfa >= 100) rysuj_prostokat(x, y, w, h, kolor);
+    else rysuj_prostokat_polprzezroczysty(x, y, w, h, kolor, alfa);
+}
+
+/* prostokat z zaokraglonymi rogami: rg = promien gornych, rd = promien dolnych */
+static void pas_zaokraglony(int x, int y, int w, int h, int rg, int rd,
+                            uint32_t kolor, int alfa)
+{
+    if (w <= 0 || h <= 0) return;
+    if (rg > w / 2) rg = w / 2;
+    if (rd > w / 2) rd = w / 2;
+    if (rg > h / 2) rg = h / 2;
+    if (rd > h / 2) rd = h / 2;
+
+    for (int i = 0; i < rg; i++) {
+        int in = inset_rogu(rg, i);
+        wypelnij_pas(x + in, y + i, w - 2 * in, 1, kolor, alfa);
+    }
+    if (h - rd > rg)
+        wypelnij_pas(x, y + rg, w, h - rd - rg, kolor, alfa);
+    for (int i = 0; i < rd; i++) {
+        int wiersz = h - 1 - i;
+        if (wiersz < rg) continue;
+        int in = inset_rogu(rd, i);
+        wypelnij_pas(x + in, y + wiersz, w - 2 * in, 1, kolor, alfa);
+    }
+}
+
+static int w_przycisku(const struct okno *okno, int x, int y, int i)
+{
+    int px = okno->x + BTN_X(i);
+    int py = okno->y + BTN_Y;
+    return x >= px && x < px + BTN_ROZMIAR && y >= py && y < py + BTN_ROZMIAR;
+}
+
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
@@ -39,27 +99,31 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
         okno->rysuj_zawartosc(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
         return;
     }
-    if (!okno->pelnoekranowy) {
-        rozmyj_prostokat(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
-        rysuj_prostokat_polprzezroczysty(okno->x, okno->y, okno->szerokosc, okno->wysokosc, KOLOR_RAMKI, 60);
-        rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 2, okno->szerokosc - 4, 20,
-                        okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 85);
-        rozmyj_prostokat(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24);
-        rysuj_prostokat_polprzezroczysty(okno->x + 2, okno->y + 22, okno->szerokosc - 4, okno->wysokosc - 24, KOLOR_OKNA, 70);
-        rysuj_tekst_chicago(okno->x + 8, okno->y + 8, okno->tytul, 0x00FFFFFF);
-        rysuj_prostokat(okno->x + okno->szerokosc - 64, okno->y + 4, 16, 16, 0x004A5D6E);
-        rysuj_prostokat(okno->x + okno->szerokosc - 60, okno->y + 10, 8, 2, 0x00FFFFFF);
-        rysuj_prostokat(okno->x + okno->szerokosc - 42, okno->y + 4, 16, 16, 0x004A5D6E);
-        if (!okno->zmaksymalizowane) {
-            rysuj_prostokat(okno->x + okno->szerokosc - 38, okno->y + 8, 8, 8, 0x00FFFFFF);
-        } else {
-            rysuj_prostokat(okno->x + okno->szerokosc - 40, okno->y + 6, 8, 8, 0x00FFFFFF);
-            rysuj_prostokat(okno->x + okno->szerokosc - 34, okno->y + 12, 8, 8, 0x00FFFFFF);
-        }
-        rysuj_prostokat(okno->x + okno->szerokosc - 22, okno->y + 4, 16, 16, KOLOR_X);
-        rysuj_znak_chicago(okno->x + okno->szerokosc - 18, okno->y + 8, 'X', 0x00FFFFFF);
+    {
+        int x = okno->x, y = okno->y;
+        int w = okno->szerokosc, h = okno->wysokosc;
+        int akt = (okno == aktywne_okno);
+        int r  = okno->zmaksymalizowane ? 0 : OKNO_PROMIEN;      /* zmaksymalizowane = ostre rogi */
+        int rp = okno->zmaksymalizowane ? 0 : OKNO_PROMIEN - 2;  /* promien wewnetrzny */
+
+        pas_zaokraglony(x, y, w, h, r, r, 0, -1);                       /* rozmycie calosci */
+        pas_zaokraglony(x, y, w, h, r, r, KOLOR_RAMKI, 60);             /* ramka */
+        pas_zaokraglony(x + 2, y + 2, w - 4, 20, rp, 0,
+                        akt ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 85);   /* pasek tytulu */
+        pas_zaokraglony(x + 2, y + 22, w - 4, h - 24, 0, rp, 0, -1);    /* rozmycie tresci */
+        pas_zaokraglony(x + 2, y + 22, w - 4, h - 24, 0, rp, KOLOR_OKNA, 70);
+
+        /* przyciski w stylu macOS (po lewej): czerwony, zolty, zielony */
+        pas_zaokraglony(x + BTN_X(0), y + BTN_Y, BTN_ROZMIAR, BTN_ROZMIAR, 6, 6,
+                        akt ? KOLOR_BTN_ZAMKNIJ : KOLOR_BTN_NIEAKTYW, 100);
+        pas_zaokraglony(x + BTN_X(1), y + BTN_Y, BTN_ROZMIAR, BTN_ROZMIAR, 6, 6,
+                        akt ? KOLOR_BTN_MINIM : KOLOR_BTN_NIEAKTYW, 100);
+        pas_zaokraglony(x + BTN_X(2), y + BTN_Y, BTN_ROZMIAR, BTN_ROZMIAR, 6, 6,
+                        akt ? KOLOR_BTN_MAKS : KOLOR_BTN_NIEAKTYW, 100);
+
+        rysuj_tekst_chicago(x + TYTUL_X, y + 8, okno->tytul, 0x00FFFFFF);
         if (okno->rysuj_zawartosc)
-            okno->rysuj_zawartosc(okno->x + 8, okno->y + 30, okno->szerokosc - 16, okno->wysokosc - 38);
+            okno->rysuj_zawartosc(x + 8, y + 30, w - 16, h - 38);
     }
 }
 
@@ -296,27 +360,21 @@ int okno_obsluz_klikniecie(int x, int y)
         return 1;
     }
 
-    if (x >= trafione->x + trafione->szerokosc - 22 &&
-        x < trafione->x + trafione->szerokosc - 6 &&
-        y >= trafione->y + 4 && y < trafione->y + 20) {
+    if (w_przycisku(trafione, x, y, 0)) {          /* czerwony: zamknij */
         okno_zamknij(trafione);
         return 1;
     }
-    if (x >= trafione->x + trafione->szerokosc - 42 &&
-        x < trafione->x + trafione->szerokosc - 26 &&
-        y >= trafione->y + 4 && y < trafione->y + 20) {
+    if (w_przycisku(trafione, x, y, 1)) {          /* zolty: minimalizuj */
+        okno_zminimalizuj(trafione);
+        return 1;
+    }
+    if (w_przycisku(trafione, x, y, 2)) {          /* zielony: powieksz / przywroc */
         if (trafione->zmaksymalizowane) okno_przywroc_rozmiar(trafione);
         else okno_maksymalizuj(trafione);
         return 1;
     }
-    if (x >= trafione->x + trafione->szerokosc - 64 &&
-        x < trafione->x + trafione->szerokosc - 48 &&
-        y >= trafione->y + 4 && y < trafione->y + 20) {
-        okno_zminimalizuj(trafione);
-        return 1;
-    }
     if (!trafione->zmaksymalizowane &&
-        x >= trafione->x + 2 && x < trafione->x + trafione->szerokosc - 64 &&
+        x >= trafione->x + 2 && x < trafione->x + trafione->szerokosc - 2 &&
         y >= trafione->y + 2 && y < trafione->y + 22) {
         aktywne_okno = trafione;
         przeciaganie = 1;
@@ -453,12 +511,13 @@ static void okno_genie_rysuj_klatke(struct okno *okno, int cx, int cy, int cw, i
         narysuj_okno_bez_odswiezania(o);
     }
     if (cw >= 4 && ch >= 4) {
-        rysuj_prostokat(cx, cy, cw, ch, KOLOR_RAMKI);
-        rysuj_prostokat(cx + 2, cy + 2, cw - 4, 20, okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA);
-        if (ch > 24) {
-            rysuj_prostokat(cx + 2, cy + 22, cw - 4, ch - 24, KOLOR_OKNA);
-        }
-        rysuj_tekst_chicago(cx + 8, cy + 8, okno->tytul, 0x00FFFFFF);
+        int r = OKNO_PROMIEN;
+        pas_zaokraglony(cx, cy, cw, ch, r, r, KOLOR_RAMKI, 100);
+        pas_zaokraglony(cx + 2, cy + 2, cw - 4, 20, r - 2, 0,
+                        okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 100);
+        if (ch > 24)
+            pas_zaokraglony(cx + 2, cy + 22, cw - 4, ch - 24, 0, r - 2, KOLOR_OKNA, 100);
+        rysuj_tekst_chicago(cx + TYTUL_X, cy + 8, okno->tytul, 0x00FFFFFF);
     }
     odswiez_widok();
 }
