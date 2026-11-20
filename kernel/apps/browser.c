@@ -391,6 +391,9 @@ static void page_from_response(int response_length)
     char anchor_url[256];
 
     page[0] = 0;
+    css_init();
+    js_init();
+    js_elem_count = 0;
     link_count = 0;
     css_rule_count = 0;
     field_count = 0;
@@ -429,6 +432,14 @@ static void page_from_response(int response_length)
             int tag_start = i + 1;
             int closing = response[tag_start] == '/';
             if (closing) tag_start++;
+            if (!closing && tag_start + 2 < response_length &&
+                response[tag_start] == '!' && response[tag_start + 1] == '-' && response[tag_start + 2] == '-') {
+                int k = tag_start + 3;
+                while (k + 2 < response_length &&
+                       !(response[k] == '-' && response[k + 1] == '-' && response[k + 2] == '>')) k++;
+                i = (k + 2 < response_length) ? k + 2 : response_length;
+                continue;
+            }
             int tag_end = tag_start;
             while (tag_end < response_length && response[tag_end] != '>') tag_end++;
             int name_end = tag_start;
@@ -459,18 +470,25 @@ static void page_from_response(int response_length)
                 if (closing) { in_script = 0; i = tag_end; continue; }
                 int s_start = tag_end + 1;
                 int s_end = s_start;
-                while (s_end + 7 < response_length &&
-                       !(response[s_end] == '<' && response[s_end + 1] == '/' &&
-                         slice_equal_nocase(response, s_end + 2, 6, "script"))) s_end++;
-                if (s_end > s_start && s_end - s_start < 2048) {
+                int found = 0;
+                while (s_end + 8 <= response_length) {
+                    if (response[s_end] == '<' && response[s_end + 1] == '/' &&
+                        slice_equal_nocase(response, s_end + 2, 6, "script")) { found = 1; break; }
+                    s_end++;
+                }
+                if (!found) { i = response_length; continue; }   /* niezamkniety skrypt */
+                int js_len = s_end - s_start;
+                if (js_len > 0 && js_len < 2048) {
                     static char js_buf[2048];
                     int jn = 0;
-                    while (s_start < s_end && jn < 2047) { js_buf[jn++] = response[s_start++]; }
+                    while (s_start < s_end && jn < 2047) js_buf[jn++] = response[s_start++];
                     js_buf[jn] = 0;
                     js_run(js_buf, jn);
                 }
-                in_script = 1;
-                i = s_end < response_length ? s_end : tag_end;
+                int close_end = s_end;
+                while (close_end < response_length && response[close_end] != '>') close_end++;
+                i = close_end;      /* petla zrobi i++ i przejdzie za '>' */
+                in_script = 0;      /* tekst po </script> nie jest juz gubiony */
                 continue;
             }
 
