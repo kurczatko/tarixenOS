@@ -192,8 +192,8 @@ static void terminal_edytor_dodaj_znak(char znak)
     int len = 0;
     while (linia[len]) len++;
     if (len >= 255) return;
-    for (int i = len; i >= 0; i--) linia[i + 1] = linia[i];
-    linia[0] = znak;
+    linia[len] = znak;
+    linia[len + 1] = 0;
     terminal_edytor_zmieniony = 1;
 }
 
@@ -204,7 +204,6 @@ static void terminal_edytor_usun_znak(void)
     int len = 0;
     while (linia[len]) len++;
     if (len == 0) return;
-    for (int i = 0; i < len - 1; i++) linia[i] = linia[i + 1];
     linia[len - 1] = 0;
     terminal_edytor_zmieniony = 1;
 }
