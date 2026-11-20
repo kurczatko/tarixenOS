@@ -466,20 +466,7 @@ static void menu_start_narysuj(void)
 static void menu_start_wyczysc(void)
 {
     odtworz_fragment_tla(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
-    
-    if (aktywne_okno && aktywne_okno->otwarte) {
-        int ox = aktywne_okno->x;
-        int oy = aktywne_okno->y;
-        int ow = aktywne_okno->szerokosc;
-        int oh = aktywne_okno->wysokosc;
-
-        if (MENU_X < ox + ow && MENU_X + MENU_SZEROKOSC > ox &&
-            MENU_Y < oy + oh && MENU_Y + MENU_WYSOKOSC > oy) {
-            okno_narysuj(aktywne_okno);
-        }
-    }
-    
-    odswiez_widok();
+    okno_odrysuj_wszystkie();
 }
 
 void menu_start_przelacz(void)

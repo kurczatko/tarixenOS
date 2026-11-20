@@ -845,11 +845,16 @@ void okno_maksymalizuj(struct okno *okno)
 void okno_przywroc_rozmiar(struct okno *okno)
 {
     if (!okno || !okno->otwarte || !okno->zmaksymalizowane) return;
+    int stare_x = okno->x;
+    int stare_y = okno->y;
+    int stare_w = okno->szerokosc;
+    int stare_h = okno->wysokosc;
     okno->x = okno->x_poprzednie;
     okno->y = okno->y_poprzednie;
     okno->szerokosc = okno->szerokosc_poprzednia;
     okno->wysokosc = okno->wysokosc_poprzednia;
     okno->zmaksymalizowane = 0;
+    odtworz_fragment_tla_bufor(stare_x, stare_y, stare_w, stare_h);
     okno_przenies_na_wierzch(okno);
     pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
