@@ -299,7 +299,18 @@ static void terminal_wykonaj_komende(const char *komenda)
     } else if (terminal_starts_with(komenda, "compile")) {
         const char *arg = terminal_pobierz_argument(komenda);
         if (arg) {
-            int res = kompiluj_plik(arg, arg);
+            char wyjsciowa[32];
+            int i = 0;
+            while (arg[i] && i < 30) { wyjsciowa[i] = arg[i]; i++; }
+            int kropekka = -1;
+            for (int j = 0; arg[j]; j++) if (arg[j] == '.') kropekka = j;
+            if (kropekka >= 0) i = kropekka;
+            wyjsciowa[i] = '.';
+            wyjsciowa[i+1] = 'e';
+            wyjsciowa[i+2] = 'l';
+            wyjsciowa[i+3] = 'f';
+            wyjsciowa[i+4] = 0;
+            int res = kompiluj_plik(arg, wyjsciowa);
             if (res == 0) terminal_dodaj_linie("skompilowano");
             else terminal_dodaj_linie("blad kompilacji");
         } else {
