@@ -57,7 +57,7 @@ struct browser_field {
 };
 
 struct okno browser_window;
-static char address[128] = "http://textfiles.com/";
+static char address[128] = "http://info.cern.ch/";
 static char response[BROWSER_RESPONSE_MAX];
 static char page[BROWSER_PAGE_MAX];
 static uint32_t page_colors[BROWSER_PAGE_MAX];
@@ -850,7 +850,7 @@ static void browser_fetch(void)
     int parsed = extract_host_path(host, sizeof(host), path, sizeof(path), &port);
     int length;
     if (parsed == 0) { set_status("Nieprawidlowy adres"); okno_narysuj(&browser_window); return; }
-    if (!net_ready()) { set_status("Brak sieci: sterownik/DHCP niedostepne"); okno_narysuj(&browser_window); return; }
+    if (!net_ready()) { net_init(); if (!net_ready()) { set_status("Brak sieci: sterownik/DHCP niedostepne"); okno_narysuj(&browser_window); return; } }
 
     set_status("Laczenie... czekaj");
     okno_narysuj(&browser_window);
@@ -1255,8 +1255,7 @@ void browser_open(void)
     address_focused = 1;
     focused_field = -1;
     for (uint32_t fi = 0; fi < field_count; fi++) fields[fi].focused = 0;
-    if (!net_ready()) set_status("Brak sieci: sterownik/DHCP niedostepne");
-    else set_status("Wpisz adres i nacisnij IDZ");
+    if (!net_ready()) { net_init(); if (!net_ready()) set_status("Brak sieci: sterownik/DHCP niedostepne"); else set_status("Wpisz adres i nacisnij IDZ"); }
     okno_stworz(&browser_window, 120, 80, BROWSER_WIDTH, BROWSER_HEIGHT,
                 "PRZEGLADARKA HTTP/HTTPS", browser_draw);
     proces_rejestruj_okno("WWW", &browser_window);

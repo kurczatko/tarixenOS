@@ -7178,6 +7178,39 @@ integracja z przegladarka:
 
 `drivers/net.c` wywoluje `rtl8111e_init()` jako pierwsze w lancuchu inicjalizacji sieci (przed `rtl8168b`, `rtl8188ce`, `e1000`, `rtl8139`). gdy karta RTL8111E jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika rtl8111e. przegladarka (`kernel/apps/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika RTL8111E przegladarka pobiera strony przez ta karte automatycznie. w środowisku QEMU (domyslna karta RTL8139) lacze jest nawiazywane przez sterownik rezerwowy `rtl8139`.
 
+## sterownik sieciowy Novell NE2000 PCI - drivers/network/ne2000.c
+
+zaawansowany sterownik karty sieciowej Novell NE2000 (chip DS8390 / kompatybilne klony: Realtek RTL8029, Winbond 89C940, Compex RL2000, KTI ET32P2, NetVin NV5000SC, VIA VT86C926) napisany w C. sterownik obsluguje wykrycie urzadzenia na magistrali PCI (klasa sieciowa 0x02), mapowanie przestrzeni I/O z BAR0, soft-reset chipa, odczyt adresu MAC z PROM przez DMA zdalne, konfiguracje pierścienia odbiorczego i bufora nadawczego, nadawanie i odbieranie ramek ethernet w trybie polling (bez przerwan), obsluge bajtowa i slowa (16-bit DMA), statystyki TX/RX z licznikami bledow (kolizje, przerwania, utrata nosnika, niedobor FIFO, bledy CRC/ramki/FIFO, utracone pakiety), test petli (loopback), konfiguracje multicast oraz wylaczenie sterownika. integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive`, co oznacza ze przegladarka (`kernel/apps/browser.c`) automatycznie korzysta z tej karty gdy jest dostepna i zainicjowana (opcja rezerwowa na koncu lancucha inicjalizacji sieci, po e1000 i rtl8139).
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `int ne2000_init(void)` | Inicjalizuje sterownik NE2000: wyszukuje urzadzenie na PCI (vendor/device ID klonow NE2000, klasa sieciowa), odczytuje BAR0 (przestrzen I/O), wlacza magistrale PCI (master + memory), resetuje chip DS8390, konfiguruje rejestry DCR (tryb slowa, dlugi adres, burst 4 slowa), RCR (rozgloszenia, multicast), TCR, IMR, ustawia granice pierścienia odbiorczego (PSTART/PSTOP/BNRY), odczytuje adres MAC z PROM przez DMA zdalne (strona 1), uruchamia chip. zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostalo znalezione lub inicjalizacja nie powiodla sie. |
+| `int ne2000_is_ready(void)` | Zwraca 1 gdy sterownik zostal zainicjalizowany i jest gotowy do nadawania/odbioru, 0 w przeciwnym razie. |
+| `int ne2000_get_mac(uint8_t mac[6])` | Kopiuje adres MAC karty do tablicy 6-bajtowej. zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy lub mac jest NULL. |
+| `void ne2000_shutdown(void)` | Zatrzymuje chip (CR_STP), wylacza przerwania (IMR = 0), czyści ISR, przechodzi w tryb monitora (RCR_MON) i loopback (TCR_LOOP), oznacza sterownik jako nieinicjalizowany. |
+
+### Nadawanie i odbieranie ramek
+
+| funkcja | opis |
+|---------|------|
+| `int ne2000_send(const void *frame, uint16_t length)` | Wysyla ramke ethernet przez karte. czeka az nadajnik bedzie wolny (bit PTX w TSR), konfiguruje DMA zdalne (TPSR, TBCR0/1, RSAR0/1, RBCR0/1), zapisuje dane do portu danych (slowa 16-bitowe), wyzwala nadawanie (CR_TXP), czeka na potwierdzenie (ISR_PTX) i aktualizuje statystyki (tx_packets, tx_errors, tx_collisions, tx_aborts, tx_carrier_lost, tx_fifo_underrun). zwraca 1 przy sukcesie, 0 przy bledzie nadawania, -1 przy blednych argumentach lub gdy nadawanie w toku. |
+| `int ne2000_receive(void *frame, uint16_t capacity)` | Odbiera nastepna dostepna ramke z pierścienia odbiorczego do podanego bufora (tryb polling, sprawdza ISR_PRX). odczytuje naglowek pakietu (strona nastepna, status odbioru, dlugosc) przez DMA zdalne, sprawdza RSR_PRX, kopiuje dane do bufora, aktualizuje wskaznik granicy (BNRY) i statystyki (rx_packets, rx_errors, rx_crc_errors, rx_frame_errors, rx_fifo_overrun, rx_missed_packets). zwraca dlugosc odebranej ramki w bajtach, 0 gdy brak danych, -1 przy blednych argumentach. |
+
+### Diagnostyka i statystyki
+
+| funkcja | opis |
+|---------|------|
+| `int ne2000_loopback_test(void)` | Wlacza wewnetrzny loopback (TCR_LOOP), wysyla ramke testowa 64-bajtowa, odbiera ja z powrotem i porownuje zawartosc. zwraca 1 gdy ramka powrotna jest zgodna, 0 przy rozbieznosci lub bledzie, -1 gdy sterownik nie jest gotowy. po tescie przywraca나 standardowa konfigurację RCR/TCR. |
+| `void ne2000_stats_reset(void)` | Zeruje wszystkie liczniki statystyk (tx_packets, rx_packets, tx_errors, rx_errors, tx_collisions, tx_aborts, tx_carrier_lost, tx_fifo_underrun, rx_crc_errors, rx_frame_errors, rx_fifo_overrun, rx_missed_packets). |
+| `int ne2000_stats_get(uint32_t *tx_packets, uint32_t *rx_packets, uint32_t *tx_errors, uint32_t *rx_errors)` | Wypelnia podane wskazniki aktualnymi wartosciami licznikow pakietow i bledow nadawania/odbioru. zwraca 1 przy sukcesie, 0 gdy ktorys z wskaznikow jest NULL. |
+| `int ne2000_set_multicast(const uint8_t *addr)` | Programuje filtr adresow multicast w rejestrach MAR (strona 1). obecnie zeruje wszystkie 8 bajtow MAR i przywraca konfiguracje RCR (rozgloszenia + multicast). zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy. |
+
+Integracja ze stosem sieciowym:
+
+`drivers/net.c` wywoluje `ne2000_init()` jako opcje rezerwowa na koncu lancucha inicjalizacji sieci (po `e1000` i `rtl8139`). gdy karta NE2000 jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika ne2000. przegladarka (`kernel/apps/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika NE2000 przegladarka pobiera strony przez ta karte automatycznie.
+
 ## karta graficzna - drivers/karty_graficzne/radeon_8500.cpp
 
 Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarządza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_8500.h i jest inicjalizowany z kernel/core/kernel.c przez `radeon_8500_init()`.
