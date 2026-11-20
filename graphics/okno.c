@@ -16,7 +16,9 @@
 #define KOLOR_PASKA_AKTYWNE 0x003B82F6
 #define KOLOR_OKNA  0x00FFFFFF
 #define OKNA_MAKS 8
-#define GENIE_KLATKI 14
+#define GENIE_KLATKI 26
+#define GENIE_CZEKAJ 250000  
+
 #define GENIE_ICON_W 24
 #define GENIE_ICON_SPACJE 4
 
@@ -143,12 +145,14 @@ static void okno_przenies_na_wierzch(struct okno *okno)
     aktywne_okno = okno;
 }
 
-static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc)
+static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc,
+                                    const struct okno *pomin)
 {
     odtworz_fragment_tla_bufor(x, y, szerokosc, wysokosc);
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         struct okno *okno = okna[indeks];
-        if (!okno || !okno->otwarte || okno->zminimalizowane || okno->x >= x + szerokosc ||
+        if (!okno || okno == pomin || !okno->otwarte || okno->zminimalizowane ||
+            okno->x >= x + szerokosc ||
             okno->x + okno->szerokosc <= x || okno->y >= y + wysokosc ||
             okno->y + okno->wysokosc <= y) continue;
         narysuj_okno_bez_odswiezania(okno);
@@ -182,7 +186,7 @@ static void okno_odrysuj_scene(int x1, int y1, int szerokosc1, int wysokosc1,
     dol = dol1 > dol2 ? dol1 : dol2;
     if (prawy <= lewy || dol <= gora) return;
 
-    odrysuj_okna_w_obszarze(lewy, gora, prawy - lewy, dol - gora);
+    odrysuj_okna_w_obszarze(lewy, gora, prawy - lewy, dol - gora, 0);
     odswiez_fragment_widoku(lewy, gora, prawy - lewy, dol - gora);
 }
 
@@ -492,52 +496,294 @@ void okno_zakoncz_przeciaganie(void)
     okno_odrysuj_wszystkie();
 }
 
+/* ====================================================================
+ * Animacja (minimalizacja i przywracanie)
+ *
+ * Okno jest dzielone na poziome wiersze. Kazdy wiersz dostaje wlasna
+ * pozycje i szerokosc, wyliczone z krzywej S laczacej oryginalne
+ * krawedzie okna z waska "szyjka" przy pasku zadan. Dolna czesc okna
+ * leci pierwsza i sie zweza, gorna rusza z opoznieniem, na koncu cala
+ * zaslona zapada sie do szyjki. Obliczenia sa stalopozycyjne (bez float).
+ * ==================================================================== */
+
+#define GENIE_FP 1024
+
+#ifndef GENIE_MIGAWKA
+#define GENIE_MIGAWKA 0
+#endif
+#ifndef GENIE_MIGAWKA_PIKSELE
+#define GENIE_MIGAWKA_PIKSELE (1024 * 768)
+#endif
+
+#if GENIE_MIGAWKA
+#if !defined(GENIE_CZYTAJ_PIKSEL) || !defined(GENIE_PISZ_PIKSEL)
+#error "uwu"
+#endif
+static uint32_t genie_migawka[GENIE_MIGAWKA_PIKSELE];
+#endif
+
+struct genie {
+    int sx, sy, sw, sh;     /* okno zrodlowe */
+    int tl, tr, ty;         /* cel: lewa i prawa krawedz szyjki, gorna krawedz paska zadan */
+    int bx, by, bw, bh;     /* obszar zajety w poprzedniej klatce */
+    int migawka;            /* 1 = uzywamy zdjecia okna */
+    int top, wys;           /* biezaca klatka: gorna krawedz i wysokosc zaslony */
+    int sq, c;              /* biezaca klatka: zwezenie i zapadanie (0..GENIE_FP) */
+};
+
 static void okno_genie_czekaj(void)
 {
     int i;
-    for (i = 0; i < 400000; i++) {
+    for (i = 0; i < GENIE_CZEKAJ; i++) {
         __asm__ volatile("nop");
     }
 }
 
-static void okno_genie_rysuj_klatke(struct okno *okno, int cx, int cy, int cw, int ch)
+static int genie_min(int a, int b) { return a < b ? a : b; }
+static int genie_max(int a, int b) { return a > b ? a : b; }
+
+/* smoothstep: t i wynik w skali 0..GENIE_FP */
+static int genie_gladko(int t)
 {
-    odtworz_fragment_tla_bufor(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
-    narysuj_pasek_zadan();
-    menu_start_rysuj_przycisk();
-    for (int indeks = 0; indeks < liczba_okien; indeks++) {
-        struct okno *o = okna[indeks];
-        if (!o || !o->otwarte || o->zminimalizowane || o == okno) continue;
-        narysuj_okno_bez_odswiezania(o);
-    }
-    if (cw >= 4 && ch >= 4) {
-        int r = OKNO_PROMIEN;
-        pas_zaokraglony(cx, cy, cw, ch, r, r, KOLOR_RAMKI, 100);
-        pas_zaokraglony(cx + 2, cy + 2, cw - 4, 20, r - 2, 0,
-                        okno == aktywne_okno ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 100);
-        if (ch > 24)
-            pas_zaokraglony(cx + 2, cy + 22, cw - 4, ch - 24, 0, r - 2, KOLOR_OKNA, 100);
-        rysuj_tekst_chicago(cx + TYTUL_X, cy + 8, okno->tytul, 0x00FFFFFF);
-    }
-    odswiez_widok();
+    if (t < 0) t = 0;
+    if (t > GENIE_FP) t = GENIE_FP;
+    return t * t / GENIE_FP * (3 * GENIE_FP - 2 * t) / GENIE_FP;
 }
 
-static void okno_genie_animuj(struct okno *okno, int sx, int sy, int sw, int sh,
-                              int ex, int ey, int ew, int eh)
+/* mieszanie dwoch kolorow, t = 0..GENIE_FP (0 = a, GENIE_FP = b) */
+static uint32_t genie_mieszaj(uint32_t a, uint32_t b, int t)
 {
-    for (int k = 0; k <= GENIE_KLATKI; k++) {
-        int e = k * k;
-        int m = GENIE_KLATKI * GENIE_KLATKI;
-        if (m == 0) m = 1;
-        int cx = sx + (ex - sx) * e / m;
-        int cy = sy + (ey - sy) * e / m;
-        int cw = sw + (ew - sw) * e / m;
-        int ch = sh + (eh - sh) * e / m;
-        if (cw < 4) cw = 4;
-        if (ch < 4) ch = 4;
-        okno_genie_rysuj_klatke(okno, cx, cy, cw, ch);
-        okno_genie_czekaj();
+    if (t < 0) t = 0;
+    if (t > GENIE_FP) t = GENIE_FP;
+    uint32_t r  = (((a >> 16) & 255u) * (uint32_t)(GENIE_FP - t) + ((b >> 16) & 255u) * (uint32_t)t) / GENIE_FP;
+    uint32_t g  = (((a >> 8) & 255u) * (uint32_t)(GENIE_FP - t) + ((b >> 8) & 255u) * (uint32_t)t) / GENIE_FP;
+    uint32_t bl = ((a & 255u) * (uint32_t)(GENIE_FP - t) + (b & 255u) * (uint32_t)t) / GENIE_FP;
+    return (r << 16) | (g << 8) | bl;
+}
+
+/*
+ * Krawedzie zaslony dla wiersza o pozycji u (0 = gora okna, GENIE_FP = dol).
+ * Wsp. 0 = oryginalne krawedzie, GENIE_FP = krawedzie szyjki.
+ */
+static void genie_krawedzie(const struct genie *g, int u, int *lx, int *rw)
+{
+    int gu = genie_gladko(u);
+    int ksztalt = (gu * gu / GENIE_FP + gu) / 2;      /* im nizej, tym mocniej do szyjki */
+    int wsp = ksztalt * g->sq / GENIE_FP;             /* rozwijanie sie lejka */
+    wsp = wsp + (GENIE_FP - wsp) * g->c / GENIE_FP;   /* na koncu zapada sie cala zaslona */
+    int l = g->sx + (g->tl - g->sx) * wsp / GENIE_FP;
+    int r = (g->sx + g->sw) + (g->tr - (g->sx + g->sw)) * wsp / GENIE_FP;
+    *lx = l;
+    *rw = r - l;
+    if (*rw < 1) *rw = 1;
+}
+
+/* odrysowuje tlo i inne okna w obszarze (z pominieciem animowanego okna) */
+static void genie_odswiez_obszar(struct okno *okno, int x, int y, int w, int h, int ty,
+                                 int pokaz)
+{
+    int x2 = x + w;
+    int y2 = y + h;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x2 > EKRAN_SZEROKOSC) x2 = EKRAN_SZEROKOSC;
+    if (y2 > ty) y2 = ty;
+    if (x2 <= x || y2 <= y) return;
+    odrysuj_okna_w_obszarze(x, y, x2 - x, y2 - y, okno);
+    if (pokaz) odswiez_fragment_widoku(x, y, x2 - x, y2 - y);
+}
+
+#if GENIE_MIGAWKA
+/* robi zdjecie okna (okno + tlo pulpitu) do bufora; zwraca 1 gdy sie udalo */
+static int genie_zrob_migawke(struct okno *okno, const struct genie *g)
+{
+    if (g->sw * g->sh > GENIE_MIGAWKA_PIKSELE) return 0;
+    uint8_t zmin = okno->zminimalizowane;
+    okno->zminimalizowane = 0;
+    odtworz_fragment_tla_bufor(g->sx, g->sy, g->sw, g->sh);
+    narysuj_okno_bez_odswiezania(okno);
+    okno->zminimalizowane = zmin;
+    for (int y = 0; y < g->sh; y++)
+        for (int x = 0; x < g->sw; x++)
+            genie_migawka[y * g->sw + x] = (uint32_t)GENIE_CZYTAJ_PIKSEL(g->sx + x, g->sy + y);
+    return 1;
+}
+
+static void genie_wiersz_migawka(const struct genie *g, int v, int y, int lx, int rw)
+{
+    const uint32_t *src = &genie_migawka[v * g->sw];
+    for (int x = 0; x < rw; x++)
+        GENIE_PISZ_PIKSEL(lx + x, y, src[x * g->sw / rw]);
+}
+#else
+static int genie_zrob_migawke(struct okno *okno, const struct genie *g)
+{
+    (void)okno;
+    (void)g;
+    return 0;
+}
+#endif
+
+/*
+ * Tryb strukturalny: jeden wiersz okna (v = wiersz zrodlowy) narysowany
+ * na wysokosci y, w przedziale [lx, lx + rw). Rysuje to samo, co
+ * narysuj_okno_bez_odswiezania, ale przeskalowane poziomo.
+ */
+static void genie_wiersz(const struct okno *okno, int v, int sw, int sh, int y, int lx, int rw)
+{
+    int sc = rw * GENIE_FP / sw;
+    int r  = okno->zmaksymalizowane ? 0 : OKNO_PROMIEN;
+    int rp = okno->zmaksymalizowane ? 0 : OKNO_PROMIEN - 2;
+    int akt = (okno == aktywne_okno);
+    int cin = 0;
+
+    /* ramka z zaokraglonymi rogami */
+    if (v < r) cin = inset_rogu(r, v);
+    else if (v >= sh - r) cin = inset_rogu(r, sh - 1 - v);
+    cin = cin * sc / GENIE_FP;
+    wypelnij_pas(lx + cin, y, rw - 2 * cin, 1, KOLOR_RAMKI, 60);
+
+    if (v >= 2 && v < sh - 2) {
+        int bor = 2 * sc / GENIE_FP;
+        int ci = 0;
+        int alfa;
+        uint32_t kolor;
+        if (bor < 1) bor = 1;
+
+        if (v < 22) {
+            int i = v - 2;
+            if (i < rp) ci = inset_rogu(rp, i);
+            kolor = akt ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA;
+            alfa = 85;
+        } else {
+            int j = (sh - 3) - v;
+            if (j < rp) ci = inset_rogu(rp, j);
+            kolor = KOLOR_OKNA;
+            alfa = 70;
+        }
+        ci = ci * sc / GENIE_FP;
+        /* w szyjce zaslona robi sie ciemniejsza, co daje wrazenie glebi */
+        kolor = genie_mieszaj(kolor, 0x00000000, (GENIE_FP - sc) / 6);
+        wypelnij_pas(lx + bor + ci, y, rw - 2 * (bor + ci), 1, kolor, alfa);
     }
+
+    /* przyciski czerwony / zolty / zielony */
+    if (v >= BTN_Y && v < BTN_Y + BTN_ROZMIAR) {
+        int i = v - BTN_Y;
+        int ri = i < BTN_ROZMIAR / 2 ? i : BTN_ROZMIAR - 1 - i;
+        int in = inset_rogu(BTN_ROZMIAR / 2, ri);
+        static const uint32_t kol[3] = { KOLOR_BTN_ZAMKNIJ, KOLOR_BTN_MINIM, KOLOR_BTN_MAKS };
+        for (int b = 0; b < 3; b++) {
+            int bx = lx + (BTN_X(b) + in) * sc / GENIE_FP;
+            int bw = (BTN_ROZMIAR - 2 * in) * sc / GENIE_FP;
+            if (bw >= 1)
+                wypelnij_pas(bx, y, bw, 1, akt ? kol[b] : KOLOR_BTN_NIEAKTYW, 100);
+        }
+    }
+}
+
+static void genie_klatka(struct okno *okno, struct genie *g, int k)
+{
+    int p = k * GENIE_FP / GENIE_KLATKI;
+    int a = genie_gladko(p * 10 / 6);                       /* dol leci pierwszy (0..60% czasu) */
+    int pt = genie_gladko((p - 358) * GENIE_FP / 666);      /* gora startuje z opoznieniem */
+    int dolne = g->sy + g->sh;
+    int top = g->sy + (g->ty - g->sy) * pt / GENIE_FP;
+    int bot = dolne + (g->ty - dolne) * a / GENIE_FP;
+    if (bot < top) bot = top;
+
+    g->sq = a;
+    g->c = genie_gladko((p - 512) * 2);                     /* zapadanie w drugiej polowie */
+    g->top = top;
+    g->wys = bot - top;
+
+    /* nowy obszar zajmowany przez zaslone */
+    int nx = genie_min(g->sx, g->tl);
+    int nr = genie_max(g->sx + g->sw, g->tr);
+    int nw = nr - nx;
+    int nh = g->wys;
+
+    /* suma poprzedniego i nowego obszaru: tyle trzeba odswiezyc */
+    int ux = genie_min(g->bx, nx);
+    int uy = genie_min(g->by, top);
+    int ux2 = genie_max(g->bx + g->bw, nr);
+    int uy2 = genie_max(g->by + g->bh, top + nh);
+    genie_odswiez_obszar(okno, ux, uy, ux2 - ux, uy2 - uy, g->ty, 0);
+
+    if (nh > 0) {
+        for (int i = 0; i < nh; i++) {
+            int den = nh > 1 ? nh - 1 : 1;
+            int v = i * (g->sh - 1) / den;
+            int u = i * GENIE_FP / den;
+            int lx, rw;
+            genie_krawedzie(g, u, &lx, &rw);
+            if (g->migawka) {
+#if GENIE_MIGAWKA
+                genie_wiersz_migawka(g, v, top + i, lx, rw);
+#endif
+            } else {
+                genie_wiersz(okno, v, g->sw, g->sh, top + i, lx, rw);
+            }
+        }
+        /* tytul tylko gdy zaslona jest jeszcze prawie nieodksztalcona */
+        if (!g->migawka && nh * 10 >= g->sh * 9) {
+            int lx, rw;
+            int yt = top + 8 * (nh - 1) / (g->sh - 1);
+            genie_krawedzie(g, 8 * GENIE_FP / (g->sh - 1), &lx, &rw);
+            if (rw * GENIE_FP / g->sw >= 940)
+                rysuj_tekst_chicago(lx + TYTUL_X, yt, okno->tytul, 0x00FFFFFF);
+        }
+    }
+
+    odswiez_fragment_widoku(genie_max(ux, 0), genie_max(uy, 0),
+                            genie_min(ux2, EKRAN_SZEROKOSC) - genie_max(ux, 0),
+                            genie_min(uy2, g->ty) - genie_max(uy, 0));
+
+    g->bx = nx;
+    g->by = top;
+    g->bw = nw;
+    g->bh = nh;
+}
+
+/*
+ * odwrotnie = 0: minimalizacja (okno zwija sie do paska zadan)
+ * odwrotnie = 1: przywracanie  (okno wylania sie z paska zadan)
+ */
+static void okno_genie_animuj(struct okno *okno, int odwrotnie)
+{
+    struct genie g;
+    g.sx = okno->x;
+    g.sy = okno->y;
+    g.sw = okno->szerokosc;
+    g.sh = okno->wysokosc;
+    g.tl = g.sx + g.sw / 2 - GENIE_ICON_W / 2;
+    g.tr = g.tl + GENIE_ICON_W;
+    g.ty = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    g.bx = g.sx;
+    g.by = g.sy;
+    g.bw = g.sw;
+    g.bh = g.sh;
+    g.top = g.sy;
+    g.wys = g.sh;
+    g.sq = 0;
+    g.c = 0;
+    if (g.sw < 2 || g.sh < 4) return;
+    g.migawka = genie_zrob_migawke(okno, &g);
+
+    if (!odwrotnie) {
+        for (int k = 1; k <= GENIE_KLATKI; k++) {
+            genie_klatka(okno, &g, k);
+            okno_genie_czekaj();
+        }
+    } else {
+        for (int k = GENIE_KLATKI - 1; k >= 1; k--) {
+            genie_klatka(okno, &g, k);
+            okno_genie_czekaj();
+        }
+    }
+
+    /* sprzatanie po ostatniej klatce */
+    genie_odswiez_obszar(okno, g.bx, g.by, g.bw, g.bh, g.ty, 1);
 }
 
 void okno_zminimalizuj(struct okno *okno)
@@ -545,16 +791,7 @@ void okno_zminimalizuj(struct okno *okno)
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
     if (okno->pelnoekranowy) return;
 
-    int start_x = okno->x;
-    int start_y = okno->y;
-    int start_w = okno->szerokosc;
-    int start_h = okno->wysokosc;
-    int cel_x = start_x + start_w / 2 - 4;
-    int cel_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 4;
-    int cel_w = 8;
-    int cel_h = 8;
-
-    okno_genie_animuj(okno, start_x, start_y, start_w, start_h, cel_x, cel_y, cel_w, cel_h);
+    okno_genie_animuj(okno, 0);
 
     int zamkniety_x = okno->x;
     int zamkniety_y = okno->y;
@@ -571,7 +808,6 @@ void okno_zminimalizuj(struct okno *okno)
         }
     }
     odtworz_fragment_tla_bufor(zamkniety_x, zamkniety_y, zamkniety_szerokosc, zamkniety_wysokosc);
-    odtworz_fragment_tla_bufor(cel_x, cel_y, cel_w, cel_h);
     pulp_zglosz_zmiane();
     okno_odrysuj_wszystkie();
 }
@@ -580,12 +816,7 @@ void okno_przywroc(struct okno *okno)
 {
     if (!okno || !okno->otwarte || !okno->zminimalizowane) return;
 
-    int cel_x = okno->x + okno->szerokosc / 2 - 4;
-    int cel_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 4;
-    odtworz_fragment_tla_bufor(cel_x, cel_y, 8, 8);
-    okno_genie_animuj(okno, cel_x, cel_y, 8, 8,
-                      okno->x, okno->y, okno->szerokosc, okno->wysokosc);
-    odtworz_fragment_tla_bufor(cel_x, cel_y, 8, 8);
+    okno_genie_animuj(okno, 1);
 
     okno->zminimalizowane = 0;
     okno_przenies_na_wierzch(okno);
