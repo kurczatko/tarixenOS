@@ -220,4 +220,4 @@ $(ISO_IMAGE): $(UEFI_BIN) $(KERNEL_ELF64) | $(ISO_DIR)
 clean:
 
 run: image
-	qemu-system-x86_64 -m 2G -enable-kvm -cpu host -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc
+	qemu-system-x86_64 -m 2G -enable-kvm -cpu host -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc -netdev user,id=net0 -device ne2000_pci,netdev=net0
