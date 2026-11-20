@@ -57,7 +57,7 @@ struct browser_field {
 };
 
 struct okno browser_window;
-static char address[128] = "http://info.cern.ch/";
+static char address[128] = "http://motherfuckingwebsite.com/";
 static char response[BROWSER_RESPONSE_MAX];
 static char page[BROWSER_PAGE_MAX];
 static uint32_t page_colors[BROWSER_PAGE_MAX];
