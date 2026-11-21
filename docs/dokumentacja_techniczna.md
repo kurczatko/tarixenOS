@@ -516,6 +516,104 @@ obsluguje kolesko myszy.
 void browser_scroll_wheel(int delta)
 ```
 
+## sterownik sieciowy virtio-net - drivers/network/virtio_net.c
+
+Zaawansowany sterownik karty sieciowej virtio-net (nowoczesny interfejs virtio 1.0+, nie legacy). Karta virtio-net to wirtualizowana karta Ethernet PCI (vendor 0x1AF4, urzadzenia 0x1046/0x1048/0x1049) ktora komunikuje sie z goscia za pomoca virtqueues (kolejki deskryptorow, pierscieni dostepnych i uzytych w pamieci fizycznej). Implementacja opiera sie na specyfikacji "virtio: I/O Virtualization Devices" (OASIS virtio v1.1) oraz "Virtio PCI Card Specification" (nowoczesny interfejs z capabilities w BAR0).
+
+Sterownik:
+- wykrywa karte po PCI i parse'uje lancuch capabilities w BAR0 (MMIO),
+- negocjuje feature'y urzadzenia (MAC, MTU, control queue),
+- buduje kolejki RX i TX virtqueue z deskryptorami, pierścieniem dostepnym i uzytych,
+- pobiera adres MAC i MTU z konfiguracji urzadzenia,
+- obsluguje wysylanie i odbieranie ramek Ethernet w trybie pollingu,
+- prowadzi statystyki (pakiety, błędy, porzucone ramki),
+- rejestrowany przez driver manager i uzywany przez stos sieciowy net.c oraz przegladarke.
+
+### virtio_net_init
+
+inicjalizuje sterownik virtio-net: wykrywa karte PCI, mapuje BAR0 (MMIO), resetuje urzadzenie, negocjuje feature'y, tworzy kolejki RX i TX virtqueue, wypelnia kolejke RX pustymi buforami, pobiera adres MAC i MTU, uruchamia urzadzenie (DRIVER_OK).
+
+```
+int virtio_net_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostanie wykryte lub inicjalizacja nie powiedzie sie.
+
+### virtio_net_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int virtio_net_is_ready(void)
+```
+
+### virtio_net_get_mac
+
+pobiera adres MAC karty virtio-net do bufora 6 bajtow.
+
+```
+int virtio_net_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### virtio_net_send
+
+wysyla ramke Ethernet przez karte virtio-net. Ramka jest otaczana naglowkiem virtio_net_hdr i przekazywana przez deskryptor kolejki TX virtqueue. Sterownik czeka az urzadzenie oznaczy deskryptor jako uzyty.
+
+```
+int virtio_net_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 gdy kolejka pelna lub blad transmisji, -1 przy blednych argumentach.
+
+### virtio_net_receive
+
+odbiera ramke Ethernet z kolejki RX virtqueue. Kopiuje dane z bufora odbiorczego (po naglowku virtio-net) do podanego bufora i zwraca deskryptor do ponownego uzycia.
+
+```
+int virtio_net_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe bajtow ramki, 0 gdy brak nowych ramki, -1 przy bledzie.
+
+### virtio_net_shutdown
+
+wylacza urzadzenie virtio-net (ustawia status FAILED) i oznacza sterownik jako niegotowy.
+
+```
+void virtio_net_shutdown(void)
+```
+
+### virtio_net_stats_get
+
+pobiera statystyki sterownika: liczba wyslanych/odebranych pakietow, bledy nadawania/odbioru, porzucone ramki.
+
+```
+int virtio_net_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                         uint32_t *tx_errors, uint32_t *rx_errors,
+                         uint32_t *tx_dropped, uint32_t *rx_dropped)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### virtio_net_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void virtio_net_stats_reset(void)
+```
+
+### virtio_net_set_mtu / virtio_net_get_mtu
+
+ustawia lub pobiera MTU karty virtio-net.
+
+```
+int virtio_net_set_mtu(uint16_t mtu);
+uint16_t virtio_net_get_mtu(void);
+```
+
 ## konta uzytkownikow - user_land/konta.c
 
 ### konta_start
