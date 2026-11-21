@@ -17,6 +17,7 @@
 #include <drivers/internet/rtl8111f.h>
 #include <drivers/internet/mt7921.h>
 #include <drivers/network/virtio_net.h>
+#include <drivers/network/virtio_net_legacy.h>
 
 extern int intel_82578dc_driver_init(void);
 extern int intel_82578dc_driver_detected(void);
@@ -233,6 +234,9 @@ int net_init(void)
     if (virtio_net_init() && virtio_net_get_mac(mac_address)) {
         net_send_fn = virtio_net_send;
         net_receive_fn = virtio_net_receive;
+    } else if (virtio_net_legacy_init() && virtio_net_legacy_get_mac(mac_address)) {
+        net_send_fn = virtio_net_legacy_send;
+        net_receive_fn = virtio_net_legacy_receive;
     } else if (intel_82578dc_driver_init() && intel_82578dc_driver_detected()) {
         net_send_fn = intel_82578dc_send_packet;
         net_receive_fn = intel_82578dc_receive_packet;

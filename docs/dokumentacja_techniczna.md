@@ -614,6 +614,105 @@ int virtio_net_set_mtu(uint16_t mtu);
 uint16_t virtio_net_get_mtu(void);
 ```
 
+## sterownik sieciowy virtio-net (legacy) - drivers/network/virtio_net_legacy.c
+
+Sterownik karty sieciowej virtio-net w trybie LEGACY (stary interfejs virtio, nie nowoczesny/virtio 1.0+). Karta virtio-net to wirtualizowana karta Ethernet PCI (vendor 0x1AF4, urzadzenia 0x1046/0x1048/0x1049) ktora w trybie legacy komunikuje sie z goscia za pomoca rejestrow w przestrzeni I/O (BAR0) oraz virtqueues (kolejki deskryptorow, pierscieni dostepnych i uzytych w pamieci fizycznej). Implementacja opiera sie na dodatku legacy specyfikacji "virtio: I/O Virtualization Devices" (OASIS virtio) oraz "Virtio PCI Card Specification" (tryb legacy).
+
+Sterownik:
+- wykrywa karte po PCI (BAR0 jako przestrzen I/O, bit0 = 1),
+- konfiguruje urzadzenie przez stalowe offsety rejestrow w BAR0 (features, kolejki, status, ISR),
+- negocjuje feature'y urzadzenia (MAC, MTU, control queue),
+- buduje kolejki RX i TX virtqueue (deskryptory, pierścień dostępny, pierścień użytych),
+- pobiera adres MAC i MTU z PCI config space,
+- obsluguje wysylanie i odbieranie ramek Ethernet w trybie pollingu,
+- prowadzi statystyki (pakiety, błędy, porzucone ramki),
+- rejestrowany przez driver manager i uzywany przez stos sieciowy net.c oraz przegladarke.
+
+### virtio_net_legacy_init
+
+inicjalizuje sterownik virtio-net w trybie legacy: wykrywa karte PCI, mapuje BAR0 (porty I/O), resetuje urzadzenie, negocjuje feature'y, tworzy kolejki RX i TX virtqueue, wypelnia kolejke RX pustymi buforami, pobiera adres MAC i MTU z PCI config space, uruchamia urzadzenie (DRIVER_OK).
+
+```
+int virtio_net_legacy_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostanie wykryte lub inicjalizacja nie powiedzie sie.
+
+### virtio_net_legacy_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int virtio_net_legacy_is_ready(void)
+```
+
+### virtio_net_legacy_get_mac
+
+pobiera adres MAC karty virtio-net do bufora 6 bajtow.
+
+```
+int virtio_net_legacy_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### virtio_net_legacy_send
+
+wysyla ramke Ethernet przez karte virtio-net (legacy). Ramka jest otaczana naglowkiem virtio_net_hdr i przekazywana przez deskryptor kolejki TX virtqueue. Sterownik powiadamia urzadzenie zapisem indeksu kolejki do portu I/O i czeka az urzadzenie oznaczy deskryptor jako uzyty.
+
+```
+int virtio_net_legacy_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 gdy kolejka pelna lub blad transmisji, -1 przy blednych argumentach.
+
+### virtio_net_legacy_receive
+
+odbiera ramke Ethernet z kolejki RX virtqueue (legacy). Kopiuje dane z bufora odbiorczego (po naglowku virtio-net) do podanego bufora i zwraca deskryptor do ponownego uzycia.
+
+```
+int virtio_net_legacy_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe bajtow ramki, 0 gdy brak nowych ramki, -1 przy bledzie.
+
+### virtio_net_legacy_shutdown
+
+wylacza urzadzenie virtio-net (legacy) (ustawia status FAILED) i oznacza sterownik jako niegotowy.
+
+```
+void virtio_net_legacy_shutdown(void)
+```
+
+### virtio_net_legacy_stats_get
+
+pobiera statystyki sterownika: liczba wyslanych/odebranych pakietow, bledy nadawania/odbioru, porzucone ramki.
+
+```
+int virtio_net_legacy_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                                uint32_t *tx_errors, uint32_t *rx_errors,
+                                uint32_t *tx_dropped, uint32_t *rx_dropped)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### virtio_net_legacy_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void virtio_net_legacy_stats_reset(void)
+```
+
+### virtio_net_legacy_set_mtu / virtio_net_legacy_get_mtu
+
+ustawia lub pobiera MTU karty virtio-net (legacy).
+
+```
+int virtio_net_legacy_set_mtu(uint16_t mtu);
+uint16_t virtio_net_legacy_get_mtu(void);
+```
+
 ## konta uzytkownikow - user_land/konta.c
 
 ### konta_start
