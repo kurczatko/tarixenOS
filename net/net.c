@@ -10,6 +10,7 @@
 #include <drivers/network/rtl8139.h>
 #include <drivers/network/ne2000.h>
 #include <drivers/network/3c509.h>
+#include <drivers/network/pcnet.h>
 #include <drivers/internet/rtl8168b.h>
 #include <drivers/internet/rtl8188ce.h>
 #include <drivers/internet/rtl8111e.h>
@@ -258,6 +259,9 @@ int net_init(void)
     } else if (c509_init() && c509_get_mac(mac_address)) {
         net_send_fn = c509_send;
         net_receive_fn = c509_receive;
+    } else if (pcnet_init() && pcnet_get_mac(mac_address)) {
+        net_send_fn = pcnet_send;
+        net_receive_fn = pcnet_receive;
     } else {
         return 0;
     }

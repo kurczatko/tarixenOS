@@ -12950,3 +12950,272 @@ driver_manager_register("gtx560", gtx560_init, 0, 0, 4);
 
 `gtx560_init` wywoluje sie raz przy starcie systemu przez menedzer sterownikow. Nie ma potrzeby wywolywania go recznie z kodu jadra.
 
+
+## sterownik sieciowy AMD PCnet - drivers/network/pcnet.c
+
+zaawansowany sterownik karty sieciowej AMD PCnet (Am79C970 / Am79C971 /
+Am79C972 / Am79C973 / Am79C974 / Am79C975) - karta sieciowa PCI 10/100 Mbps.
+rejestry, blok inicjalizacji, struktury deskryptorow piercieni (RX/TX) oraz
+sekwencja inicjalizacji sa oparte na dokumentacji technicznej AMD:
+"Am79C970 / Am79C971 PCnet-PCI Ethernet Controller Data Sheet",
+"Am79C973 PCnet-PCI Ethernet Controller Data Sheet" oraz sterownikach
+Linux drivers/net/ethernet/amd/pcnet32.c i NetBSD sys/dev/ic/am7990.c.
+
+sterownik operuje w trybie 32-bitowym (CSR3 SWSTYLE = 32-bit), buduje
+blok inicjalizacji oraz pierścienie deskryptorow odbiorczych i nadawczych
+w pamieci, uzyskuje adres MAC (z EEPROM karty lub domyslny lokalnie
+administrowany), obsluguje nadawanie i odbieranie ramek Ethernet w trybie
+pollingu, prowadzi statystyki bledow (CRC, kolizje, przepelnienie,
+nieodebrane ramki, bledy pamieci, babble), obsluguje filtr multicast,
+tryb posluchawczy oraz test petli wewnetrznej (internal loopback).
+
+integracja:
+- `net.c` (`net_init`) - karta PCnet jest probowana jako nastepna opcja
+  nastepujaca po 3c509 w lancuchu wyboru sterownika sieciowego, wiec
+  przegladarka i stos TCP/IP (`net_http_get`, `net_tcp_connect` itp.)
+  korzystaja z `pcnet_send` / `pcnet_receive` gdy PCnet jest wykryte.
+- `kernel/core/kernel.c` - rejestracja przez menedzer sterownikow:
+  `driver_manager_register("pcnet_net", pcnet_init, pcnet_shutdown, 0, 2);`
+- `makefile` - `drivers/network/pcnet.c` dodane do `KERNEL_SOURCES`.
+
+wsupported identyfikatory urzadzen (vendor 0x1022 = AMD):
+
+| urzadzenie | device ID | opis |
+|------------|-----------|------|
+| Am79C970 | 0x2000 | PCnet-PCI |
+| Am79C971 | 0x2001 | PCnet-PCI |
+| Am79C972 | 0x2624 | PCnet-PCI II |
+| Am79C973 | 0x2625 | PCnet-PCI Ethernet |
+| Am79C975 | 0x2626 | PCnet-PCI |
+
+porty I/O (przesuniecia od bazy I/O w BAR0):
+
+| port | przesuniecie | opis |
+|------|--------------|------|
+| RDP | 0x10 | Register Data Port (16 bit) |
+| RAP | 0x12 | Register Address Port (16 bit) |
+| RESET | 0x14 | Reset Register |
+
+rejestry CSR (dostep przez zapis indeksu do RAP, nastepnie odczyt/zapis RDP):
+
+| CSR | nazwa | opis |
+|-----|-------|------|
+| 0 | CSR0 | status i sterowanie |
+| 1 | CSR1 | adres bloku inicjalizacji, bity 0-15 |
+| 2 | CSR2 | adres bloku inicjalizacji, bity 16-23 |
+| 3 | CSR3 | sterowanie szyna (SWSTYLE / BSWP) |
+
+bity CSR0:
+
+| bit | nazwa | opis |
+|-----|-------|------|
+| 15 | ERR | podsumowanie bledow |
+| 14 | BABL | transmit babble (ramka zbyt dluga) |
+| 13 | CERR | blad kolizji |
+| 12 | MISS | nieodebwana ramka |
+| 11 | MERR | blad pamieci (DMA) |
+| 10 | RINT | przerwanie odbioru |
+| 9 | TINT | przerwanie nadawania |
+| 8 | IDON | inicjalizacja zakonczona |
+| 7 | INTR | zadano przerwanie |
+| 6 | TXON | nadajnik wlaczony |
+| 5 | RXON | odbiornik wlaczony |
+| 4 | TDMD | zapotrzebowanie nadawania |
+| 1 | STRT | uruchom |
+| 0 | INIT | inicjalizuj |
+| 2 | STOP | zatrzymaj |
+
+blok inicjalizacji (48 bajtow, uzywane pierwsze 16):
+
+| offset | pole | opis |
+|--------|------|------|
+| 0x00 | mode | bit 15 PROM, bit 14 INTL (petla wewnetrzna) |
+| 0x02 | padr0 | PADR[15:0] (adres MAC bajty 0-1) |
+| 0x04 | padr1 | PADR[31:16] (adres MAC bajty 2-3) |
+| 0x06 | padr2 | PADR[47:32] (adres MAC bajty 4-5) |
+| 0x08-0x0E | ladrf0-3 | filtr logicznych adresow multicast (64 bity) |
+| 0x10 | rdra_lo | adres pierścienia odbiorczego (bity 0-15) |
+| 0x12 | rdra_hi_rlen | adres RX hi (8 b) + RLEN (4 b) |
+| 0x14 | tdra_lo | adres pierścienia nadawczego (bity 0-15) |
+| 0x16 | tdra_hi_tlen | adres TX hi (8 b) + TLEN (4 b) |
+
+deskryptor odbiorczy RMD (8 bajtow):
+
+| offset | pole | bity | opis |
+|--------|------|------|------|
+| 0x00 | addr | 32 | adres bufora odbiorczego |
+| 0x04 | status | 15:OWN 14:ERR 13:FRAM 12:OFLO 11:CRC 10:BUFF 9:STP 8:ENP | status odbioru |
+| 0x06 | mcnt | 16 | liczba bajtow odebranej wiadomosci |
+
+deskryptor nadawczy TMD (8 bajtow):
+
+| offset | pole | bity | opis |
+|--------|------|------|------|
+| 0x00 | addr | 32 | adres bufora nadawczego |
+| 0x04 | status | 15:OWN 14:ERR 13:MORE 12:ONE 11:DEF 10:STP 9:ENP | sterowanie/nadawanie |
+| 0x06 | bcnt | 12 | 2's complement dlugosci bufora |
+
+### pcnet_init
+
+inicjalizuje sterownik AMD PCnet: wyszukuje urzadzenie na magistrali PCI
+(vendor 0x1022, device ID Am79C970/971/972/973/975), wlacza przestrzen I/O,
+maszere pamieci i bus master w rejestrze komend PCI, wykonuje reset sprzetowy,
+buduje blok inicjalizacji oraz pierścienie RX/TX (po 8 deskryptorow),
+odczytuje adres MAC (z PADR/EEPROM lub domyslny lokalnie administrowany
+02:00:00:52:54:53), wlacza odbiornik i nadajnik (RXON/TXON) w trybie
+pollingu (bez przerwan).
+
+```
+int pcnet_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy karta nie zostanie wykryta lub inicjalizacja
+nie powiedzie sie. wywolywane przez `net_init` oraz
+`driver_manager_register` (guard `ready` zapobiega podwojnej inicjalizacji).
+
+### pcnet_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int pcnet_is_ready(void)
+```
+
+### pcnet_get_mac
+
+kopiuje adres MAC karty do podanego bufora 6 bajtow.
+
+```
+int pcnet_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy lub `mac` jest NULL.
+
+### pcnet_send
+
+nadaje ramke Ethernet przez karte PCnet. ramka jest kopiowana do bufora
+deskryptora nadawczego, poddawana do minimum 60 bajtow, a nastepnie
+deskryptor jest aktywowany (OWN, STP, ENP) i sygnalizowane jest
+zapotrzebowanie nadawania (TDMD). funkcja czeka na zakonczenie nadawania
+(TINT lub zwolnienie bitu OWN) i aktualizuje statystyki (pakiety, bledy,
+kolizje, przerwania wiecej niz jednokrotne).
+
+```
+int pcnet_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie sprzetowym, -1 przy blednych
+argumentach (karta niegotowa, NULL, dlugosc 0 lub wieksza niz 1518).
+
+### pcnet_receive
+
+odbiera nastepna dostepna ramke Ethernet z pierścienia odbiorczego.
+jesli deskryptor jest wlasny dla karty (OWN = 1), zwraca 0 (brak ramki).
+przy bledzie odbioru (ERR) aktualizuje liczniki bledow (CRC, ramka,
+przepelnienie, bufor) i zwraca 0. w przeciwnym razie kopiuje ramke do
+bufora wyjsciowego i zwraca jej dlugosc. nastepnie zwraca deskryptor karcie
+(OWN = 1) i przesuwa kursor pierścienia. rowniez sprawdza CSR0 pod katem
+bledow MERR, MISS i BABL.
+
+```
+int pcnet_receive(void *frame, uint16_t capacity)
+```
+
+zwraca dlugosc odebranej ramki w bajtach, 0 gdy brak ramki lub blad,
+-1 przy blednych argumentach.
+
+### pcnet_shutdown
+
+zatrzymuje nadajnik i odbiornik (CSR0 STOP, czysci RXON/TXON) i oznacza
+sterownik jako niegotowy.
+
+```
+void pcnet_shutdown(void)
+```
+
+### pcnet_stats_get
+
+pobiera statystyki sterownika do podanych wyjsc: liczba wyslanych/odebranych
+pakietow, bledy nadawania/odbioru, kolizje i bledy CRC odbioru.
+
+```
+int pcnet_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                    uint32_t *tx_errors, uint32_t *rx_errors,
+                    uint32_t *tx_collisions, uint32_t *rx_crc_errors)
+```
+
+zwraca 1 przy sukcesie, 0 gdy ktorys z wymaganych wskaznikow jest NULL.
+
+### pcnet_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void pcnet_stats_reset(void)
+```
+
+### pcnet_set_multicast
+
+ustawia bit w filterze logicznych adresow (LADRF) dla podanego adresu
+multicast. indeks bitu wyznaczany jest z bitow [31:26] CRC32 adresu (zgodnie
+z dokumentacja AMD), a nastepnie karta jest ponownie inicjalizowana z nowym
+filtrem.
+
+```
+int pcnet_set_multicast(const uint8_t *addr)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy lub `addr` jest NULL.
+
+### pcnet_set_promiscuous
+
+wlacza (enable = 1) lub wylacza (enable = 0) tryb posluchawczy (PROM) w
+bloku inicjalizacji i ponownie inicjalizuje karte.
+
+```
+int pcnet_set_promiscuous(uint8_t enable)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
+### pcnet_loopback_test
+
+wykonuje test petli wewnetrznej (internal loopback): wlacza bit INTL w trybie
+bloku inicjalizacji, ponownie inicjalizuje karte, wysyla ramke testowa 64
+bajtow i czeka na jej odebranie przez ta karte, porownujaca zawartosc.
+nastepnie przywraca normalny tryb (bez petli) i ponowna inicjalizacja.
+
+```
+int pcnet_loopback_test(void)
+```
+
+zwraca 1 gdy ramka testowa zostala wyslana i odebranej zgodnie z wyslana,
+0 w przeciwnym razie lub gdy sterownik nie jest gotowy.
+
+### struktura pcnet_stats
+
+| pole | opis |
+|------|------|
+| tx_packets | liczba pomyslnie wyslanych pakietow |
+| rx_packets | liczba pomyslnie odebranych pakietow |
+| tx_errors | liczba bledow nadawania |
+| rx_errors | liczba bledow odbioru |
+| tx_collisions | liczba kolizji przy nadawaniu |
+| tx_aborted | liczba przerwanych nadawan (wiecej niz jedna proba) |
+| rx_crc_errors | liczba bledow CRC przy odbiorze |
+| rx_frame_errors | liczba bledow ramki przy odbiorze |
+| rx_over_errors | liczba bledow przepelnienia przy odbiorze |
+| rx_buffer_errors | liczba bledow bufora przy odbiorze |
+| rx_missed | liczba nieodebranych ramek (MISS) |
+| tx_babble | liczba bledow babble przy nadawaniu |
+| mem_errors | liczba bledow pamieci/DMA (MERR) |
+
+### integracja z przegladarka i stosem sieciowym
+
+przegladarka (`kernel/apps/browser.c`, funkcja `browser_fetch`) oraz caly
+stos TCP/IP (`net.c`, `net_http_get`, `net_tcp_connect`, `net_tcp_send`,
+`net_tcp_receive`) korzystaja z funkcji `pcnet_send` / `pcnet_receive`
+poprzez wskazniki `net_send_fn` / `net_receive_fn` ustawiane przez
+`net_init`. gdy karta AMD PCnet jest jedynym wykrytym urzadzeniem sieciowym,
+przegladarka pobiera strony HTTP przez ten sterownik, a status internetu na
+pasku zadan jest ustawiany przez `ustaw_status_internetu(net_ready())`.
