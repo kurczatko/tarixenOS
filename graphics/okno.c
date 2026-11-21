@@ -64,13 +64,11 @@ static void klip_ustaw(int x, int y, int w, int h)
     klip_y1 = y;
     klip_x2 = x + w;
     klip_y2 = y + h;
-    OKNO_KLIP_GRAFIKI_USTAW(x, y, w, h);
 }
 
 static void klip_wylacz(void)
 {
     klip_wlaczony = 0;
-    OKNO_KLIP_GRAFIKI_WYLACZ();
 }
 
 /* czy prostokat ma jakakolwiek czesc wspolna z obszarem przycinania */
