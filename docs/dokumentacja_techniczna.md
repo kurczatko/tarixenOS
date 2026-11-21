@@ -1943,6 +1943,103 @@ zamyka polaczenie TCP.
 void net_tcp_close(struct net_tcp_connection *connection)
 ```
 
+## sterownik 3Com EtherLink III 3C509/3C509B - drivers/network/3c509.c
+
+zaawansowany sterownik karty sieciowej 3Com EtherLink III (modele 3C509 i 3C509B, karta ISA 10 Mbps) napisany w C. obsluguje wykrycie karty za pomoca dokumentowanej sekwencji selekcji ISA (port ID + sekwencja ID z EEPROM) lub, w ostatecznosci, sondowanie standardowych adresow I/O z weryfikacja sygnatora producenta (0x6d50 = 3Com). odczytuje adres MAC i skonfigurowany adres bazowy z EEPROM (brak zgadywania elementow sprzetowych), konfiguruje rejestry okien 0/1/2 (adres stacji, filtr odbioru, statystyki), wysyla i odbiera ramki ethernet przez FIFO PIO (okno 1), obsluguje pelny zestaw statystyk TX/RX (kolizje, CRC, błędy ramki, overrun, length), test petli (loopback), wlaczenie/wylaczenie multicast oraz zamkniecie sterownika. dziala w trybie pollingu (brak przerwan), zgodnie ze stosem sieciowym (`drivers/net.c`), wiec przegladarka (`kernel/apps/browser.c`) korzysta z tej karty automatycznie po wywolaniu `net_init()` gdy karta zostanie wykryta i zainicjowana.
+
+### c509_init
+
+inicjalizuje sterownik 3C509/3C509B: lokalizuje karte (sekwencja ID ISA lub sondowanie adresow), aktywuje adres bazowy z EEPROM, resetuje kartę (TOTAL_RESET), wybiera linie IRQ z EEPROM, wpisuje adres MAC do okna 2, ustawia filtr odbioru (wlasny adres + rozgloszeniowy), wlacza statystyki, nadajnik i odbiornik oraz maski statusu/przerwan.
+
+```
+int c509_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy karta nie zostanie wykryta lub inicjalizacja nie powiedzie sie.
+
+### c509_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int c509_is_ready(void)
+```
+
+### c509_get_mac
+
+pobiera adres MAC karty do 6-bajtowego bufora.
+
+```
+int c509_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy lub mac jest NULL.
+
+### c509_send
+
+wysyla ramke ethernet przez karte. czeka az TX FIFO bedzie mial miejsce (brak ZATEZENIA polecenia i wystarczajaco wolnych bajtow), nastepnie zapisuje obraz transmisji ([dlugosc][0x0000][dane]) do FIFO nadawczego (okno 1, port 0x00) i czeka na TX_COMPLETE. po zakonnzeniu zdjecie stosu statusow nadawania (TX_STATUS) i aktualizacja statystyk.
+
+```
+int c509_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie transmisji, -1 przy blednych argumentach.
+
+### c509_receive
+
+odbiera ramke ethernet z karty. odczytuje RX_STATUS (okno 1, port 0x08): jesli jest pelny pakiet bez bledow, odczytuje dane z RX FIFO (port 0x00) jako slowa, usuwa wypelnienie do granicy slowa i zwalnia pakiet poleceniem RX_DISCARD. aktualizuje statystyki odbioru i liczniki bledow (CRC, ramka, overrun, length).
+
+```
+int c509_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe odebranych bajtow, 0 gdy brak pakietu, -1 przy blednych argumentach.
+
+### c509_shutdown
+
+wylacza statystyki, odbiornik i nadajnik oraz maskuje przerwania, nastepnie oznacza sterownik jako niegotowy.
+
+```
+void c509_shutdown(void)
+```
+
+### c509_loopback_test
+
+wysyla ramke testowa (wzorzec 0..63) i czeka na jej powrot przez odbiornik (wymaga podlaczenia kabelka petli lub trybu loopback). zwraca 1 gdy odebrano identyczna ramke, 0 w przeciwnym razie.
+
+```
+int c509_loopback_test(void)
+```
+
+### c509_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika (tx_packets, rx_packets, tx_errors, rx_errors, tx_collisions, rx_crc_errors, rx_frame_errors, rx_over_errors, rx_length_errors).
+
+```
+void c509_stats_reset(void)
+```
+
+### c509_stats_get
+
+pobiera podstawowe statystyki sterownika (pakiety i bledy TX/RX).
+
+```
+int c509_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                   uint32_t *tx_errors, uint32_t *rx_errors)
+```
+
+zwraca 1 przy sukcesie, 0 gdy którykolwiek z wskaznikow jest NULL.
+
+### c509_set_multicast
+
+wlacza odbieranie ramki multicast (obok wlasnego adresu i rozgloszeniowego) poprzez rejestr filtru odbioru (okno 1, polecenie SET_RX_FILTER).
+
+```
+int c509_set_multicast(const uint8_t *addr)
+```
+
+zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy.
+
 ## sterownik RTL8168B - drivers/internet/rtl8168b.cpp
 
 sterownik karty sieciowej Realtek RTL8168B / RTL8111B (PCIe Gigabit Ethernet) napisany w C++. obsluguje wysylanie i odbieranie ramek ethernet, integracja ze stosem sieciowym (`drivers/net.c`) przez funkcje `send`/`receive` takze przegladarka (`kernel/apps/browser.c`) korzysta z tej karty automatycznie gdy jest dostepna.
