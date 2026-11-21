@@ -32,6 +32,13 @@
 #define BTN_Y 6
 #define TYTUL_X 68
 
+/* 1 = dwa przebiegi rozmycia tresci okna (jak dawniej), 0 = jeden przebieg.
+ * Drugi przebieg wplywa na ok. 12% koloru tresci, wiec praktycznie go nie widac,
+ * a kosztuje tyle co pierwszy. */
+#ifndef OKNO_PODWOJNE_ROZMYCIE
+#define OKNO_PODWOJNE_ROZMYCIE 0
+#endif
+
 struct okno *aktywne_okno;
 static struct okno *okna[OKNA_MAKS];
 static int liczba_okien;
@@ -42,6 +49,36 @@ static uint8_t zmienianie_rozmiaru;
 static int kierunek_zmiany;
 static char schowek[512];
 static int schowek_dlugosc;
+
+/* ====================================================================
+ * Przycinanie: podczas odswiezania fragmentu ekranu rysujemy (i rozmywamy)
+ * tylko to, co lezy w odswiezanym prostokacie, a nie cale okna.
+ * ==================================================================== */
+static int klip_wlaczony;
+static int klip_x1, klip_y1, klip_x2, klip_y2;
+
+static void klip_ustaw(int x, int y, int w, int h)
+{
+    klip_wlaczony = 1;
+    klip_x1 = x;
+    klip_y1 = y;
+    klip_x2 = x + w;
+    klip_y2 = y + h;
+    OKNO_KLIP_GRAFIKI_USTAW(x, y, w, h);
+}
+
+static void klip_wylacz(void)
+{
+    klip_wlaczony = 0;
+    OKNO_KLIP_GRAFIKI_WYLACZ();
+}
+
+/* czy prostokat ma jakakolwiek czesc wspolna z obszarem przycinania */
+static int klip_przecina(int x, int y, int w, int h)
+{
+    if (!klip_wlaczony) return 1;
+    return x < klip_x2 && x + w > klip_x1 && y < klip_y2 && y + h > klip_y1;
+}
 
 /* ile pikseli odciac z danego wiersza rogu (i = 0 to najwyzszy wiersz) */
 static int inset_rogu(int promien, int i)
@@ -58,6 +95,17 @@ static int inset_rogu(int promien, int i)
 static void wypelnij_pas(int x, int y, int w, int h, uint32_t kolor, int alfa)
 {
     if (w <= 0 || h <= 0) return;
+    if (klip_wlaczony) {
+        int x2 = x + w;
+        int y2 = y + h;
+        if (x < klip_x1) x = klip_x1;
+        if (y < klip_y1) y = klip_y1;
+        if (x2 > klip_x2) x2 = klip_x2;
+        if (y2 > klip_y2) y2 = klip_y2;
+        if (x2 <= x || y2 <= y) return;
+        w = x2 - x;
+        h = y2 - y;
+    }
     if (alfa < 0) rozmyj_prostokat(x, y, w, h);
     else if (alfa >= 100) rysuj_prostokat(x, y, w, h, kolor);
     else rysuj_prostokat_polprzezroczysty(x, y, w, h, kolor, alfa);
@@ -68,6 +116,7 @@ static void pas_zaokraglony(int x, int y, int w, int h, int rg, int rd,
                             uint32_t kolor, int alfa)
 {
     if (w <= 0 || h <= 0) return;
+    if (!klip_przecina(x, y, w, h)) return;   /* szybkie odrzucenie */
     if (rg > w / 2) rg = w / 2;
     if (rd > w / 2) rd = w / 2;
     if (rg > h / 2) rg = h / 2;
@@ -97,8 +146,10 @@ static int w_przycisku(const struct okno *okno, int x, int y, int i)
 static void narysuj_okno_bez_odswiezania(struct okno *okno)
 {
     if (!okno || !okno->otwarte || okno->zminimalizowane) return;
+    if (!klip_przecina(okno->x, okno->y, okno->szerokosc, okno->wysokosc)) return;
     if (okno->pelnoekranowy) {
-        okno->rysuj_zawartosc(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
+        if (okno->rysuj_zawartosc)
+            okno->rysuj_zawartosc(okno->x, okno->y, okno->szerokosc, okno->wysokosc);
         return;
     }
     {
@@ -112,7 +163,9 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
         pas_zaokraglony(x, y, w, h, r, r, KOLOR_RAMKI, 60);             /* ramka */
         pas_zaokraglony(x + 2, y + 2, w - 4, 20, rp, 0,
                         akt ? KOLOR_PASKA_AKTYWNE : KOLOR_PASKA, 85);   /* pasek tytulu */
+#if OKNO_PODWOJNE_ROZMYCIE
         pas_zaokraglony(x + 2, y + 22, w - 4, h - 24, 0, rp, 0, -1);    /* rozmycie tresci */
+#endif
         pas_zaokraglony(x + 2, y + 22, w - 4, h - 24, 0, rp, KOLOR_OKNA, 70);
 
         /* przyciski w stylu macOS (po lewej): czerwony, zolty, zielony */
@@ -123,8 +176,9 @@ static void narysuj_okno_bez_odswiezania(struct okno *okno)
         pas_zaokraglony(x + BTN_X(2), y + BTN_Y, BTN_ROZMIAR, BTN_ROZMIAR, 6, 6,
                         akt ? KOLOR_BTN_MAKS : KOLOR_BTN_NIEAKTYW, 100);
 
-        rysuj_tekst_chicago(x + TYTUL_X, y + 8, okno->tytul, 0x00FFFFFF);
-        if (okno->rysuj_zawartosc)
+        if (klip_przecina(x + TYTUL_X, y + 6, w - TYTUL_X, 16))
+            rysuj_tekst_chicago(x + TYTUL_X, y + 8, okno->tytul, 0x00FFFFFF);
+        if (okno->rysuj_zawartosc && klip_przecina(x + 8, y + 30, w - 16, h - 38))
             okno->rysuj_zawartosc(x + 8, y + 30, w - 16, h - 38);
     }
 }
@@ -149,6 +203,7 @@ static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc,
                                     const struct okno *pomin)
 {
     odtworz_fragment_tla_bufor(x, y, szerokosc, wysokosc);
+    klip_ustaw(x, y, szerokosc, wysokosc);
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         struct okno *okno = okna[indeks];
         if (!okno || okno == pomin || !okno->otwarte || okno->zminimalizowane ||
@@ -157,6 +212,30 @@ static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc,
             okno->y + okno->wysokosc <= y) continue;
         narysuj_okno_bez_odswiezania(okno);
     }
+    klip_wylacz();
+}
+
+/* Czesciowe odswiezenie: tylko podany prostokat (bez paska zadan). */
+static void odswiez_obszar(int x, int y, int w, int h)
+{
+    int dol = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    int x2 = x + w;
+    int y2 = y + h;
+    if (x < 0) x = 0;
+    if (y < 0) y = 0;
+    if (x2 > EKRAN_SZEROKOSC) x2 = EKRAN_SZEROKOSC;
+    if (y2 > dol) y2 = dol;
+    if (x2 <= x || y2 <= y) return;
+    odrysuj_okna_w_obszarze(x, y, x2 - x, y2 - y, 0);
+    odswiez_fragment_widoku(x, y, x2 - x, y2 - y);
+}
+
+static void odswiez_pasek(void)
+{
+    pasek_zadan_rysuj_ikony_minimalizowanych();
+    narysuj_pasek_zadan();
+    odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
+                            EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
 }
 
 static void okno_odrysuj_scene(int x1, int y1, int szerokosc1, int wysokosc1,
@@ -192,6 +271,7 @@ static void okno_odrysuj_scene(int x1, int y1, int szerokosc1, int wysokosc1,
 
 void okno_odrysuj_wszystkie(void)
 {
+    klip_wylacz();
     for (int indeks = 0; indeks < liczba_okien; indeks++) {
         struct okno *okno = okna[indeks];
         if (okno && okno->otwarte)
@@ -355,8 +435,13 @@ int okno_obsluz_klikniecie(int x, int y)
     }
 
     if (trafione != aktywne_okno) {
+        struct okno *poprzednie = aktywne_okno;
         okno_przenies_na_wierzch(trafione);
-        okno_odrysuj_wszystkie();
+        /* zmienia sie tylko wyglad dwoch okien: tracacego i zdobywajacego fokus */
+        if (poprzednie && poprzednie != trafione && poprzednie->otwarte && !poprzednie->zminimalizowane)
+            odswiez_obszar(poprzednie->x, poprzednie->y, poprzednie->szerokosc, poprzednie->wysokosc);
+        odswiez_obszar(trafione->x, trafione->y, trafione->szerokosc, trafione->wysokosc);
+        odswiez_pasek();
     }
 
     if (trafione->pelnoekranowy) {
@@ -475,9 +560,9 @@ void okno_obsluz_ruch(int x, int y)
         if (aktywne_okno->x + nowy_w > EKRAN_SZEROKOSC) nowy_w = EKRAN_SZEROKOSC - aktywne_okno->x;
         if (aktywne_okno->y + nowy_h > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) nowy_h = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->y;
         if (nowy_w == stare_w && nowy_h == stare_h) return;
-        okno_odrysuj_scene(stare_x, stare_y, stare_w, stare_h, stare_x, stare_y, nowy_w, nowy_h);
         aktywne_okno->szerokosc = nowy_w;
         aktywne_okno->wysokosc = nowy_h;
+        /* jedno przerysowanie sumy starego i nowego obszaru (dawniej dwa) */
         okno_odrysuj_scene(stare_x, stare_y, stare_w, stare_h, stare_x, stare_y, nowy_w, nowy_h);
     }
 }
@@ -504,6 +589,9 @@ void okno_zakoncz_przeciaganie(void)
  * krawedzie okna z waska "szyjka" przy pasku zadan. Dolna czesc okna
  * leci pierwsza i sie zweza, gorna rusza z opoznieniem, na koncu cala
  * zaslona zapada sie do szyjki. Obliczenia sa stalopozycyjne (bez float).
+ *
+ * Liczba klatek jest dobierana do liczby okien lezacych pod animowanym
+ * oknem: gdy nic go nie przeslania, jest pelne GENIE_KLATKI.
  * ==================================================================== */
 
 #define GENIE_FP 1024
@@ -529,6 +617,7 @@ struct genie {
     int migawka;            /* 1 = uzywamy zdjecia okna */
     int top, wys;           /* biezaca klatka: gorna krawedz i wysokosc zaslony */
     int sq, c;              /* biezaca klatka: zwezenie i zapadanie (0..GENIE_FP) */
+    int klatki;             /* liczba klatek tej animacji */
 };
 
 static void okno_genie_czekaj(void)
@@ -684,7 +773,7 @@ static void genie_wiersz(const struct okno *okno, int v, int sw, int sh, int y, 
 
 static void genie_klatka(struct okno *okno, struct genie *g, int k)
 {
-    int p = k * GENIE_FP / GENIE_KLATKI;
+    int p = k * GENIE_FP / g->klatki;
     int a = genie_gladko(p * 10 / 6);                       /* dol leci pierwszy (0..60% czasu) */
     int pt = genie_gladko((p - 358) * GENIE_FP / 666);      /* gora startuje z opoznieniem */
     int dolne = g->sy + g->sh;
@@ -770,13 +859,27 @@ static void okno_genie_animuj(struct okno *okno, int odwrotnie)
     if (g.sw < 2 || g.sh < 4) return;
     g.migawka = genie_zrob_migawke(okno, &g);
 
+    /* ile okien lezy pod animowanym oknem (kazde trzeba przerysowac w kazdej klatce) */
+    int warstwy = 0;
+    for (int i = 0; i < liczba_okien; i++) {
+        struct okno *inne = okna[i];
+        if (!inne || inne == okno || !inne->otwarte || inne->zminimalizowane) continue;
+        if (inne->x >= g.sx + g.sw || inne->x + inne->szerokosc <= g.sx ||
+            inne->y >= g.sy + g.sh || inne->y + inne->wysokosc <= g.sy) continue;
+        warstwy++;
+    }
+    g.klatki = GENIE_KLATKI;
+    if (warstwy > 5) g.klatki = GENIE_KLATKI / 2;
+    else if (warstwy > 2) g.klatki = GENIE_KLATKI * 2 / 3;
+    if (g.klatki < 8) g.klatki = 8;
+
     if (!odwrotnie) {
-        for (int k = 1; k <= GENIE_KLATKI; k++) {
+        for (int k = 1; k <= g.klatki; k++) {
             genie_klatka(okno, &g, k);
             okno_genie_czekaj();
         }
     } else {
-        for (int k = GENIE_KLATKI - 1; k >= 1; k--) {
+        for (int k = g.klatki - 1; k >= 1; k--) {
             genie_klatka(okno, &g, k);
             okno_genie_czekaj();
         }
