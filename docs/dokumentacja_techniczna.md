@@ -713,6 +713,108 @@ int virtio_net_legacy_set_mtu(uint16_t mtu);
 uint16_t virtio_net_legacy_get_mtu(void);
 ```
 
+## sterownik sieciowy Sun GEM - drivers/network/sun_gem.c
+
+Zaawansowany sterownik karty sieciowej Sun GEM (Gigabit Ethernet MAC). Karta Sun GEM to kontroler Ethernet 10/100/1000 Mbps produkcji Sun Microsystems (vendor 0x108E, urzadzenia 0x2BAD / 0x1101 / 0x1001) obecny m.in. w platformach Sun UltraSPARC oraz Apple UniNorth (GMAC). Komunikacja z goscia odbywa sie przez rejestry MMIO (BAR0) oraz pierścienie deskryptorow RX/TX w pamieci fizycznej. Implementacja opiera sie na dokumentacji:
+   - "sungem.h: Definitions for Sun GEM ethernet driver" (Linux kernel, drivers/net/ethernet/sun/sungem.h, David S. Miller),
+   - "sungem.c: Sun GEM ethernet driver" (Linux kernel, drivers/net/ethernet/sun/sungem.c),
+   - "Sun GEM device emulation" (Qemu, net/sungem.c).
+
+Sterownik:
+- wykrywa karte po PCI (vendor 0x108E, urzadzenia GEM/RIO GEM/Happy Meal),
+- mapuje BAR0 (MMIO),
+- resetuje MAC (TX/RX) i konfiguruje DMA (TXDMA/RXDMA),
+- buduje pierścienie deskryptorow RX i TX (128 wpisow kazdy, 16 bajtow na deskryptor),
+- pobiera adres MAC z konfiguracji urzadzenia (PCI config space),
+- obsluguje wysylanie i odbieranie ramek Ethernet w trybie pollingu,
+- prowadzi statystyki (pakiety, błędy, porzucone ramki),
+- rejestrowany przez driver manager i uzywany przez stos sieciowy net.c oraz przegladarke.
+
+### sun_gem_init
+
+inicjalizuje sterownik Sun GEM: wykrywa karte PCI, mapuje BAR0 (MMIO), resetuje MAC, zatrzymuje DMA, odczytuje adres MAC, inicjalizuje kolejki TX i RX (deskryptory, baza tablic, konfiguracja DMA), wypelnia pierścień RX pustymi buforami, wlacza TX i RX MAC, ustawia maske przerwan (polling).
+
+```
+int sun_gem_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostanie wykryte lub inicjalizacja nie powiedzie sie.
+
+### sun_gem_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int sun_gem_is_ready(void)
+```
+
+### sun_gem_get_mac
+
+pobiera adres MAC karty Sun GEM do bufora 6 bajtow.
+
+```
+int sun_gem_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### sun_gem_send
+
+wysyla ramke Ethernet przez karte Sun GEM. Ramka jest kopiowana do bufora deskryptora TX, otwierana bitami SOF/EOF i przekazywana GEM przez rejestr TXDMA_KICK. Sterownik czeka na potwierdzenie TXDONE w rejestrze GREG_STAT.
+
+```
+int sun_gem_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 gdy brak wolnego deskryptora lub blad transmisji, -1 przy blednych argumentach.
+
+### sun_gem_receive
+
+odbiera ramke Ethernet z pierścienia RX. Sprawdza bit RXDONE w GREG_STAT, odczytuje deskryptor RX (sprawdzajac bit OWN), kopiuje dane do podanego bufora i zwraca deskryptor do ponownego uzycia przez GEM.
+
+```
+int sun_gem_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe bajtow ramki, 0 gdy brak nowych ramki, -1 przy bledzie.
+
+### sun_gem_shutdown
+
+zatrzymuje DMA, wylacza TX i RX MAC, czysci maske przerwan i oznacza sterownik jako niegotowy.
+
+```
+void sun_gem_shutdown(void)
+```
+
+### sun_gem_stats_get
+
+pobiera statystyki sterownika: liczba wyslanych/odebranych pakietow, bledy nadawania/odbioru, porzucone ramki.
+
+```
+int sun_gem_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                      uint32_t *tx_errors, uint32_t *rx_errors,
+                      uint32_t *tx_dropped, uint32_t *rx_dropped)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### sun_gem_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void sun_gem_stats_reset(void)
+```
+
+### sun_gem_set_mtu / sun_gem_get_mtu
+
+ustawia lub pobiera MTU karty Sun GEM.
+
+```
+int sun_gem_set_mtu(uint16_t mtu);
+uint16_t sun_gem_get_mtu(void);
+```
+
 ## konta uzytkownikow - user_land/konta.c
 
 ### konta_start
