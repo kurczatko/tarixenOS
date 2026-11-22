@@ -815,6 +815,114 @@ int sun_gem_set_mtu(uint16_t mtu);
 uint16_t sun_gem_get_mtu(void);
 ```
 
+## sterownik sieciowy Intel e1000e - drivers/network/e1000e.c
+
+Zaawansowany sterownik karty sieciowej Intel e1000e (82574/82578/82579/I217 Gigabit Ethernet). Karta e1000e to kontroler Ethernet PCI (vendor 0x8086) z Nowszą architektura niz e1000, rejestrami MMIO w BAR0, pierścieniami deskryptorow RX/TX i dostepem do PHY przez rejestr MDIC (MDIO). Implementacja opiera sie na dokumentacji Intel 82574/82578/82579 Gigabit Ethernet Controller (rejestry CTRL, STATUS, CTRL_EXT, MDIC, RCTL, TCTL, RDBAL/RDBAH/RDLEN/RDH/RDT, TDBAL/TDBAH/TDLEN/TDH/TDT, RAL/RAH, ICR/IMS/IMC, EICS/EIMS/EIMC/EICR).
+
+Sterownik:
+- wykrywa karte po PCI (vendor 0x8086, urzadzenia 82574L/82578DM/82578DC/82579LM/I217LM),
+- mapuje BAR0 (MMIO),
+- resetuje urzadzenie (CTRL.RST), odczytuje adres MAC z RAL/RAH,
+- inicjalizuje PHY przez MDIC (autonegocjacja 10/100/1000 Mbps, full/half duplex),
+- buduje pierścienie deskryptorow RX i TX (32 RX, 8 TX, 16 bajtow na deskryptor),
+- obsluguje wysylanie i odbieranie ramek Ethernet w trybie pollingu,
+- prowadzi statystyki (pakiety, błędy, porzucone ramki),
+- wspiera MTU get/set,
+- rejestrowany przez driver manager i uzywany przez stos sieciowy net.c oraz przegladarke.
+
+### e1000e_init
+
+inicjalizuje sterownik e1000e: wykrywa karte PCI, mapuje BAR0 (MMIO), resetuje urzadzenie, odczytuje adres MAC, inicjalizuje PHY (autonegocjacja), tworzy kolejki RX i TX (deskryptory, baza tablic, dlugosc pierścienia), konfiguruje MAC i DMA, wynegocjowuje link i wlacza urzadzenie.
+
+```
+int e1000e_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostanie wykryte lub inicjalizacja nie powiedzie sie.
+
+### e1000e_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int e1000e_is_ready(void)
+```
+
+### e1000e_get_mac
+
+pobiera adres MAC karty e1000e do bufora 6 bajtow.
+
+```
+int e1000e_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### e1000e_send
+
+wysyla ramke Ethernet przez karte e1000e. Ramka jest kopiowana do bufora deskryptora TX, otwierana bitami EOP/IFCS/RS i przekazywana przez zapis indeksu TDT. Sterownik czeka na bit DD w deskryptorze (potwierdzenie transmisji).
+
+```
+int e1000e_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 gdy brak wolnego deskryptora lub blad transmisji, -1 przy blednych argumentach.
+
+### e1000e_receive
+
+odbiera ramke Ethernet z pierścienia RX. Sprawdza bit DD w deskryptorze RX, kopiuje dane do podanego bufora i zwraca deskryptor do ponownego uzycia przez zapis RDT.
+
+```
+int e1000e_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe bajtow ramki, 0 gdy brak nowej ramki, -1 przy bledzie.
+
+### e1000e_shutdown
+
+zatrzymuje TX i RX, maskuje przerwania i oznacza sterownik jako niegotowy.
+
+```
+void e1000e_shutdown(void)
+```
+
+### e1000e_stats_get
+
+pobiera statystyki sterownika: liczba wyslanych/odebranych pakietow, bledy nadawania/odbioru, porzucone ramki.
+
+```
+int e1000e_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                     uint32_t *tx_errors, uint32_t *rx_errors,
+                     uint32_t *tx_dropped, uint32_t *rx_dropped)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### e1000e_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void e1000e_stats_reset(void)
+```
+
+### e1000e_set_mtu / e1000e_get_mtu
+
+ustawia lub pobiera MTU karty e1000e.
+
+```
+int e1000e_set_mtu(uint16_t mtu);
+uint16_t e1000e_get_mtu(void);
+```
+
+### e1000e_link_up
+
+zwraca 1 gdy lacze sieciowe jest aktywne (link up po autonegocjacji), 0 w przeciwnym razie.
+
+```
+int e1000e_link_up(void);
+```
+
 ## konta uzytkownikow - user_land/konta.c
 
 ### konta_start

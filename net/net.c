@@ -7,6 +7,7 @@
 
 #include <net/net.h>
 #include <drivers/network/e1000.h>
+#include <drivers/network/e1000e.h>
 #include <drivers/network/rtl8139.h>
 #include <drivers/network/ne2000.h>
 #include <drivers/network/3c509.h>
@@ -259,6 +260,9 @@ int net_init(void)
     } else if (rtl8188ce_init() && rtl8188ce_get_mac(mac_address)) {
         net_send_fn = rtl8188ce_send;
         net_receive_fn = rtl8188ce_receive;
+    } else if (e1000e_init() && e1000e_get_mac(mac_address)) {
+        net_send_fn = e1000e_send;
+        net_receive_fn = e1000e_receive;
     } else if (e1000_init() && e1000_get_mac(mac_address)) {
         net_send_fn = e1000_send;
         net_receive_fn = e1000_receive;
