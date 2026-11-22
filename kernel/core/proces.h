@@ -143,6 +143,7 @@ struct proces *proces_find(uint32_t pid);
 int proces_get_stats(uint32_t pid, struct proces *out);
 struct proces *proces_stworz_sterownik(uint32_t entry_point, const char *name, uint32_t arg, uint32_t poll_interval);
 uint32_t proces_get_kernel_page_dir(void);
+void proces_ustaw_stos(struct proces *p, uint32_t entry_point, uint32_t arg);
 
 #ifdef __cplusplus
 }

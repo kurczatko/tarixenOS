@@ -926,7 +926,7 @@ uint32_t sched_idle_hint(uint32_t cpu) {
 /* Stos procesu uzytkownika                                                  */
 /* ------------------------------------------------------------------------- */
 
-static void proces_ustaw_stos(struct proces *p, uint32_t entry_point, uint32_t arg) {
+void proces_ustaw_stos(struct proces *p, uint32_t entry_point, uint32_t arg) {
     p->user_stack = 0x003FF000;
     p->kernel_stack = (uint32_t)gdt_kernel_stack_top();
 

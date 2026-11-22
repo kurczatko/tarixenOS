@@ -4,6 +4,7 @@
 #include <include/printf/types.h>
 
 int userspace_load_elf(const char *path, uint32_t *entry_out);
+int userspace_load_elf_into_dir(uint32_t *page_dir, const char *path, uint32_t *entry_out, uint32_t *stack_out);
 int userspace_load_and_run(const char *path);
 int proces_zaladuj_elf(const char *path);
 
