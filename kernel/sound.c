@@ -18,7 +18,6 @@
 /*includy*/
 
 #include <include/printf/types.h>
-#include <include/printf/vga.h>
 
 /* sterowniki dzwieku w projekcie - deklaracje z powiazaniem C (definicje w sound_adapter.cpp) */
 

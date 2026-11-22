@@ -21,7 +21,7 @@
 #include <drivers/karty_dzwiekowe/alc880.h>
 #include <drivers/karty_dzwiekowe/alc1150.h>
 #include <drivers/sound/audigy2.h>
-#include <include/printf/vga.h>
+
 
 extern "C" {
     void init_intel_hda(void);

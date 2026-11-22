@@ -13,7 +13,7 @@
 */
 
 #include <drivers/sound/ensoniq_es1370.h>
-#include <include/printf/vga.h>
+
 
 ES1370* ES1370::g_instance = 0;
 static ES1370 g_es1370_fallback;

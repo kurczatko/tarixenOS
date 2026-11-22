@@ -6,7 +6,7 @@
 */
 
 #include <drivers/karty_dzwiekowe/hda_codec.h>
-#include <include/printf/vga.h>
+
 
 typedef unsigned int uintptr_t;
 

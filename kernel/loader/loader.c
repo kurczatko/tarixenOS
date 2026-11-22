@@ -10,7 +10,6 @@
 #include <kernel/memory/paging.h>
 #include <kernel/sys/syscall.h>
 #include <kernel/core/userspace.h>
-#include <include/printf/vga.h>
 #include <kernel/core/proces.h>
 
 #define ELF_MAGIC 0x464C457F

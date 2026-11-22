@@ -16,7 +16,6 @@
 #include <drivers/gsm/gsm.h>
 #include <include/printf/printf.h>
 #include <include/printf/types.h>
-#include <include/printf/vga.h>
 #include <lib/string.h>
 #include <lib/stddef.h>
 #include <kernel/sys/timer.h>

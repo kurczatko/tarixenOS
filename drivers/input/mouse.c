@@ -7,7 +7,6 @@
 
 #include <drivers/input/mouse.h>
 #include <include/printf/types.h>
-#include <include/printf/vga.h>
 #include <graphics/rysowanie.h>
 #include <graphics/okno.h>
 #include <graphics/menu_start.h>
