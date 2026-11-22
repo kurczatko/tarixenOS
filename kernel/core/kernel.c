@@ -228,8 +228,10 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     * wiec prosze sie nie spłakiwać ze zżera 400 terabajtów ramu
     */
 
+    init_fs(); //system plikow
+
     /*rejestracja sterownikow*/
-    init_fs();
+
     driver_manager_register("floppy", floppy_init, 0, 0, 4);
     driver_manager_register("plyty", plyty_init, 0, 0, 4);
     driver_manager_register("nvme", nvme_init, 0, 0, 4);
@@ -293,15 +295,15 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     kamera_ui_init();
     pulp_init();
     tapeta_app();
-    __asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    //__asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     menu_start();
 
-    __asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    __asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    __asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    __asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    //__asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    //__asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    //__asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    //__asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
-    __asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    //__asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     //konta_start();
     printf("q");
     pik_init();
