@@ -5,20 +5,22 @@
 * kurczatkojestslodkie@gmail.com
 */
 
-#include <drivers/sound/audigy2.h>
+/*TODO: naprawić bledy*/
 
-#define AUDIGY2_VENDOR_ID 0x1102
-#define AUDIGY2_DEVICE_ID 0x0004
+#include <drivers/sound/audigy/audigy2.h>
 
-#define REG_HCFG 0x00
-#define REG_ICWR 0x04
-#define REG_ICDR 0x08
-#define REG_PTR 0x7C
-#define REG_DATA 0x80
+#define AUDIGY2_VENDOR_ID                           0x1102 //vendor id
+#define AUDIGY2_DEVICE_ID                           0x0004 //id urzadzenia
 
-#define DSP_PLAYBACK_LIST_ADDR 0x00
-#define DSP_CAPTURE_LIST_ADDR 0x01
-#define DSP_EFX_RAM_ADDR 0x02
+#define REG_HCFG                                    0x00
+#define REG_ICWR                                    0x04
+#define REG_ICDR                                    0x08
+#define REG_PTR                                     0x7C
+#define REG_DATA                                    0x80
+
+#define DSP_PLAYBACK_LIST_ADDR                      0x00
+#define DSP_CAPTURE_LIST_ADDR                       0x01
+#define DSP_EFX_RAM_ADDR                            0x02
 
 static inline uint32_t f2u(float v) { union { float f; uint32_t u; } u = {v}; return u.u; }
 
@@ -145,7 +147,7 @@ void Audigy2::irq_handler(void)
     (void)status;
 }
 
-void Audigy2::mixer_init(void)
+void Audigy2::mixer_init(void) // init mixera
 {
     write_reg(0x20, master_vol);
     write_reg(0x24, master_vol);
@@ -303,6 +305,7 @@ void Audigy2::voice3d_set_gain(Voice3D* voice, float gain)
 }
 
 void Audigy2::voice3d_play(Voice3D* voice, const void* buffer, uint32_t size)
+// latające samochodzy mówili.... a zamiast tego mamy dzwiek 3d
 {
     voice->buffer_addr = (uint32_t)buffer;
     voice->buffer_size = size;
@@ -341,7 +344,7 @@ int Audigy2::eax_set_environment(const EaxEnvironment* env)
     return 0;
 }
 
-int Audigy2::eax_enable(uint8_t enable)
+int Audigy2::eax_enable(uint8_t enable) //wlaczanie eax
 {
     eax_enabled = enable ? 1 : 0;
     write_reg(0x60, eax_enabled);
@@ -378,7 +381,7 @@ uint8_t Audigy2::get_master_volume(void)
     return master_vol;
 }
 
-extern "C" void audigy2_irq(void)
+extern "C" void audigy2_irq(void) //  eksportowanie funkcji
 {
     if (g_audigy2) g_audigy2->irq_handler();
 }

@@ -20,7 +20,7 @@
 #include <drivers/karty_dzwiekowe/hda_codec.h>
 #include <drivers/karty_dzwiekowe/alc880.h>
 #include <drivers/karty_dzwiekowe/alc1150.h>
-#include <drivers/sound/audigy2.h>
+#include <drivers/sound/audigy/audigy2.h>
 
 
 extern "C" {
