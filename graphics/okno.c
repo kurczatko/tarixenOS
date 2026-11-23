@@ -11,6 +11,18 @@
 #include <graphics/pulpit.h>
 #include <graphics/menu_start.h>
 
+/* --- uklad gornego paska i docka --- */
+#ifndef PASEK_GORNY_WYSOKOSC
+#define PASEK_GORNY_WYSOKOSC 24
+#endif
+#define DOCK_WYSOKOSC_PX    60
+#define DOCK_MARGINES_DOLNY 10
+#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX)
+#define OKNA_DOL_MAKS       (DOCK_PAS_Y - 6)
+extern void menu_start_rysuj_dock(void);
+extern int menu_start_czy_w_docku(int x, int y);
+void okno_odrysuj_dolny_pas(void);
+
 #define KOLOR_RAMKI 0x00787C82
 #define KOLOR_PASKA 0x00787C82
 #define KOLOR_PASKA_AKTYWNE 0x003B82F6
@@ -197,8 +209,9 @@ static void okno_przenies_na_wierzch(struct okno *okno)
     aktywne_okno = okno;
 }
 
-static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc,
-                                    const struct okno *pomin)
+/* tapeta + okna w prostokacie, BEZ docka */
+static void odrysuj_okna_surowe(int x, int y, int szerokosc, int wysokosc,
+                                const struct okno *pomin)
 {
     odtworz_fragment_tla_bufor(x, y, szerokosc, wysokosc);
     klip_ustaw(x, y, szerokosc, wysokosc);
@@ -213,16 +226,34 @@ static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc,
     klip_wylacz();
 }
 
-/* Czesciowe odswiezenie: tylko podany prostokat (bez paska zadan). */
+/* Czysta scena (tapeta + okna) w pasie, w ktorym stoi dock. Dock rozmywa
+ * to, co ma pod soba, wiec zawsze rysujemy go na swiezo odtworzonej scenie. */
+void okno_odrysuj_dolny_pas(void)
+{
+    odrysuj_okna_surowe(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y, 0);
+}
+
+/* tapeta + okna w prostokacie; jesli dotyka pasa docka, dock jest rysowany od nowa */
+static void odrysuj_okna_w_obszarze(int x, int y, int szerokosc, int wysokosc,
+                                    const struct okno *pomin)
+{
+    odrysuj_okna_surowe(x, y, szerokosc, wysokosc, pomin);
+    if (y + wysokosc > DOCK_PAS_Y && y < EKRAN_WYSOKOSC) {
+        odrysuj_okna_surowe(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y, pomin);
+        menu_start_rysuj_dock();
+        odswiez_fragment_widoku(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
+    }
+}
+
+/* Czesciowe odswiezenie: tylko podany prostokat (pod gornym paskiem). */
 static void odswiez_obszar(int x, int y, int w, int h)
 {
-    int dol = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
     int x2 = x + w;
     int y2 = y + h;
     if (x < 0) x = 0;
-    if (y < 0) y = 0;
+    if (y < PASEK_GORNY_WYSOKOSC) y = PASEK_GORNY_WYSOKOSC;
     if (x2 > EKRAN_SZEROKOSC) x2 = EKRAN_SZEROKOSC;
-    if (y2 > dol) y2 = dol;
+    if (y2 > EKRAN_WYSOKOSC) y2 = EKRAN_WYSOKOSC;
     if (x2 <= x || y2 <= y) return;
     odrysuj_okna_w_obszarze(x, y, x2 - x, y2 - y, 0);
     odswiez_fragment_widoku(x, y, x2 - x, y2 - y);
@@ -232,8 +263,6 @@ static void odswiez_pasek(void)
 {
     pasek_zadan_rysuj_ikony_minimalizowanych();
     narysuj_pasek_zadan();
-    odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
-                            EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
 }
 
 static void okno_odrysuj_scene(int x1, int y1, int szerokosc1, int wysokosc1,
@@ -279,7 +308,7 @@ void okno_odrysuj_wszystkie(void)
         if (okna[indeks] && okna[indeks]->otwarte && !okna[indeks]->zminimalizowane)
             narysuj_okno_bez_odswiezania(okna[indeks]);
     pasek_zadan_rysuj_ikony_minimalizowanych();
-    narysuj_pasek_zadan();
+    narysuj_pasek_zadan();      /* gorny pasek + dock (dock rozmywa scene pod soba) */
     odswiez_widok();
 }
 
@@ -297,6 +326,9 @@ int okno_czy_aktywne(const struct okno *okno)
 void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
                  const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc)
 {
+    /* okno nie moze zaczynac sie pod gornym paskiem ani zjechac pod dock */
+    if (y + wysokosc > OKNA_DOL_MAKS) y = OKNA_DOL_MAKS - wysokosc;
+    if (y < PASEK_GORNY_WYSOKOSC) y = PASEK_GORNY_WYSOKOSC;
     okno->x = x;
     okno->y = y;
     okno->szerokosc = szerokosc;
@@ -331,13 +363,13 @@ void okno_stworz(struct okno *okno, int x, int y, int szerokosc, int wysokosc,
 void okno_stworz_pelnoekranowy(struct okno *okno, const char *tytul, okno_rysuj_zawartosc rysuj_zawartosc)
 {
     okno->x = 0;
-    okno->y = 0;
+    okno->y = PASEK_GORNY_WYSOKOSC;
     okno->szerokosc = EKRAN_SZEROKOSC;
-    okno->wysokosc = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    okno->wysokosc = OKNA_DOL_MAKS - PASEK_GORNY_WYSOKOSC;
     okno->x_poprzednie = 0;
-    okno->y_poprzednie = 0;
+    okno->y_poprzednie = PASEK_GORNY_WYSOKOSC;
     okno->szerokosc_poprzednia = EKRAN_SZEROKOSC;
-    okno->wysokosc_poprzednia = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    okno->wysokosc_poprzednia = OKNA_DOL_MAKS - PASEK_GORNY_WYSOKOSC;
     okno->tytul = tytul;
     okno->rysuj_zawartosc = rysuj_zawartosc;
     okno->obsluz_klik = 0;
@@ -416,6 +448,8 @@ void okno_zamknij(struct okno *okno)
 int okno_obsluz_klikniecie(int x, int y)
 {
     struct okno *trafione = 0;
+    /* dock jest ponad oknami: klik w dock nie trafia w okno pod nim */
+    if (menu_start_czy_w_docku(x, y)) return 0;
     for (int indeks = liczba_okien - 1; indeks >= 0; indeks--) {
         struct okno *kandydat = okna[indeks];
         if (kandydat && kandydat->otwarte && !kandydat->zminimalizowane && x >= kandydat->x &&
@@ -525,11 +559,11 @@ void okno_obsluz_ruch(int x, int y)
         ny = y - przesuniecie_y;
 
         if (nx < 0) nx = 0;
-        if (ny < 0) ny = 0;
+        if (ny < PASEK_GORNY_WYSOKOSC) ny = PASEK_GORNY_WYSOKOSC;
         if (nx + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
             nx = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
-        if (ny + aktywne_okno->wysokosc > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
-            ny = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->wysokosc;
+        /* okno moze wejsc pod dock, ale pasek tytulu zostaje nad nim */
+        if (ny > DOCK_PAS_Y - 24) ny = DOCK_PAS_Y - 24;
 
         if (nx == aktywne_okno->x && ny == aktywne_okno->y) return;
 
@@ -556,7 +590,7 @@ void okno_obsluz_ruch(int x, int y)
         if (nowy_w < 100) nowy_w = 100;
         if (nowy_h < 100) nowy_h = 100;
         if (aktywne_okno->x + nowy_w > EKRAN_SZEROKOSC) nowy_w = EKRAN_SZEROKOSC - aktywne_okno->x;
-        if (aktywne_okno->y + nowy_h > EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) nowy_h = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - aktywne_okno->y;
+        if (aktywne_okno->y + nowy_h > EKRAN_WYSOKOSC) nowy_h = EKRAN_WYSOKOSC - aktywne_okno->y;
         if (nowy_w == stare_w && nowy_h == stare_h) return;
         aktywne_okno->szerokosc = nowy_w;
         aktywne_okno->wysokosc = nowy_h;
@@ -574,8 +608,7 @@ void okno_zakoncz_przeciaganie(void)
 
     if (!aktywne_okno || !aktywne_okno->otwarte) return;
 
-    odtworz_fragment_tla_bufor(0, 0, EKRAN_SZEROKOSC,
-                               EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+    odtworz_fragment_tla_bufor(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC);
     okno_odrysuj_wszystkie();
 }
 
@@ -584,7 +617,7 @@ void okno_zakoncz_przeciaganie(void)
  *
  * Okno jest dzielone na poziome wiersze. Kazdy wiersz dostaje wlasna
  * pozycje i szerokosc, wyliczone z krzywej S laczacej oryginalne
- * krawedzie okna z waska "szyjka" przy pasku zadan. Dolna czesc okna
+ * krawedzie okna z waska "szyjka" przy docku. Dolna czesc okna
  * leci pierwsza i sie zweza, gorna rusza z opoznieniem, na koncu cala
  * zaslona zapada sie do szyjki. Obliczenia sa stalopozycyjne (bez float).
  *
@@ -610,7 +643,7 @@ static uint32_t genie_migawka[GENIE_MIGAWKA_PIKSELE];
 
 struct genie {
     int sx, sy, sw, sh;     /* okno zrodlowe */
-    int tl, tr, ty;         /* cel: lewa i prawa krawedz szyjki, gorna krawedz paska zadan */
+    int tl, tr, ty;         /* cel: lewa i prawa krawedz szyjki, gorna krawedz docka */
     int bx, by, bw, bh;     /* obszar zajety w poprzedniej klatce */
     int migawka;            /* 1 = uzywamy zdjecia okna */
     int top, wys;           /* biezaca klatka: gorna krawedz i wysokosc zaslony */
@@ -666,15 +699,15 @@ static void genie_krawedzie(const struct genie *g, int u, int *lx, int *rw)
 }
 
 /* odrysowuje tlo i inne okna w obszarze (z pominieciem animowanego okna) */
-static void genie_odswiez_obszar(struct okno *okno, int x, int y, int w, int h, int ty,
+static void genie_odswiez_obszar(struct okno *okno, int x, int y, int w, int h, int dol,
                                  int pokaz)
 {
     int x2 = x + w;
     int y2 = y + h;
     if (x < 0) x = 0;
-    if (y < 0) y = 0;
+    if (y < PASEK_GORNY_WYSOKOSC) y = PASEK_GORNY_WYSOKOSC;
     if (x2 > EKRAN_SZEROKOSC) x2 = EKRAN_SZEROKOSC;
-    if (y2 > ty) y2 = ty;
+    if (y2 > dol) y2 = dol;
     if (x2 <= x || y2 <= y) return;
     odrysuj_okna_w_obszarze(x, y, x2 - x, y2 - y, okno);
     if (pokaz) odswiez_fragment_widoku(x, y, x2 - x, y2 - y);
@@ -795,7 +828,7 @@ static void genie_klatka(struct okno *okno, struct genie *g, int k)
     int uy = genie_min(g->by, top);
     int ux2 = genie_max(g->bx + g->bw, nr);
     int uy2 = genie_max(g->by + g->bh, top + nh);
-    genie_odswiez_obszar(okno, ux, uy, ux2 - ux, uy2 - uy, g->ty, 0);
+    genie_odswiez_obszar(okno, ux, uy, ux2 - ux, uy2 - uy, EKRAN_WYSOKOSC, 0);
 
     if (nh > 0) {
         for (int i = 0; i < nh; i++) {
@@ -824,7 +857,7 @@ static void genie_klatka(struct okno *okno, struct genie *g, int k)
 
     odswiez_fragment_widoku(genie_max(ux, 0), genie_max(uy, 0),
                             genie_min(ux2, EKRAN_SZEROKOSC) - genie_max(ux, 0),
-                            genie_min(uy2, g->ty) - genie_max(uy, 0));
+                            genie_min(uy2, EKRAN_WYSOKOSC) - genie_max(uy, 0));
 
     g->bx = nx;
     g->by = top;
@@ -833,8 +866,8 @@ static void genie_klatka(struct okno *okno, struct genie *g, int k)
 }
 
 /*
- * odwrotnie = 0: minimalizacja (okno zwija sie do paska zadan)
- * odwrotnie = 1: przywracanie  (okno wylania sie z paska zadan)
+ * odwrotnie = 0: minimalizacja (okno zwija sie do docka)
+ * odwrotnie = 1: przywracanie  (okno wylania sie z docka)
  */
 static void okno_genie_animuj(struct okno *okno, int odwrotnie)
 {
@@ -845,7 +878,7 @@ static void okno_genie_animuj(struct okno *okno, int odwrotnie)
     g.sh = okno->wysokosc;
     g.tl = g.sx + g.sw / 2 - GENIE_ICON_W / 2;
     g.tr = g.tl + GENIE_ICON_W;
-    g.ty = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    g.ty = DOCK_PAS_Y;
     g.bx = g.sx;
     g.by = g.sy;
     g.bw = g.sw;
@@ -884,7 +917,7 @@ static void okno_genie_animuj(struct okno *okno, int odwrotnie)
     }
 
     /* sprzatanie po ostatniej klatce */
-    genie_odswiez_obszar(okno, g.bx, g.by, g.bw, g.bh, g.ty, 1);
+    genie_odswiez_obszar(okno, g.bx, g.by, g.bw, g.bh, EKRAN_WYSOKOSC, 1);
 }
 
 void okno_zminimalizuj(struct okno *okno)
@@ -934,9 +967,9 @@ void okno_maksymalizuj(struct okno *okno)
     okno->szerokosc_poprzednia = okno->szerokosc;
     okno->wysokosc_poprzednia = okno->wysokosc;
     okno->x = 0;
-    okno->y = 0;
+    okno->y = PASEK_GORNY_WYSOKOSC;
     okno->szerokosc = EKRAN_SZEROKOSC;
-    okno->wysokosc = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
+    okno->wysokosc = OKNA_DOL_MAKS - PASEK_GORNY_WYSOKOSC;
     okno->zmaksymalizowane = 1;
     okno_przenies_na_wierzch(okno);
     pulp_zglosz_zmiane();

@@ -21,26 +21,44 @@
 #include <kernel/core/zadania.h>
 #include <graphics/terminal.h>
 
-#define START_X 0
-#define START_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC)
-#define START_SZEROKOSC 72
-#define START_WYSOKOSC PASEK_ZADAN_WYSOKOSC
+/* --- uklad gornego paska i docka --- */
+#ifndef PASEK_GORNY_WYSOKOSC
+#define PASEK_GORNY_WYSOKOSC 24
+#endif
+#define DOCK_WYSOKOSC_PX    60
+#define DOCK_MARGINES_DOLNY 10
+#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX)
+#define OKNA_DOL_MAKS       (DOCK_PAS_Y - 6)
+void rysuj_szklo(int x, int y, int w, int h, int promien,
+                 uint32_t tint, uint32_t alfa, int z_obrazu);
+int menu_start_czy_w_docku(int x, int y);
+void menu_start_rysuj_dock(void);
 
-#define LICZBA_POZYCJI 11
-#define POZYCJA_WYSOKOSC 38
-#define POZYCJA_ODSTEP 42
-#define MENU_MARGINES 12
+/* ---------------- menu w lewym gornym rogu (jak jablko w macOS) ---------------- */
+#define PRZYCISK_SZEROKOSC 112   /* logo + napis "TarixenOS" */
 
-#define MENU_X 0
+#define MENU_X 4
+#define MENU_Y (PASEK_GORNY_WYSOKOSC + 2)
 #define MENU_SZEROKOSC 170
-#define MENU_WYSOKOSC (MENU_MARGINES + (LICZBA_POZYCJI - 1) * POZYCJA_ODSTEP + POZYCJA_WYSOKOSC + 10)
-#define MENU_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - MENU_WYSOKOSC)
+#define MENU_MARGINES 6
+#define POZYCJA_WYSOKOSC 38
+#define MENU_WYSOKOSC (2 * MENU_MARGINES + POZYCJA_WYSOKOSC)   /* jedna pozycja: WYLACZ */
 
-#define KOLOR_PRZYCISKU_START 0x004A5D6E
-#define KOLOR_RAMKA_MENU      0x003A4B5C
-#define KOLOR_TLO_MENU        0x001E293B
-#define KOLOR_ELEMENT_MENU    0x00334155
-#define KOLOR_TEKST_BIALY     0x00FFFFFF
+#define KOLOR_TLO_MENU     0x001E293B
+#define KOLOR_ELEMENT_MENU 0x00334155
+#define KOLOR_TEKST_BIALY  0x00FFFFFF
+
+/* ---------------- dock ---------------- */
+#define DOCK_IKONA   32
+#define DOCK_SLOT    44
+#define DOCK_PAD     8
+#define DOCK_WYS     DOCK_WYSOKOSC_PX
+#define DOCK_DOL     DOCK_MARGINES_DOLNY
+#define DOCK_PROMIEN 16
+#define DOCK_APEK    10
+#define DOCK_ROZDZ   16
+#define DOCK_Y       DOCK_PAS_Y
+#define DOCK_IKONA_Y (DOCK_Y + 9)
 
 static uint8_t menu_otwarte;
 
@@ -378,10 +396,13 @@ static void ikona_terminal(int x, int y)
     rysuj_prostokat(x + 4, y + 24, 22, 4, 0x00333333);
 }
 
-static void (*const ikony_menu[LICZBA_POZYCJI])(int, int) = {
+/* ====================================================================
+ * DOCK: wszystkie aplikacje, ktore byly w menu start (bez WYLACZ).
+ * Po prawej, za separatorem, sa zminimalizowane okna.
+ * ==================================================================== */
+static void (*const ikony_dock[DOCK_APEK])(int, int) = {
     ikona_notatnik,
     ikona_konta,
-    ikona_wylacz,
     ikona_pliki,
     ikona_www,
     ikona_kalkulator,
@@ -392,20 +413,145 @@ static void (*const ikony_menu[LICZBA_POZYCJI])(int, int) = {
     ikona_terminal
 };
 
-static const char *const nazwy_menu[LICZBA_POZYCJI] = {
-    "NOTATNIK",
-    "KONTA",
-    "WYLACZ",
-    "PLIKI",
-    "WWW",
-    "KALKULATOR",
-    "GRA",
-    "MALOWANIE",
-    "ZADANIA",
-    "DUSZKI",
-    "TERMINAL"
+static const char *const nazwy_dock[DOCK_APEK] = {
+    "NOTATNIK", "KONTA", "PLIKI", "WWW", "KALKULATOR",
+    "GRA", "MALOWANIE", "ZADANIA", "DUSZKI", "TERMINAL"
 };
 
+static char male_na_duze(char c)
+{
+    return (c >= 'a' && c <= 'z') ? (char)(c - 'a' + 'A') : c;
+}
+
+static int tekst_rowny_ci(const char *a, const char *b)
+{
+    while (*a && *b) {
+        if (male_na_duze(*a++) != male_na_duze(*b++)) return 0;
+    }
+    return *a == *b;
+}
+
+/* ktory przycisk docka odpowiada tytulowi okna (-1 = nie wiadomo) */
+static int dock_indeks_dla_tytulu(const char *tytul)
+{
+    if (!tytul) return -1;
+    for (int i = 0; i < DOCK_APEK; i++)
+        if (tekst_rowny_ci(tytul, nazwy_dock[i])) return i;
+    if (tekst_rowny_ci(tytul, "PRZEGLADARKA HTTP/HTTPS")) return 3;
+    return -1;
+}
+
+static int dock_licz_min(void)
+{
+    int n = 0;
+    for (int i = 0; i < okno_liczba_okien(); i++) {
+        struct okno *o = okno_pobierz_okno(i);
+        if (o && o->otwarte && o->zminimalizowane) n++;
+    }
+    return n;
+}
+
+static struct okno *dock_okno_min(int j)
+{
+    for (int i = 0; i < okno_liczba_okien(); i++) {
+        struct okno *o = okno_pobierz_okno(i);
+        if (!o || !o->otwarte || !o->zminimalizowane) continue;
+        if (j-- == 0) return o;
+    }
+    return 0;
+}
+
+static void dock_geom(int *x, int *w, int *nmin)
+{
+    int n = dock_licz_min();
+    int szer = 2 * DOCK_PAD + DOCK_APEK * DOCK_SLOT;
+    if (n > 0) szer += DOCK_ROZDZ + n * DOCK_SLOT;
+    if (szer > EKRAN_SZEROKOSC) szer = EKRAN_SZEROKOSC;
+    *x = (EKRAN_SZEROKOSC - szer) / 2;
+    *w = szer;
+    *nmin = n;
+}
+
+static int dock_czy_uruchomiona(int indeks)
+{
+    for (int i = 0; i < okno_liczba_okien(); i++) {
+        struct okno *o = okno_pobierz_okno(i);
+        if (o && o->otwarte && dock_indeks_dla_tytulu(o->tytul) == indeks) return 1;
+    }
+    return 0;
+}
+
+/* ikona zminimalizowanego okna w docku */
+static void dock_rysuj_min(int x, int y, const char *tytul)
+{
+    int idx = dock_indeks_dla_tytulu(tytul);
+    if (idx >= 0) {
+        ikony_dock[idx](x, y);
+    } else {
+        char lit[2];
+        lit[0] = (tytul && tytul[0]) ? male_na_duze(tytul[0]) : '?';
+        lit[1] = 0;
+        ikona_cien(x + 1, y + 1, 30, 30, 7);
+        ikona_rect(x + 1, y + 1, 30, 30, 7, 0x006FB1FF, 0x001E4FA8);
+        rysuj_tekst_chicago(x + 12, y + 12, lit, 0x00FFFFFF);
+    }
+}
+
+void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul)
+{
+    dock_rysuj_min(x, y, tytul);
+}
+
+struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
+{
+    int dx, dw, n;
+    dock_geom(&dx, &dw, &n);
+    if (n == 0 || y < DOCK_Y || y >= DOCK_Y + DOCK_WYS) return 0;
+    int rel = x - (dx + DOCK_PAD + DOCK_APEK * DOCK_SLOT + DOCK_ROZDZ);
+    if (rel < 0) return 0;
+    int j = rel / DOCK_SLOT;
+    if (j >= n) return 0;
+    return dock_okno_min(j);
+}
+
+int menu_start_czy_w_docku(int x, int y)
+{
+    int dx, dw, n;
+    dock_geom(&dx, &dw, &n);
+    return x >= dx && x < dx + dw && y >= DOCK_Y && y < DOCK_Y + DOCK_WYS;
+}
+
+void menu_start_rysuj_dock(void)
+{
+    int dx, dw, n;
+    dock_geom(&dx, &dw, &n);
+
+    /* rozmyte, zaokraglone szklo - rozmywa to, co jest pod dockiem (tapeta i okna) */
+    rysuj_szklo(dx, DOCK_Y, dw, DOCK_WYS, DOCK_PROMIEN, 0x00FFFFFF, 64, 1);
+
+    for (int i = 0; i < DOCK_APEK; i++) {
+        int ix = dx + DOCK_PAD + i * DOCK_SLOT + (DOCK_SLOT - DOCK_IKONA) / 2;
+        ikony_dock[i](ix, DOCK_IKONA_Y);
+        if (dock_czy_uruchomiona(i))   /* kropka pod uruchomiona aplikacja */
+            ikona_kolo(ix + DOCK_IKONA / 2, DOCK_Y + DOCK_WYS - 7, 2, 0x00606878, 0x00101820);
+    }
+
+    if (n > 0) {
+        int sx = dx + DOCK_PAD + DOCK_APEK * DOCK_SLOT + DOCK_ROZDZ / 2;
+        rysuj_prostokat_polprzezroczysty(sx, DOCK_Y + 10, 1, DOCK_WYS - 20, 0x00FFFFFF, 140);
+        rysuj_prostokat_polprzezroczysty(sx + 1, DOCK_Y + 10, 1, DOCK_WYS - 20, 0x00000000, 40);
+        for (int j = 0; j < n; j++) {
+            struct okno *o = dock_okno_min(j);
+            int ix = dx + DOCK_PAD + DOCK_APEK * DOCK_SLOT + DOCK_ROZDZ + j * DOCK_SLOT +
+                     (DOCK_SLOT - DOCK_IKONA) / 2;
+            if (o) dock_rysuj_min(ix, DOCK_IKONA_Y, o->tytul);
+        }
+    }
+}
+
+/* ====================================================================
+ * Lewy gorny rog: logo + nazwa aktywnego okna
+ * ==================================================================== */
 void menu_start_rysuj_przycisk(void)
 {
     static const uint8_t ikona_menu_start[16][16] = {
@@ -426,46 +572,60 @@ void menu_start_rysuj_przycisk(void)
         {0,0,0,0,0,1,1,1,1,1,1,0,0,0,0,0},
         {0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0}
     };
-    rozmyj_prostokat(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC);
-    rysuj_prostokat_polprzezroczysty(START_X, START_Y, START_SZEROKOSC, START_WYSOKOSC, KOLOR_PRZYCISKU_START, 70);
-    
+
+    /* podswietlenie, gdy menu jest otwarte */
+    if (menu_otwarte)
+        rysuj_prostokat_polprzezroczysty(0, 0, PRZYCISK_SZEROKOSC, PASEK_GORNY_WYSOKOSC - 1,
+                                         0x00FFFFFF, 55);
+
     for (int iy = 0; iy < 16; iy++) {
         for (int ix = 0; ix < 16; ix++) {
-            if (ikona_menu_start[iy][ix]) { 
-                rysuj_piksel(START_X + 6 + ix, START_Y + (START_WYSOKOSC / 2) - 8 + iy, KOLOR_ZOLTY);
-            }
+            if (ikona_menu_start[iy][ix])
+                rysuj_piksel(8 + ix, (PASEK_GORNY_WYSOKOSC - 16) / 2 + iy, KOLOR_ZOLTY);
         }
     }
-    
-    rysuj_tekst_chicago(START_X + 26, START_Y + (START_WYSOKOSC / 2) - 4, "start", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(30, PASEK_GORNY_WYSOKOSC / 2 - 4, "TarixenOS", KOLOR_TEKST_BIALY);
+
+    /* nazwa aktywnego okna, jak nazwa aplikacji w macOS */
+    if (aktywne_okno && aktywne_okno->otwarte && !aktywne_okno->zminimalizowane && aktywne_okno->tytul)
+        rysuj_tekst_chicago(PRZYCISK_SZEROKOSC + 12, PASEK_GORNY_WYSOKOSC / 2 - 4,
+                            aktywne_okno->tytul, KOLOR_TEKST_BIALY);
 }
 
 void menu_start(void)
 {
     menu_otwarte = 0;
-    menu_start_rysuj_przycisk();
+    narysuj_pasek_zadan();
     odswiez_widok();
+}
+
+/* ====================================================================
+ * Menu rozwijane (tylko WYLACZ)
+ * ==================================================================== */
+static void polprzezroczysty_zaokr(int x, int y, int w, int h, int r, uint32_t kolor, uint32_t alfa)
+{
+    for (int i = 0; i < h; i++) {
+        int in = ikona_wciecie(i, h, r);
+        rysuj_prostokat_polprzezroczysty(x + in, y + i, w - 2 * in, 1, kolor, alfa);
+    }
 }
 
 static void menu_start_narysuj(void)
 {
-    rozmyj_prostokat(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
-    rysuj_prostokat_polprzezroczysty(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, KOLOR_RAMKA_MENU, 80);
-    rysuj_prostokat_polprzezroczysty(MENU_X + 2, MENU_Y + 2, MENU_SZEROKOSC - 4, MENU_WYSOKOSC - 4, KOLOR_TLO_MENU, 75);
+    rysuj_szklo(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC, 10, KOLOR_TLO_MENU, 150, 1);
 
-    for (int i = 0; i < LICZBA_POZYCJI; i++) {
-        int gora = MENU_Y + MENU_MARGINES + i * POZYCJA_ODSTEP;
-        rysuj_prostokat_polprzezroczysty(MENU_X + 6, gora, MENU_SZEROKOSC - 12, POZYCJA_WYSOKOSC, KOLOR_ELEMENT_MENU, 85);
-        ikony_menu[i](MENU_X + 10, gora + 3);
-        rysuj_tekst_chicago(MENU_X + 50, gora + (POZYCJA_WYSOKOSC / 2) - 4, nazwy_menu[i], KOLOR_TEKST_BIALY);
-    }
+    int gora = MENU_Y + MENU_MARGINES;
+    polprzezroczysty_zaokr(MENU_X + 6, gora, MENU_SZEROKOSC - 12, POZYCJA_WYSOKOSC, 6,
+                           KOLOR_ELEMENT_MENU, 120);
+    ikona_wylacz(MENU_X + 10, gora + 3);
+    rysuj_tekst_chicago(MENU_X + 50, gora + (POZYCJA_WYSOKOSC / 2) - 4, "WYLACZ", KOLOR_TEKST_BIALY);
 
     odswiez_widok();
 }
 
 static void menu_start_wyczysc(void)
 {
-    odtworz_fragment_tla(MENU_X, MENU_Y, MENU_SZEROKOSC, MENU_WYSOKOSC);
+    odtworz_fragment_tla(MENU_X - 2, MENU_Y - 2, MENU_SZEROKOSC + 4, MENU_WYSOKOSC + 4);
     okno_odrysuj_wszystkie();
 }
 
@@ -476,7 +636,24 @@ void menu_start_przelacz(void)
         menu_start_wyczysc();
     } else {
         menu_otwarte = 1;
+        narysuj_pasek_zadan();    /* podswietlenie przycisku */
         menu_start_narysuj();
+    }
+}
+
+static void dock_uruchom(int indeks)
+{
+    switch (indeks) {
+    case 0: notatnik_otworz(); break;
+    case 1: konta_zarzadzaj(); break;
+    case 2: eksplorator_plikow(); break;
+    case 3: browser_open(); break;
+    case 4: kalkulator_otworz(); break;
+    case 5: gra(); break;
+    case 6: malowanie_otworz(); break;
+    case 7: zadania_otworz(); break;
+    case 8: duszki(); break;
+    case 9: terminal_otworz(); break;
     }
 }
 
@@ -484,76 +661,45 @@ void menu_start_mouse_click(void)
 {
     int x;
     int y;
-    int wzgledne;
-    int indeks;
 
     mouse_pozycja(&x, &y);
 
-    if (!menu_otwarte) {
-        if (x >= START_X && x < START_X + START_SZEROKOSC &&
-            y >= START_Y && y < START_Y + START_WYSOKOSC) {
-            menu_otwarte = 1;
-            menu_start_narysuj();
-        }
-        return;
-    }
+    int na_przycisku = (x >= 0 && x < PRZYCISK_SZEROKOSC && y >= 0 && y < PASEK_GORNY_WYSOKOSC);
 
-    if (x < MENU_X || x >= MENU_X + MENU_SZEROKOSC ||
-        y < MENU_Y || y >= MENU_Y + MENU_WYSOKOSC) {
+    if (menu_otwarte) {
+        if (x >= MENU_X && x < MENU_X + MENU_SZEROKOSC &&
+            y >= MENU_Y && y < MENU_Y + MENU_WYSOKOSC) {
+            int gora = MENU_Y + MENU_MARGINES;
+            if (x >= MENU_X + 6 && x < MENU_X + MENU_SZEROKOSC - 6 &&
+                y >= gora && y < gora + POZYCJA_WYSOKOSC) {
+                shutdown();
+            }
+            return;
+        }
         menu_otwarte = 0;
         menu_start_wyczysc();
+        if (na_przycisku) return;     /* klik w przycisk tylko zamyka menu */
+    }
+
+    if (na_przycisku) {
+        menu_otwarte = 1;
+        narysuj_pasek_zadan();
+        menu_start_narysuj();
         return;
     }
 
-    if (x < MENU_X + 6 || x >= MENU_X + MENU_SZEROKOSC - 6)
-        return;
+    /* dock */
+    int dx, dw, n;
+    dock_geom(&dx, &dw, &n);
+    if (y < DOCK_Y || y >= DOCK_Y + DOCK_WYS || x < dx || x >= dx + dw) return;
 
-    wzgledne = y - MENU_Y - MENU_MARGINES;
-    if (wzgledne < 0)
-        return;
-
-    indeks = wzgledne / POZYCJA_ODSTEP;
-    if (indeks >= LICZBA_POZYCJI || wzgledne % POZYCJA_ODSTEP >= POZYCJA_WYSOKOSC)
-        return;
-
-    if (indeks == 2) {
-        shutdown();
+    int rel = x - (dx + DOCK_PAD);
+    if (rel < 0) return;
+    int slot = rel / DOCK_SLOT;
+    if (slot < DOCK_APEK) {
+        dock_uruchom(slot);
         return;
     }
-
-    menu_otwarte = 0;
-    menu_start_wyczysc();
-
-    switch (indeks) {
-    case 0:
-        notatnik_otworz();
-        break;
-    case 1:
-        konta_zarzadzaj();
-        break;
-    case 3:
-        eksplorator_plikow();
-        break;
-    case 4:
-        browser_open();
-        break;
-    case 5:
-        kalkulator_otworz();
-        break;
-    case 6:
-        gra();
-        break;
-    case 7:
-        malowanie_otworz();
-        break;
-    case 8:
-        zadania_otworz();
-        break;
-    case 9:
-        duszki();
-        break;
-    case 10:
-        terminal_otworz();
-        break;
-    }
+    struct okno *min = pasek_zadan_ikona_na_pozycji(x, y);
+    if (min) okno_przywroc(min);
 }

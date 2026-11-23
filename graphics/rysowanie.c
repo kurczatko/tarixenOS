@@ -14,10 +14,35 @@
 #include <graphics/menu_start.h>
 #include <graphics/hal_gfx.h>
 
+/* --- uklad gornego paska i docka --- */
+#ifndef PASEK_GORNY_WYSOKOSC
+#define PASEK_GORNY_WYSOKOSC 24
+#endif
+#define DOCK_WYSOKOSC_PX    60
+#define DOCK_MARGINES_DOLNY 10
+#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX)
+#define OKNA_DOL_MAKS       (DOCK_PAS_Y - 6)
+extern void menu_start_rysuj_dock(void);
+extern void okno_odrysuj_dolny_pas(void);
+
 #define CURSOR_W 12
 #define CURSOR_H 18
 #define KOLOR_TLA 0x0098C74C
-#define KOLOR_PASKA_ZADAN 0x002D3E50
+#define KOLOR_PASKA_ZADAN 0x002D3E50   /* uzywany przez rozmyj_prostokat (okna) */
+
+/* ---- wyglad gornego paska (ciemne, rozmazane szklo) ---- */
+#define KOLOR_SZKLO_GORNE 0x001E293B
+#define SZKLO_GORNE_ALFA  130
+
+/* ---- polozenie elementow po prawej stronie gornego paska ---- */
+#define CZAS_X       (EKRAN_SZEROKOSC - 72)
+#define CZAS_Y       8
+#define INTERNET_X   (EKRAN_SZEROKOSC - 92)
+#define INTERNET_Y   5
+#define KAM_TOP_W    20
+#define KAM_TOP_H    16
+#define KAM_TOP_X    (EKRAN_SZEROKOSC - 120)
+#define KAM_TOP_Y    4
 
 static inline uint8_t vbe_read8(volatile uint8_t *base, uint32_t off) {
 #pragma GCC diagnostic push
@@ -30,7 +55,7 @@ static inline uint8_t vbe_read8(volatile uint8_t *base, uint32_t off) {
 
 #define NAPIS_SZEROKOSC (27 * 8)
 #define NAPIS_X (EKRAN_SZEROKOSC - NAPIS_SZEROKOSC - 16)
-#define NAPIS_Y (EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC - 16)
+#define NAPIS_Y (DOCK_PAS_Y - 22)
 #define NAPIS_WYSOKOSC 8
 
 static volatile uint8_t *pamiec_graficzna = (volatile uint8_t *)0xFD000000;
@@ -89,6 +114,133 @@ static uint32_t kolor_tla_dla_x(int x)
     return (zielony << 8) | niebieski;
 }
 
+/* piksel tapety (z przycinaniem do ekranu) - zrodlo dla szkla */
+static uint32_t tapeta_piksel(int x, int y)
+{
+    if (x < 0) x = 0;
+    if (x >= EKRAN_SZEROKOSC) x = EKRAN_SZEROKOSC - 1;
+    if (y < 0) y = 0;
+    if (y >= EKRAN_WYSOKOSC) y = EKRAN_WYSOKOSC - 1;
+    if (tapeta_bitmapa_wczytana) {
+        return tapeta_bitmapa[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x];
+    }
+    if (tapeta_gradientowa) {
+        return kolor_tla_dla_x(x);
+    }
+    return kolor_tapety;
+}
+
+/* maluje tapete w wierszach [y0, y1) */
+static void narysuj_tlo_poziome(int y0, int y1)
+{
+    if (y0 < 0) y0 = 0;
+    if (y1 > EKRAN_WYSOKOSC) y1 = EKRAN_WYSOKOSC;
+    for (int y = y0; y < y1; y++) {
+        uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
+        for (int x = 0; x < EKRAN_SZEROKOSC; x++)
+            obraz[offset + x] = tapeta_piksel(x, y);
+    }
+}
+
+/* ====================================================================
+ * SZKLO: rozmyte, zaokraglone, polprzezroczyste tlo (gorny pasek, dock,
+ * menu rozwijane). z_obrazu = 0: rozmywa sama tapete (wynik zawsze taki
+ * sam, mozna rysowac wielokrotnie), z_obrazu = 1: rozmywa to, co jest
+ * teraz w buforze (okna pod spodem).
+ * ==================================================================== */
+static const int gauss_kernel[9] = {1, 4, 9, 14, 16, 14, 9, 4, 1};
+#define GAUSS_SUM 72
+#define SZKLO_MAX_H 80
+static uint32_t szklo_temp[(SZKLO_MAX_H + 8) * EKRAN_SZEROKOSC];
+
+static uint32_t szklo_zrodlo(int x, int y, int z_obrazu)
+{
+    if (!z_obrazu) return tapeta_piksel(x, y);
+    if (x < 0) x = 0;
+    if (x >= EKRAN_SZEROKOSC) x = EKRAN_SZEROKOSC - 1;
+    if (y < 0) y = 0;
+    if (y >= EKRAN_WYSOKOSC) y = EKRAN_WYSOKOSC - 1;
+    return obraz[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x];
+}
+
+static int szklo_wciecie(int r, int i)
+{
+    if (r <= 0 || i >= r) return 0;
+    int d = 2 * (r - i) - 1;
+    int lim = 4 * r * r - d * d;
+    int s = 0;
+    while ((s + 1) * (s + 1) * 4 <= lim) s++;
+    return r - s;
+}
+
+static uint32_t mieszaj_alfa(uint32_t dest, uint32_t kolor, uint32_t alfa)
+{
+    uint32_t r = (((dest >> 16) & 0xFF) * (255 - alfa) + ((kolor >> 16) & 0xFF) * alfa) / 255;
+    uint32_t g = (((dest >> 8) & 0xFF) * (255 - alfa) + ((kolor >> 8) & 0xFF) * alfa) / 255;
+    uint32_t b = ((dest & 0xFF) * (255 - alfa) + (kolor & 0xFF) * alfa) / 255;
+    return (r << 16) | (g << 8) | b;
+}
+
+void rysuj_szklo(int x, int y, int w, int h, int promien, uint32_t tint,
+                 uint32_t alfa, int z_obrazu)
+{
+    if (w <= 0 || h <= 0) return;
+    if (w > EKRAN_SZEROKOSC) w = EKRAN_SZEROKOSC;
+    if (h > SZKLO_MAX_H) h = SZKLO_MAX_H;
+    if (promien < 0) promien = 0;
+    if (promien > w / 2) promien = w / 2;
+    if (promien > h / 2) promien = h / 2;
+
+    /* przebieg poziomy: wiersze od y-4 do y+h+3 */
+    for (int ty = 0; ty < h + 8; ty++) {
+        int sy = y + ty - 4;
+        for (int px = 0; px < w; px++) {
+            uint32_t r = 0, g = 0, b = 0;
+            for (int k = 0; k < 9; k++) {
+                uint32_t p = szklo_zrodlo(x + px + k - 4, sy, z_obrazu);
+                int wag = gauss_kernel[k];
+                r += ((p >> 16) & 0xFF) * wag;
+                g += ((p >> 8) & 0xFF) * wag;
+                b += (p & 0xFF) * wag;
+            }
+            szklo_temp[(uint32_t)ty * EKRAN_SZEROKOSC + (uint32_t)px] =
+                (r / GAUSS_SUM << 16) | (g / GAUSS_SUM << 8) | (b / GAUSS_SUM);
+        }
+    }
+
+    /* przebieg pionowy + tint + ramka + zaokraglone rogi */
+    for (int i = 0; i < h; i++) {
+        int py = y + i;
+        if (py < 0 || py >= EKRAN_WYSOKOSC) continue;
+        int ri = i < h - 1 - i ? i : h - 1 - i;
+        int in = szklo_wciecie(promien, ri);
+        for (int px = in; px < w - in; px++) {
+            int sx = x + px;
+            if (sx < 0 || sx >= EKRAN_SZEROKOSC) continue;
+            uint32_t r = 0, g = 0, b = 0;
+            for (int k = 0; k < 9; k++) {
+                uint32_t p = szklo_temp[(uint32_t)(i + k) * EKRAN_SZEROKOSC + (uint32_t)px];
+                int wag = gauss_kernel[k];
+                r += ((p >> 16) & 0xFF) * wag;
+                g += ((p >> 8) & 0xFF) * wag;
+                b += (p & 0xFF) * wag;
+            }
+            uint32_t c = (r / GAUSS_SUM << 16) | (g / GAUSS_SUM << 8) | (b / GAUSS_SUM);
+            c = mieszaj_alfa(c, tint, alfa);
+            if (promien > 0 && (i == 0 || i == h - 1 || px == in || px == w - in - 1))
+                c = mieszaj_alfa(c, 0x00FFFFFF, i == 0 ? 130 : 80);
+            obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)sx] = c;
+        }
+    }
+}
+
+/* fragment gornego paska (szklo + cienka dolna kreska) */
+static void szklo_gorne(int x, int w)
+{
+    rysuj_szklo(x, 0, w, PASEK_GORNY_WYSOKOSC, 0, KOLOR_SZKLO_GORNE, SZKLO_GORNE_ALFA, 0);
+    rysuj_prostokat_polprzezroczysty(x, PASEK_GORNY_WYSOKOSC - 1, w, 1, 0x00000000, 70);
+}
+
 static void narysuj_ikone_internetu(void)
 {
     static const uint16_t bitmapa[14] = {
@@ -96,21 +248,17 @@ static void narysuj_ikone_internetu(void)
         0x3019, 0x2C31, 0x23C1, 0x1002, 0x0C0C, 0x03F0, 0x0000
     };
     uint32_t kolor = internet_dostepny ? KOLOR_BIALY : KOLOR_SZARY;
-    int x = EKRAN_SZEROKOSC - 22;
-    int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 8;
     for (int pion = 0; pion < 14; pion++) {
         for (int poziom = 0; poziom < 12; poziom++) {
             if (bitmapa[pion] & (0x0800 >> poziom))
-                rysuj_piksel(x + poziom, y + pion, kolor);
+                rysuj_piksel(INTERNET_X + poziom, INTERNET_Y + pion, kolor);
         }
     }
 }
 
 static void narysuj_czas_paska(void)
 {
-    int x = EKRAN_SZEROKOSC - 108;
-    int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 11;
-    rysuj_tekst_chicago(x, y, czas_paska, KOLOR_BIALY);
+    rysuj_tekst_chicago(CZAS_X, CZAS_Y, czas_paska, KOLOR_BIALY);
 }
 
 void ustaw_czas_paska(const char *czas)
@@ -119,141 +267,24 @@ void ustaw_czas_paska(const char *czas)
     while (czas[i] && i < 8) { czas_paska[i] = czas[i]; i++; }
     czas_paska[i] = 0;
     while (i < 8) czas_paska[i++] = ' ';
+    /* najpierw odtwarzamy szklo pod zegarem, zeby cyfry sie nie nakladaly */
+    szklo_gorne(CZAS_X - 4, EKRAN_SZEROKOSC - (CZAS_X - 4));
     narysuj_czas_paska();
-    odswiez_fragment_widoku(EKRAN_SZEROKOSC - 112,
-                            EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
-                            88, PASEK_ZADAN_WYSOKOSC);
+    odswiez_fragment_widoku(CZAS_X - 4, 0, EKRAN_SZEROKOSC - (CZAS_X - 4), PASEK_GORNY_WYSOKOSC);
 }
 
 void ustaw_status_internetu(uint8_t dostepny)
 {
     internet_dostepny = dostepny != 0;
+    szklo_gorne(INTERNET_X - 2, 16);
     narysuj_ikone_internetu();
-    odswiez_fragment_widoku(EKRAN_SZEROKOSC - 24,
-                            EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC,
-                            24, PASEK_ZADAN_WYSOKOSC);
+    odswiez_fragment_widoku(INTERNET_X - 2, 0, 16, PASEK_GORNY_WYSOKOSC);
 }
 
-#define PASEK_ICON_W 24
-#define PASEK_ICON_H 24
-#define PASEK_ICON_SPACJE 4
-#define PASEK_ICON_START_X 80
-
-static int tekst_rowne(const char *a, const char *b)
-{
-    while (*a && *b) {
-        if (*a++ != *b++) return 0;
-    }
-    return *a == *b;
-}
-
-static const uint8_t ikona_notatnik_pasek[12][12] = {
-    {0,0,0,0,0,0,0,0,0,0,0,1},
-    {0,0,0,0,0,0,0,0,0,0,1,1},
-    {0,0,0,0,0,0,0,0,0,1,1,0},
-    {0,0,0,0,0,0,0,0,1,1,0,0},
-    {0,0,0,0,0,0,0,1,1,0,0,0},
-    {0,0,0,0,0,0,1,1,0,0,0,0},
-    {0,0,0,0,0,1,1,0,0,0,0,0},
-    {0,0,0,0,1,1,0,0,0,0,0,0},
-    {0,0,0,1,1,0,0,0,0,0,0,0},
-    {0,0,1,1,0,0,0,0,0,0,0,0},
-    {0,1,1,0,0,0,0,0,0,0,0,0},
-    {1,1,0,0,0,0,0,0,0,0,0,0}
-};
-
-static const uint8_t ikona_pliki_pasek[12][12] = {
-    {0,0,0,0,0,0,0,0,0,0,0,0},
-    {0,0,1,1,1,1,0,0,0,0,0,0},
-    {0,1,1,1,1,1,1,0,0,0,0,0},
-    {1,1,1,1,1,1,1,1,1,1,1,0},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1}
-};
-
-static const uint8_t ikona_www_pasek[12][12] = {
-    {0,0,0,0,1,1,1,1,0,0,0,0},
-    {0,0,1,1,1,2,2,1,1,1,0,0},
-    {0,1,1,2,1,2,2,1,2,1,1,0},
-    {1,1,2,1,1,2,2,1,1,2,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,2,2,2,2,2,2,2,2,1,1},
-    {1,1,1,1,1,1,1,1,1,1,1,1},
-    {1,1,2,1,1,2,2,1,1,2,1,1},
-    {0,1,1,2,1,2,2,1,2,1,1,0},
-    {0,0,1,1,1,2,2,1,1,1,0,0},
-    {0,0,0,0,1,1,1,1,0,0,0,0},
-    {0,0,0,0,0,0,0,0,0,0,0,0}
-};
-
-void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul)
-{
-    rysuj_prostokat(x, y, PASEK_ICON_W, PASEK_ICON_H, 0x003A4B5C);
-    int ix = x + (PASEK_ICON_W - 12) / 2;
-    int iy = y + (PASEK_ICON_H - 12) / 2;
-    if (tekst_rowne(tytul, "NOTATNIK")) {
-        for (int i = 0; i < 12; i++) {
-            for (int j = 0; j < 12; j++) {
-                if (ikona_notatnik_pasek[i][j])
-                    rysuj_piksel(ix + j, iy + i, KOLOR_ZOLTY);
-            }
-        }
-    } else if (tekst_rowne(tytul, "Pliki")) {
-        for (int i = 0; i < 12; i++) {
-            for (int j = 0; j < 12; j++) {
-                if (ikona_pliki_pasek[i][j])
-                    rysuj_piksel(ix + j, iy + i, KOLOR_ZOLTY);
-            }
-        }
-    } else if (tekst_rowne(tytul, "PRZEGLADARKA HTTP/HTTPS")) {
-        for (int i = 0; i < 12; i++) {
-            for (int j = 0; j < 12; j++) {
-                uint8_t p = ikona_www_pasek[i][j];
-                if (p)
-                    rysuj_piksel(ix + j, iy + i, p == 1 ? KOLOR_NIEBIESKI : 0x0068B8FF);
-            }
-        }
-    } else {
-        rysuj_prostokat(ix + 2, iy + 2, 8, 8, KOLOR_BIALY);
-        rysuj_prostokat(ix + 4, iy + 4, 4, 4, KOLOR_CZARNY);
-    }
-    rysuj_prostokat(x, y, PASEK_ICON_W, 1, KOLOR_BIALY);
-    rysuj_prostokat(x, y, 1, PASEK_ICON_H, KOLOR_BIALY);
-    rysuj_prostokat(x + PASEK_ICON_W - 1, y, 1, PASEK_ICON_H, KOLOR_BIALY);
-    rysuj_prostokat(x, y + PASEK_ICON_H - 1, PASEK_ICON_W, 1, KOLOR_BIALY);
-}
-
+/* Ikony minimalizowanych okien sa teraz w docku (menu_start.c);
+ * funkcja zostaje tylko dla zgodnosci. */
 void pasek_zadan_rysuj_ikony_minimalizowanych(void)
 {
-    int x = PASEK_ICON_START_X;
-    int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 3;
-    x = PASEK_ICON_START_X;
-    for (int i = 0; i < okno_liczba_okien(); i++) {
-        struct okno *okno = okno_pobierz_okno(i);
-        if (!okno || !okno->otwarte || !okno->zminimalizowane) continue;
-        pasek_zadan_rysuj_ikone(x, y, okno->tytul);
-        x += PASEK_ICON_W + PASEK_ICON_SPACJE;
-    }
-}
-
-struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
-{
-    int start_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC + 3;
-    if (y < start_y || y > start_y + PASEK_ICON_H) return 0;
-    int ix = PASEK_ICON_START_X;
-    for (int i = 0; i < okno_liczba_okien(); i++) {
-        struct okno *okno = okno_pobierz_okno(i);
-        if (!okno || !okno->otwarte || !okno->zminimalizowane) continue;
-        if (x >= ix && x < ix + PASEK_ICON_W) return okno;
-        ix += PASEK_ICON_W + PASEK_ICON_SPACJE;
-    }
-    return 0;
 }
 
 static void zapisz_piksel_framebuffera(int x, int y, uint32_t kolor)
@@ -360,6 +391,7 @@ void odswiez_widok(void)
     narysuj_kursor_bitmapa(kursor_x, kursor_y);
 }
 
+/* Przywraca tapete (bez gornego paska - ten rysuje narysuj_pasek_zadan). */
 void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
 {
     if (x < 0) {
@@ -376,10 +408,10 @@ void odtworz_fragment_tla_bufor(int x, int y, int szerokosc, int wysokosc)
 
     for (int py = y; py < y + wysokosc; py++) {
         uint32_t offset = (uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)x;
+        if (py < PASEK_GORNY_WYSOKOSC)
+            continue;
         for (int px = 0; px < szerokosc; px++) {
-            if (py >= EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC) {
-                continue;
-            } else if (tapeta_bitmapa_wczytana) {
+            if (tapeta_bitmapa_wczytana) {
                 obraz[offset + px] = tapeta_bitmapa[offset + px];
             } else {
                 obraz[offset + px] = tapeta_gradientowa ? kolor_tla_dla_x(x + px) : kolor_tapety;
@@ -489,86 +521,25 @@ static void narysuj_kursor_bitmapa(int x, int y)
     }
 }
 
-#define BLUR_RADIUS 4
-static const int gauss_kernel[9] = {1, 4, 9, 14, 16, 14, 9, 4, 1};
-#define GAUSS_SUM 72
-static uint32_t blur_temp[EKRAN_SZEROKOSC * PASEK_ZADAN_WYSOKOSC];
-
-static uint32_t tapeta_piksel(int x, int y)
-{
-    if (x < 0) x = 0;
-    if (x >= EKRAN_SZEROKOSC) x = EKRAN_SZEROKOSC - 1;
-    if (y < 0) y = 0;
-    if (y >= EKRAN_WYSOKOSC) y = EKRAN_WYSOKOSC - 1;
-    if (tapeta_bitmapa_wczytana) {
-        return tapeta_bitmapa[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x];
-    }
-    if (tapeta_gradientowa) {
-        return kolor_tla_dla_x(x);
-    }
-    return kolor_tapety;
-}
-
-static void rozmyj_pasek_zadan(void)
-{
-    int paske_y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC;
-
-    for (int py = 0; py < PASEK_ZADAN_WYSOKOSC; py++) {
-        int y = paske_y + py;
-        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-            uint32_t r = 0, g = 0, b = 0;
-            for (int k = 0; k < 9; k++) {
-                int sx = x + (k - 4);
-                uint32_t px = tapeta_piksel(sx, y);
-                int w = gauss_kernel[k];
-                r += ((px >> 16) & 0xFF) * w;
-                g += ((px >> 8) & 0xFF) * w;
-                b += (px & 0xFF) * w;
-            }
-            blur_temp[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)x] =
-                (r / GAUSS_SUM << 16) | (g / GAUSS_SUM << 8) | (b / GAUSS_SUM);
-        }
-    }
-
-    for (int py = 0; py < PASEK_ZADAN_WYSOKOSC; py++) {
-        int y = paske_y + py;
-        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-            uint32_t r = 0, g = 0, b = 0;
-            for (int k = 0; k < 9; k++) {
-                int sy = py + (k - 4);
-                if (sy < 0) sy = 0;
-                if (sy >= PASEK_ZADAN_WYSOKOSC) sy = PASEK_ZADAN_WYSOKOSC - 1;
-                uint32_t px = blur_temp[(uint32_t)sy * EKRAN_SZEROKOSC + (uint32_t)x];
-                int w = gauss_kernel[k];
-                r += ((px >> 16) & 0xFF) * w;
-                g += ((px >> 8) & 0xFF) * w;
-                b += (px & 0xFF) * w;
-            }
-            uint32_t blurred = (r / GAUSS_SUM << 16) | (g / GAUSS_SUM << 8) | (b / GAUSS_SUM);
-
-            uint32_t taskbar = KOLOR_PASKA_ZADAN;
-            int krawedz = py < 2 ? py : (py > PASEK_ZADAN_WYSOKOSC - 3 ? PASEK_ZADAN_WYSOKOSC - 1 - py : 2);
-            uint32_t alpha = 60 + krawedz * 15;
-            r = ((blurred >> 16) & 0xFF) * (255 - alpha) + ((taskbar >> 16) & 0xFF) * alpha;
-            g = ((blurred >> 8) & 0xFF) * (255 - alpha) + ((taskbar >> 8) & 0xFF) * alpha;
-            b = (blurred & 0xFF) * (255 - alpha) + (taskbar & 0xFF) * alpha;
-
-            obraz[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x] = (r / 255 << 16) | (g / 255 << 8) | (b / 255);
-        }
-    }
-}
-
+/* Gorny pasek (24 px) + dock. Dock rozmywa to, co jest pod nim (tapete i okna),
+ * wiec najpierw odtwarzamy dolny pas sceny (tapeta + okna), a dopiero potem
+ * rysujemy na nim dock. Dzieki temu wielokrotne przerysowanie nie kumuluje rozmycia. */
 void narysuj_pasek_zadan(void)
 {
-    rozmyj_pasek_zadan();
-    menu_start_rysuj_przycisk();
-    pasek_zadan_rysuj_ikony_minimalizowanych();
+    szklo_gorne(0, EKRAN_SZEROKOSC);
+
+    menu_start_rysuj_przycisk();      /* lewy gorny rog: logo + nazwa aktywnego okna */
     narysuj_czas_paska();
     narysuj_ikone_internetu();
     bluetooth_ui_rysuj_pasek();
     quickcam_ui_rysuj_pasek();
     bateria_ui_rysuj_pasek();
-    odswiez_fragment_widoku(0, EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC, EKRAN_SZEROKOSC, PASEK_ZADAN_WYSOKOSC);
+
+    okno_odrysuj_dolny_pas();         /* czysta scena pod dockiem */
+    menu_start_rysuj_dock();
+
+    odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, PASEK_GORNY_WYSOKOSC);
+    odswiez_fragment_widoku(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
 }
 
 static const int gauss_kernel_5[5] = {1, 4, 6, 4, 1};
@@ -671,18 +642,13 @@ void ustaw_kolor_tapety(uint32_t kolor)
     kolor_tapety = kolor;
     tapeta_gradientowa = 0;
     tapeta_bitmapa_wczytana = 0;
-    for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
-        uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
-        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-            obraz[offset + x] = kolor_tapety;
-        }
-    }
+    narysuj_tlo_poziome(PASEK_GORNY_WYSOKOSC, EKRAN_WYSOKOSC);
     narysuj_napis_systemowy();
     if (okno_liczba_okien() > 0) {
         okno_odrysuj_wszystkie();
     } else {
-        odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC,
-                                EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+        narysuj_pasek_zadan();   /* szklo musi sie rozmyc na nowej tapecie */
+        odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC);
     }
 }
 
@@ -734,34 +700,13 @@ static uint32_t parsuj_hex(char **p)
 
 static void narysuj_tapete_tlo(void)
 {
-    if (tapeta_bitmapa_wczytana) {
-        for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
-            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
-            for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-                obraz[offset + x] = tapeta_bitmapa[offset + x];
-            }
-        }
-    } else if (tapeta_gradientowa) {
-        for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
-            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
-            for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-                obraz[offset + x] = kolor_tla_dla_x(x);
-            }
-        }
-    } else {
-        for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
-            uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
-            for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-                obraz[offset + x] = kolor_tapety;
-            }
-        }
-    }
+    narysuj_tlo_poziome(PASEK_GORNY_WYSOKOSC, EKRAN_WYSOKOSC);
     narysuj_napis_systemowy();
     if (okno_liczba_okien() > 0) {
         okno_odrysuj_wszystkie();
     } else {
-        odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC,
-                                EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC);
+        narysuj_pasek_zadan();   /* szklo musi sie rozmyc na nowej tapecie */
+        odswiez_fragment_widoku(0, 0, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC);
     }
 }
 
@@ -899,25 +844,11 @@ void rysowanie_init(void)
     }
 
     tapeta_gradientowa = 1;
-    for (int y = 0; y < EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y++) {
-        uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
-        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-            obraz[offset + x] = kolor_tla_dla_x(x);
-        }
-    }
-
-    for (int y = EKRAN_WYSOKOSC - PASEK_ZADAN_WYSOKOSC; y < EKRAN_WYSOKOSC; y++) {
-        uint32_t offset = (uint32_t)y * EKRAN_SZEROKOSC;
-        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
-            obraz[offset + x] = KOLOR_PASKA_ZADAN;
-        }
-    }
+    narysuj_tlo_poziome(0, EKRAN_WYSOKOSC);   /* cala tapeta, szklo rozmyje ja potem */
 
     internet_dostepny = 0;
-    narysuj_czas_paska();
-    narysuj_ikone_internetu();
-
     narysuj_napis_systemowy();
+    narysuj_pasek_zadan();                    /* gorny pasek + dock */
 
     odswiez_widok();
     kursor_graficzny_init();
@@ -950,6 +881,7 @@ void quickcam_ui_init(void)
 {
 }
 
+/* ikona kamery w gornym pasku (bez ramki, jak ikony w macOS) */
 void quickcam_ui_rysuj_pasek(void)
 {
     extern unsigned char quickcam_driver_is_detected(void);
@@ -957,22 +889,17 @@ void quickcam_ui_rysuj_pasek(void)
     if (!quickcam_driver_is_detected()) return;
     uint8_t streaming = quickcam_driver_is_streaming();
     uint32_t kolor = streaming ? KOLOR_CZERWONY : KOLOR_BIALY;
-    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y, KAMERA_IKONA_W, KAMERA_IKONA_H, 0x003A4B5C);
-    rysuj_prostokat(KAMERA_IKONA_X + 6, KAMERA_IKONA_Y + 6, 12, 10, kolor);
-    rysuj_kwadrat(KAMERA_IKONA_X + 10, KAMERA_IKONA_Y + 10, 4, 0x00000000);
-    if (streaming) {
-        rysuj_prostokat(KAMERA_IKONA_X + 20, KAMERA_IKONA_Y + 2, 4, 4, KOLOR_CZERWONY);
-    }
-    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y, KAMERA_IKONA_W, 1, 0x00FFFFFF);
-    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y, 1, KAMERA_IKONA_H, 0x00FFFFFF);
-    rysuj_prostokat(KAMERA_IKONA_X + KAMERA_IKONA_W - 1, KAMERA_IKONA_Y, 1, KAMERA_IKONA_H, 0x00FFFFFF);
-    rysuj_prostokat(KAMERA_IKONA_X, KAMERA_IKONA_Y + KAMERA_IKONA_H - 1, KAMERA_IKONA_W, 1, 0x00FFFFFF);
+    rysuj_prostokat(KAM_TOP_X + 2, KAM_TOP_Y + 3, 12, 10, kolor);
+    rysuj_prostokat(KAM_TOP_X + 14, KAM_TOP_Y + 5, 3, 6, kolor);
+    rysuj_kwadrat(KAM_TOP_X + 6, KAM_TOP_Y + 6, 4, 0x00000000);
+    if (streaming)
+        rysuj_prostokat(KAM_TOP_X + 16, KAM_TOP_Y + 1, 3, 3, KOLOR_CZERWONY);
 }
 
 int quickcam_ui_icon_at(int x, int y)
 {
-    if (y < KAMERA_IKONA_Y || y >= KAMERA_IKONA_Y + KAMERA_IKONA_H) return 0;
-    if (x < KAMERA_IKONA_X || x >= KAMERA_IKONA_X + KAMERA_IKONA_W) return 0;
+    if (y < KAM_TOP_Y || y >= KAM_TOP_Y + KAM_TOP_H) return 0;
+    if (x < KAM_TOP_X || x >= KAM_TOP_X + KAM_TOP_W) return 0;
     return 1;
 }
 
