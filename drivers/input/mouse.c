@@ -180,6 +180,7 @@ void mouse_poll(void) {
                 okno_obsluz_ruch(x, y);
                 pulp_mouse_ruch(x, y);
             }
+            menu_start_dock_hover(x, y);
         }
     }
 }

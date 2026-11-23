@@ -816,6 +816,7 @@ void menu_start_dock_hover(int x, int y)
     dock_my = y;
     dock_hover_aktywny = aktywny;
 
+    odtworz_fragment_tla(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
     okno_odrysuj_dolny_pas();
     menu_start_rysuj_dock();
     odswiez_fragment_widoku(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
