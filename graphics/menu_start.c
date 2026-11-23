@@ -27,14 +27,21 @@
 #endif
 #define DOCK_WYSOKOSC_PX    60
 #define DOCK_MARGINES_DOLNY 10
-#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX)
-#define OKNA_DOL_MAKS       (DOCK_PAS_Y - 6)
+#define DOCK_MAG_GORA       28    /* miejsce nad dockiem na powiekszone ikony */
+/* gorna krawedz pasa, ktory przerysowujemy razem z dockiem */
+#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX - DOCK_MAG_GORA)
+/* gorna krawedz samego szkla docka */
+#define DOCK_SZKLO_Y        (DOCK_PAS_Y + DOCK_MAG_GORA)
+#define OKNA_DOL_MAKS       (DOCK_SZKLO_Y - 8)
 void rysuj_szklo(int x, int y, int w, int h, int promien,
                  uint32_t tint, uint32_t alfa, int z_obrazu);
 int menu_start_czy_w_docku(int x, int y);
 void menu_start_rysuj_dock(void);
+void menu_start_dock_hover(int x, int y);
+void okno_odrysuj_dolny_pas(void);
+extern uint32_t *obraz;
 
-/* ---------------- menu w lewym gornym rogu (jak jablko w macOS) ---------------- */
+/* ---------------- menu w lewym gornym rogu ---------------- */
 #define PRZYCISK_SZEROKOSC 112   /* logo + napis "TarixenOS" */
 
 #define MENU_X 4
@@ -57,7 +64,7 @@ void menu_start_rysuj_dock(void);
 #define DOCK_PROMIEN 16
 #define DOCK_APEK    10
 #define DOCK_ROZDZ   16
-#define DOCK_Y       DOCK_PAS_Y
+#define DOCK_Y       DOCK_SZKLO_Y
 #define DOCK_IKONA_Y (DOCK_Y + 9)
 
 static uint8_t menu_otwarte;
@@ -448,7 +455,7 @@ static int dock_licz_min(void)
         struct okno *o = okno_pobierz_okno(i);
         if (o && o->otwarte && o->zminimalizowane) n++;
     }
-    return n;
+    return n > 16 ? 16 : n;
 }
 
 static struct okno *dock_okno_min(int j)
@@ -461,15 +468,216 @@ static struct okno *dock_okno_min(int j)
     return 0;
 }
 
-static void dock_geom(int *x, int *w, int *nmin)
+/* ---- uklad docka z powiekszaniem ---- */
+#define DOCK_MAG_PROMIEN   100     /* zasieg powiekszenia wokol kursora (px) */
+#define DOCK_MAG_MAX       1741    /* maksymalna skala: 1.7x (1024 = 1.0) */
+#define DOCK_MAG_PODEJSCIE 36      /* ile px nad dockiem zaczyna sie powiekszanie */
+#define DOCK_MAX_POZ       (DOCK_APEK + 16)
+#define DOCK_BLOK          44      /* bufor ikony: 32 px + zapas na cien */
+#define DOCK_BLOK_X        6
+#define DOCK_BLOK_Y        4
+
+struct dock_poz {
+    int x;      /* lewa krawedz slotu */
+    int w;      /* szerokosc slotu */
+    int s;      /* skala ikony (1024 = 1.0) */
+};
+
+static struct dock_poz dock_p[DOCK_MAX_POZ];
+static int dock_mx = -1000;
+static int dock_my = -1000;
+static int dock_hover_aktywny;
+
+/* ikony z kanalem alfa (premultiplied ARGB), potrzebne do skalowania */
+static uint32_t dock_cache[DOCK_APEK + 1][DOCK_BLOK * DOCK_BLOK];
+static int dock_cache_proba;
+static int dock_cache_ok;
+
+static void ikona_generyczna(int x, int y)
 {
-    int n = dock_licz_min();
-    int szer = 2 * DOCK_PAD + DOCK_APEK * DOCK_SLOT;
-    if (n > 0) szer += DOCK_ROZDZ + n * DOCK_SLOT;
-    if (szer > EKRAN_SZEROKOSC) szer = EKRAN_SZEROKOSC;
-    *x = (EKRAN_SZEROKOSC - szer) / 2;
-    *w = szer;
-    *nmin = n;
+    ikona_cien(x + 1, y + 1, 30, 30, 7);
+    ikona_rect(x + 1, y + 1, 30, 30, 7, 0x006FB1FF, 0x001E4FA8);
+}
+
+static void dock_ikona_bezposrednio(int idx, int x, int y)
+{
+    if (idx >= 0 && idx < DOCK_APEK) ikony_dock[idx](x, y);
+    else ikona_generyczna(x, y);
+}
+
+/* Kazda ikone rysujemy raz na czarnym i raz na bialym tle i z roznicy
+ * wyliczamy przezroczystosc. Gdy rysowanie nie trafia do bufora obraz
+ * (tryb ze sterownikiem hal_gfx), cache jest wylaczony i dock dziala bez
+ * powiekszania. */
+static void dock_zbuduj_cache(void)
+{
+    static uint32_t zapas[DOCK_BLOK * DOCK_BLOK];
+    static uint32_t czarne[DOCK_BLOK * DOCK_BLOK];
+    static uint32_t biale[DOCK_BLOK * DOCK_BLOK];
+    int bx = 4;
+    int by = DOCK_PAS_Y + 20;
+    int ok = 1;
+
+    dock_cache_proba = 1;
+    for (int j = 0; j < DOCK_BLOK; j++)
+        for (int i = 0; i < DOCK_BLOK; i++)
+            zapas[j * DOCK_BLOK + i] = obraz[(by + j) * EKRAN_SZEROKOSC + bx + i];
+
+    for (int idx = 0; idx <= DOCK_APEK && ok; idx++) {
+        for (int przebieg = 0; przebieg < 2 && ok; przebieg++) {
+            uint32_t tlo = przebieg ? 0x00FFFFFF : 0x00000000;
+            uint32_t *cel = przebieg ? biale : czarne;
+            rysuj_prostokat(bx, by, DOCK_BLOK, DOCK_BLOK, tlo);
+            if ((obraz[by * EKRAN_SZEROKOSC + bx] & 0x00FFFFFF) != tlo) {
+                ok = 0;
+                break;
+            }
+            dock_ikona_bezposrednio(idx, bx + DOCK_BLOK_X, by + DOCK_BLOK_Y);
+            for (int j = 0; j < DOCK_BLOK; j++)
+                for (int i = 0; i < DOCK_BLOK; i++)
+                    cel[j * DOCK_BLOK + i] = obraz[(by + j) * EKRAN_SZEROKOSC + bx + i] & 0x00FFFFFF;
+        }
+        if (!ok) break;
+        for (int k = 0; k < DOCK_BLOK * DOCK_BLOK; k++) {
+            int cb = (int)czarne[k];
+            int cw = (int)biale[k];
+            int d = (((cw >> 16) & 255) - ((cb >> 16) & 255) +
+                     ((cw >> 8) & 255) - ((cb >> 8) & 255) +
+                     (cw & 255) - (cb & 255)) / 3;
+            int al = 255 - d;
+            int pr = (cb >> 16) & 255;
+            int pg = (cb >> 8) & 255;
+            int pb = cb & 255;
+            if (al < 0) al = 0;
+            if (al > 255) al = 255;
+            if (pr > al) pr = al;
+            if (pg > al) pg = al;
+            if (pb > al) pb = al;
+            dock_cache[idx][k] = ((uint32_t)al << 24) | ((uint32_t)pr << 16) |
+                                 ((uint32_t)pg << 8) | (uint32_t)pb;
+        }
+    }
+
+    for (int j = 0; j < DOCK_BLOK; j++)
+        for (int i = 0; i < DOCK_BLOK; i++)
+            obraz[(by + j) * EKRAN_SZEROKOSC + bx + i] = zapas[j * DOCK_BLOK + i];
+    dock_cache_ok = ok;
+}
+
+/* ikona skalowana dwuliniowo z cache, narysowana na buforze obraz */
+static void dock_blit(int idx, int ikona_x, int ikona_y, int s)
+{
+    const uint32_t *src = dock_cache[idx];
+    int bw = DOCK_BLOK * s / 1024;
+    int bl = ikona_x - DOCK_BLOK_X * s / 1024;
+    int bt = ikona_y - DOCK_BLOK_Y * s / 1024;
+    if (bw < 1 || s < 1) return;
+
+    for (int dy = 0; dy < bw; dy++) {
+        int py = bt + dy;
+        if (py < 0 || py >= EKRAN_WYSOKOSC) continue;
+        int sv = ((2 * dy + 1) * 131072) / s - 128;
+        int v0 = sv >> 8;
+        int fv = sv & 255;
+        int v1 = v0 + 1;
+        if (v0 < 0) v0 = 0;
+        if (v0 > DOCK_BLOK - 1) v0 = DOCK_BLOK - 1;
+        if (v1 < 0) v1 = 0;
+        if (v1 > DOCK_BLOK - 1) v1 = DOCK_BLOK - 1;
+        for (int dx = 0; dx < bw; dx++) {
+            int px = bl + dx;
+            if (px < 0 || px >= EKRAN_SZEROKOSC) continue;
+            int su = ((2 * dx + 1) * 131072) / s - 128;
+            int u0 = su >> 8;
+            int fu = su & 255;
+            int u1 = u0 + 1;
+            if (u0 < 0) u0 = 0;
+            if (u0 > DOCK_BLOK - 1) u0 = DOCK_BLOK - 1;
+            if (u1 < 0) u1 = 0;
+            if (u1 > DOCK_BLOK - 1) u1 = DOCK_BLOK - 1;
+
+            uint32_t p00 = src[v0 * DOCK_BLOK + u0];
+            uint32_t p10 = src[v0 * DOCK_BLOK + u1];
+            uint32_t p01 = src[v1 * DOCK_BLOK + u0];
+            uint32_t p11 = src[v1 * DOCK_BLOK + u1];
+            uint32_t w00 = (uint32_t)((256 - fu) * (256 - fv));
+            uint32_t w10 = (uint32_t)(fu * (256 - fv));
+            uint32_t w01 = (uint32_t)((256 - fu) * fv);
+            uint32_t w11 = (uint32_t)(fu * fv);
+            uint32_t al = ((p00 >> 24) * w00 + (p10 >> 24) * w10 +
+                           (p01 >> 24) * w01 + (p11 >> 24) * w11) >> 16;
+            if (al == 0) continue;
+            uint32_t r = (((p00 >> 16) & 255) * w00 + ((p10 >> 16) & 255) * w10 +
+                          ((p01 >> 16) & 255) * w01 + ((p11 >> 16) & 255) * w11) >> 16;
+            uint32_t g = (((p00 >> 8) & 255) * w00 + ((p10 >> 8) & 255) * w10 +
+                          ((p01 >> 8) & 255) * w01 + ((p11 >> 8) & 255) * w11) >> 16;
+            uint32_t b = ((p00 & 255) * w00 + (p10 & 255) * w10 +
+                          (p01 & 255) * w01 + (p11 & 255) * w11) >> 16;
+            uint32_t d = obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)px];
+            r += ((d >> 16) & 255) * (255 - al) / 255;
+            g += ((d >> 8) & 255) * (255 - al) / 255;
+            b += (d & 255) * (255 - al) / 255;
+            if (r > 255) r = 255;
+            if (g > 255) g = 255;
+            if (b > 255) b = 255;
+            obraz[(uint32_t)py * EKRAN_SZEROKOSC + (uint32_t)px] = (r << 16) | (g << 8) | b;
+        }
+    }
+}
+
+/* waga powiekszenia zalezna od wysokosci kursora (0..1024) */
+static int dock_waga(int y)
+{
+    int gora = DOCK_Y - DOCK_MAG_PODEJSCIE;
+    if (y < gora) return 0;
+    if (y >= DOCK_Y) return 1024;
+    return (y - gora) * 1024 / DOCK_MAG_PODEJSCIE;
+}
+
+static int dock_gladko(int t)
+{
+    if (t < 0) t = 0;
+    if (t > 1024) t = 1024;
+    return t * t / 1024 * (3 * 1024 - 2 * t) / 1024;
+}
+
+/* Liczy pozycje wszystkich ikon dla kursora w (hx, hy). Dock jest wysrodkowany;
+ * po powiekszeniu ikon robi sie szerszy na obie strony. */
+static void dock_uloz(int hx, int hy, int n, int *lewy, int *szer)
+{
+    int a = dock_cache_ok ? dock_waga(hy) : 0;
+    int liczba;
+    int suma = 0;
+    int bsz;
+    int bl;
+    int x;
+    if (n > 16) n = 16;
+    liczba = DOCK_APEK + n;
+    bsz = 2 * DOCK_PAD + DOCK_APEK * DOCK_SLOT + (n > 0 ? DOCK_ROZDZ + n * DOCK_SLOT : 0);
+    bl = (EKRAN_SZEROKOSC - bsz) / 2;
+
+    for (int i = 0; i < liczba; i++) {
+        int cb = bl + DOCK_PAD + i * DOCK_SLOT + DOCK_SLOT / 2 + (i >= DOCK_APEK ? DOCK_ROZDZ : 0);
+        int s = 1024;
+        if (a > 0) {
+            int d = hx > cb ? hx - cb : cb - hx;
+            if (d < DOCK_MAG_PROMIEN) {
+                int f = 1024 - dock_gladko(d * 1024 / DOCK_MAG_PROMIEN);
+                s = 1024 + (DOCK_MAG_MAX - 1024) * f / 1024 * a / 1024;
+            }
+        }
+        dock_p[i].s = s;
+        dock_p[i].w = DOCK_SLOT * s / 1024;
+        suma += dock_p[i].w;
+    }
+    *szer = 2 * DOCK_PAD + suma + (n > 0 ? DOCK_ROZDZ : 0);
+    *lewy = (EKRAN_SZEROKOSC - *szer) / 2;
+    x = *lewy + DOCK_PAD;
+    for (int i = 0; i < liczba; i++) {
+        if (i == DOCK_APEK) x += DOCK_ROZDZ;
+        dock_p[i].x = x;
+        x += dock_p[i].w;
+    }
 }
 
 static int dock_czy_uruchomiona(int indeks)
@@ -481,59 +689,85 @@ static int dock_czy_uruchomiona(int indeks)
     return 0;
 }
 
-/* ikona zminimalizowanego okna w docku */
-static void dock_rysuj_min(int x, int y, const char *tytul)
+/* gorna krawedz ikony o danej skali (dolna jest zawsze w tym samym miejscu) */
+static int dock_ikona_gora(const struct dock_poz *p)
 {
-    int idx = dock_indeks_dla_tytulu(tytul);
-    if (idx >= 0) {
-        ikony_dock[idx](x, y);
-    } else {
+    return DOCK_Y + 9 + DOCK_IKONA - DOCK_IKONA * p->s / 1024;
+}
+
+/* ktora pozycja docka jest pod punktem (x, y); kursor = (x, y) */
+static int dock_trafienie(int x, int y, int *indeks)
+{
+    int lewy, szer;
+    int n = dock_licz_min();
+    if (n > 16) n = 16;
+    dock_uloz(x, y, n, &lewy, &szer);
+    for (int i = 0; i < DOCK_APEK + n; i++) {
+        int gora = dock_ikona_gora(&dock_p[i]);
+        if (gora > DOCK_Y) gora = DOCK_Y;
+        if (x >= dock_p[i].x && x < dock_p[i].x + dock_p[i].w &&
+            y >= gora && y < DOCK_Y + DOCK_WYS) {
+            *indeks = i;
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void dock_rysuj_pozycje(int cache_idx, const char *tytul, const struct dock_poz *p)
+{
+    int d = DOCK_IKONA * p->s / 1024;
+    int lewo = p->x + (p->w - d) / 2;
+    int gora = dock_ikona_gora(p);
+    if (dock_cache_ok) dock_blit(cache_idx, lewo, gora, p->s);
+    else dock_ikona_bezposrednio(cache_idx, lewo, gora);
+    if (cache_idx >= DOCK_APEK) {     /* okno bez rozpoznanej aplikacji: pierwsza litera */
         char lit[2];
         lit[0] = (tytul && tytul[0]) ? male_na_duze(tytul[0]) : '?';
         lit[1] = 0;
-        ikona_cien(x + 1, y + 1, 30, 30, 7);
-        ikona_rect(x + 1, y + 1, 30, 30, 7, 0x006FB1FF, 0x001E4FA8);
-        rysuj_tekst_chicago(x + 12, y + 12, lit, 0x00FFFFFF);
+        rysuj_tekst_chicago(lewo + d / 2 - 4, gora + d / 2 - 4, lit, 0x00FFFFFF);
     }
 }
 
 void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul)
 {
-    dock_rysuj_min(x, y, tytul);
+    int idx = dock_indeks_dla_tytulu(tytul);
+    dock_ikona_bezposrednio(idx, x, y);
 }
 
 struct okno *pasek_zadan_ikona_na_pozycji(int x, int y)
 {
-    int dx, dw, n;
-    dock_geom(&dx, &dw, &n);
-    if (n == 0 || y < DOCK_Y || y >= DOCK_Y + DOCK_WYS) return 0;
-    int rel = x - (dx + DOCK_PAD + DOCK_APEK * DOCK_SLOT + DOCK_ROZDZ);
-    if (rel < 0) return 0;
-    int j = rel / DOCK_SLOT;
-    if (j >= n) return 0;
-    return dock_okno_min(j);
+    int idx;
+    if (!dock_trafienie(x, y, &idx) || idx < DOCK_APEK) return 0;
+    return dock_okno_min(idx - DOCK_APEK);
 }
 
 int menu_start_czy_w_docku(int x, int y)
 {
-    int dx, dw, n;
-    dock_geom(&dx, &dw, &n);
-    return x >= dx && x < dx + dw && y >= DOCK_Y && y < DOCK_Y + DOCK_WYS;
+    int idx;
+    int lewy, szer;
+    int n = dock_licz_min();
+    if (n > 16) n = 16;
+    if (dock_trafienie(x, y, &idx)) return 1;
+    dock_uloz(x, y, n, &lewy, &szer);
+    return x >= lewy && x < lewy + szer && y >= DOCK_Y && y < DOCK_Y + DOCK_WYS;
 }
 
 void menu_start_rysuj_dock(void)
 {
-    int dx, dw, n;
-    dock_geom(&dx, &dw, &n);
+    int lewy, szer;
+    int n = dock_licz_min();
+    if (n > 16) n = 16;
+    if (!dock_cache_proba) dock_zbuduj_cache();
+    dock_uloz(dock_mx, dock_my, n, &lewy, &szer);
 
     /* rozmyte, zaokraglone szklo - rozmywa to, co jest pod dockiem (tapeta i okna) */
-    rysuj_szklo(dx, DOCK_Y, dw, DOCK_WYS, DOCK_PROMIEN, 0x00FFFFFF, 64, 1);
+    rysuj_szklo(lewy, DOCK_Y, szer, DOCK_WYS, DOCK_PROMIEN, 0x00FFFFFF, 64, 1);
 
     for (int i = 0; i < DOCK_APEK; i++) {
-        int ix = dx + DOCK_PAD + i * DOCK_SLOT + (DOCK_SLOT - DOCK_IKONA) / 2;
-        ikony_dock[i](ix, DOCK_IKONA_Y);
-        if (dock_czy_uruchomiona(i)) {  /* biala kropka pod uruchomiona aplikacja */
-            int kx = ix + DOCK_IKONA / 2 - 2;
+        dock_rysuj_pozycje(i, 0, &dock_p[i]);
+        if (dock_czy_uruchomiona(i)) {   /* biala kropka pod uruchomiona aplikacja */
+            int kx = dock_p[i].x + dock_p[i].w / 2 - 2;
             int ky = DOCK_Y + DOCK_WYS - 9;
             rysuj_prostokat(kx + 1, ky, 2, 1, 0x00FFFFFF);
             rysuj_prostokat(kx, ky + 1, 4, 2, 0x00FFFFFF);
@@ -542,16 +776,49 @@ void menu_start_rysuj_dock(void)
     }
 
     if (n > 0) {
-        int sx = dx + DOCK_PAD + DOCK_APEK * DOCK_SLOT + DOCK_ROZDZ / 2;
+        int sx = dock_p[DOCK_APEK - 1].x + dock_p[DOCK_APEK - 1].w + DOCK_ROZDZ / 2;
         rysuj_prostokat_polprzezroczysty(sx, DOCK_Y + 10, 1, DOCK_WYS - 20, 0x00FFFFFF, 140);
         rysuj_prostokat_polprzezroczysty(sx + 1, DOCK_Y + 10, 1, DOCK_WYS - 20, 0x00000000, 40);
         for (int j = 0; j < n; j++) {
             struct okno *o = dock_okno_min(j);
-            int ix = dx + DOCK_PAD + DOCK_APEK * DOCK_SLOT + DOCK_ROZDZ + j * DOCK_SLOT +
-                     (DOCK_SLOT - DOCK_IKONA) / 2;
-            if (o) dock_rysuj_min(ix, DOCK_IKONA_Y, o->tytul);
+            if (!o) continue;
+            int idx = dock_indeks_dla_tytulu(o->tytul);
+            dock_rysuj_pozycje(idx >= 0 ? idx : DOCK_APEK, o->tytul, &dock_p[DOCK_APEK + j]);
         }
     }
+}
+
+/* Wywolywane przy kazdym ruchu kursora: przerysowuje dock z powiekszeniem. */
+void menu_start_dock_hover(int x, int y)
+{
+    int aktywny = 0;
+    if (!dock_cache_ok) {
+        dock_mx = x;
+        dock_my = y;
+        return;
+    }
+    if (dock_waga(y) > 0) {
+        int n = dock_licz_min();
+        int bsz;
+        int bl;
+        if (n > 16) n = 16;
+        bsz = 2 * DOCK_PAD + DOCK_APEK * DOCK_SLOT + (n > 0 ? DOCK_ROZDZ + n * DOCK_SLOT : 0);
+        bl = (EKRAN_SZEROKOSC - bsz) / 2;
+        if (x >= bl - DOCK_MAG_PROMIEN && x < bl + bsz + DOCK_MAG_PROMIEN) aktywny = 1;
+    }
+    if (!aktywny && !dock_hover_aktywny) {
+        dock_mx = x;
+        dock_my = y;
+        return;
+    }
+    if (aktywny && x == dock_mx && y == dock_my) return;
+    dock_mx = x;
+    dock_my = y;
+    dock_hover_aktywny = aktywny;
+
+    okno_odrysuj_dolny_pas();
+    menu_start_rysuj_dock();
+    odswiez_fragment_widoku(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
 }
 
 /* ====================================================================
@@ -735,17 +1002,12 @@ void menu_start_mouse_click(void)
     }
 
     /* dock */
-    int dx, dw, n;
-    dock_geom(&dx, &dw, &n);
-    if (y < DOCK_Y || y >= DOCK_Y + DOCK_WYS || x < dx || x >= dx + dw) return;
-
-    int rel = x - (dx + DOCK_PAD);
-    if (rel < 0) return;
-    int slot = rel / DOCK_SLOT;
-    if (slot < DOCK_APEK) {
-        dock_kliknij_aplikacje(slot);
+    int idx;
+    if (!dock_trafienie(x, y, &idx)) return;
+    if (idx < DOCK_APEK) {
+        dock_kliknij_aplikacje(idx);
         return;
     }
-    struct okno *min = pasek_zadan_ikona_na_pozycji(x, y);
+    struct okno *min = dock_okno_min(idx - DOCK_APEK);
     if (min) okno_przywroc(min);
 }
