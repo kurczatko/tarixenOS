@@ -792,6 +792,8 @@ void menu_start_rysuj_dock(void)
 void menu_start_dock_hover(int x, int y)
 {
     int aktywny = 0;
+    int stary_x = dock_mx;
+    int stary_y = dock_my;
     if (!dock_cache_ok) {
         dock_mx = x;
         dock_my = y;
@@ -816,10 +818,27 @@ void menu_start_dock_hover(int x, int y)
     dock_my = y;
     dock_hover_aktywny = aktywny;
 
-    odtworz_fragment_tla(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
+    /* Odswiezamy tylko obszar starego i nowego polozenia docka. */
+    int n = dock_licz_min();
+    int stary_lewy, stara_szer, nowy_lewy, nowa_szer;
+    int lewy, prawy;
+    if (n > 16) n = 16;
+    dock_uloz(stary_x, stary_y, n, &stary_lewy, &stara_szer);
+    dock_uloz(x, y, n, &nowy_lewy, &nowa_szer);
+
+    lewy = stary_lewy < nowy_lewy ? stary_lewy : nowy_lewy;
+    prawy = stary_lewy + stara_szer > nowy_lewy + nowa_szer ?
+             stary_lewy + stara_szer : nowy_lewy + nowa_szer;
+    if (lewy < 0) lewy = 0;
+    if (prawy > EKRAN_SZEROKOSC) prawy = EKRAN_SZEROKOSC;
+    if (prawy <= lewy) return;
+
+    odtworz_fragment_tla(lewy, DOCK_PAS_Y, prawy - lewy,
+                         EKRAN_WYSOKOSC - DOCK_PAS_Y);
     okno_odrysuj_dolny_pas();
     menu_start_rysuj_dock();
-    odswiez_fragment_widoku(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y);
+    odswiez_fragment_widoku(lewy, DOCK_PAS_Y, prawy - lewy,
+                            EKRAN_WYSOKOSC - DOCK_PAS_Y);
 }
 
 /* ====================================================================
