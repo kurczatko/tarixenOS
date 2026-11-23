@@ -532,8 +532,13 @@ void menu_start_rysuj_dock(void)
     for (int i = 0; i < DOCK_APEK; i++) {
         int ix = dx + DOCK_PAD + i * DOCK_SLOT + (DOCK_SLOT - DOCK_IKONA) / 2;
         ikony_dock[i](ix, DOCK_IKONA_Y);
-        if (dock_czy_uruchomiona(i))   /* kropka pod uruchomiona aplikacja */
-            ikona_kolo(ix + DOCK_IKONA / 2, DOCK_Y + DOCK_WYS - 7, 2, 0x00606878, 0x00101820);
+        if (dock_czy_uruchomiona(i)) {  /* biala kropka pod uruchomiona aplikacja */
+            int kx = ix + DOCK_IKONA / 2 - 2;
+            int ky = DOCK_Y + DOCK_WYS - 9;
+            rysuj_prostokat(kx + 1, ky, 2, 1, 0x00FFFFFF);
+            rysuj_prostokat(kx, ky + 1, 4, 2, 0x00FFFFFF);
+            rysuj_prostokat(kx + 1, ky + 3, 2, 1, 0x00FFFFFF);
+        }
     }
 
     if (n > 0) {
@@ -657,6 +662,47 @@ static void dock_uruchom(int indeks)
     }
 }
 
+/* Klik w ikone aplikacji w docku:
+ *  - brak otwartego okna          -> uruchom aplikacje
+ *  - okno jest, ale bez fokusu    -> ustaw na nim fokus (na wierzch)
+ *  - okno ma fokus                -> zminimalizuj je
+ *  - okno jest tylko zminimalizowane -> przywroc je */
+static void dock_kliknij_aplikacje(int indeks)
+{
+    struct okno *cel = 0;        /* najwyzsze widoczne okno tej aplikacji */
+    struct okno *zmin = 0;       /* zminimalizowane okno tej aplikacji */
+
+    for (int i = okno_liczba_okien() - 1; i >= 0; i--) {
+        struct okno *o = okno_pobierz_okno(i);
+        if (!o || !o->otwarte || dock_indeks_dla_tytulu(o->tytul) != indeks) continue;
+        if (o->zminimalizowane) {
+            if (!zmin) zmin = o;
+        } else if (!cel) {
+            cel = o;
+        }
+    }
+
+    if (cel) {
+        struct okno *aktywne_tej_aplikacji = 0;
+        if (aktywne_okno && aktywne_okno->otwarte && !aktywne_okno->zminimalizowane &&
+            dock_indeks_dla_tytulu(aktywne_okno->tytul) == indeks)
+            aktywne_tej_aplikacji = aktywne_okno;
+
+        if (aktywne_tej_aplikacji) {
+            okno_zminimalizuj(aktywne_tej_aplikacji);
+        } else {
+            okno_ustaw_aktywne(cel);
+            okno_odrysuj_wszystkie();
+        }
+        return;
+    }
+    if (zmin) {
+        okno_przywroc(zmin);
+        return;
+    }
+    dock_uruchom(indeks);
+}
+
 void menu_start_mouse_click(void)
 {
     int x;
@@ -697,7 +743,7 @@ void menu_start_mouse_click(void)
     if (rel < 0) return;
     int slot = rel / DOCK_SLOT;
     if (slot < DOCK_APEK) {
-        dock_uruchom(slot);
+        dock_kliknij_aplikacje(slot);
         return;
     }
     struct okno *min = pasek_zadan_ikona_na_pozycji(x, y);
