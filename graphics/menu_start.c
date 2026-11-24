@@ -476,6 +476,7 @@ static struct okno *dock_okno_min(int j)
 #define DOCK_BLOK          44      /* bufor ikony: 32 px + zapas na cien */
 #define DOCK_BLOK_X        6
 #define DOCK_BLOK_Y        4
+#define DOCK_HOVER_MARGINES 6      /* zapas po bokach odswiezanego obszaru (cienie, krawedz szkla) */
 
 struct dock_poz {
     int x;      /* lewa krawedz slotu */
@@ -788,7 +789,12 @@ void menu_start_rysuj_dock(void)
     }
 }
 
-/* Wywolywane przy kazdym ruchu kursora: przerysowuje dock z powiekszeniem. */
+/* Wywolywane przy kazdym ruchu kursora: przerysowuje dock z powiekszeniem.
+ *
+ * Cala klatka jest skladana w buforze obraz (czysta scena + dock), a na ekran
+ * trafia dopiero gotowy wynik, jednym odswiezeniem. Wczesniej tapeta byla
+ * wysylana na ekran jeszcze przed narysowaniem docka (odtworz_fragment_tla),
+ * przez co dock znikal na ulamek sekundy przy kazdym ruchu myszy. */
 void menu_start_dock_hover(int x, int y)
 {
     int aktywny = 0;
@@ -829,14 +835,17 @@ void menu_start_dock_hover(int x, int y)
     lewy = stary_lewy < nowy_lewy ? stary_lewy : nowy_lewy;
     prawy = stary_lewy + stara_szer > nowy_lewy + nowa_szer ?
              stary_lewy + stara_szer : nowy_lewy + nowa_szer;
+    lewy -= DOCK_HOVER_MARGINES;
+    prawy += DOCK_HOVER_MARGINES;
     if (lewy < 0) lewy = 0;
     if (prawy > EKRAN_SZEROKOSC) prawy = EKRAN_SZEROKOSC;
     if (prawy <= lewy) return;
 
-    odtworz_fragment_tla(lewy, DOCK_PAS_Y, prawy - lewy,
-                         EKRAN_WYSOKOSC - DOCK_PAS_Y);
+    /* 1. czysta scena (tapeta + okna) w buforze - nic nie idzie na ekran */
     okno_odrysuj_dolny_pas();
+    /* 2. dock na swiezej scenie, tez tylko w buforze */
     menu_start_rysuj_dock();
+    /* 3. jedno odswiezenie gotowej klatki */
     odswiez_fragment_widoku(lewy, DOCK_PAS_Y, prawy - lewy,
                             EKRAN_WYSOKOSC - DOCK_PAS_Y);
 }
