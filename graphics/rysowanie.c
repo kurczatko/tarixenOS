@@ -370,7 +370,7 @@ static void narysuj_napis_systemowy(void)
 {
     int tekst_x = NAPIS_X;
     int tekst_y = NAPIS_Y;
-    rysuj_tekst_chicago(tekst_x, tekst_y, "TarixenOS Tryb Graficzny", KOLOR_TEKST_BIALY);
+    rysuj_tekst_chicago(tekst_x, tekst_y, ""/*kiedys tu byl napis ale nie ma go*/, KOLOR_TEKST_BIALY);
 }
 
 void odswiez_widok(void)
