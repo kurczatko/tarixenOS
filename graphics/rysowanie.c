@@ -14,14 +14,18 @@
 #include <graphics/menu_start.h>
 #include <graphics/hal_gfx.h>
 
-/* --- uklad gornego paska i docka --- */
+/* --- uklad gornego paska i docka (musi byc zgodny z menu_start.c i okno.c) --- */
 #ifndef PASEK_GORNY_WYSOKOSC
 #define PASEK_GORNY_WYSOKOSC 24
 #endif
 #define DOCK_WYSOKOSC_PX    60
 #define DOCK_MARGINES_DOLNY 10
-#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX)
-#define OKNA_DOL_MAKS       (DOCK_PAS_Y - 6)
+#define DOCK_MAG_GORA       28    /* miejsce nad dockiem na powiekszone ikony */
+/* gorna krawedz pasa, ktory przerysowujemy razem z dockiem */
+#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX - DOCK_MAG_GORA)
+/* gorna krawedz samego szkla docka */
+#define DOCK_SZKLO_Y        (DOCK_PAS_Y + DOCK_MAG_GORA)
+#define OKNA_DOL_MAKS       (DOCK_SZKLO_Y - 6)
 extern void menu_start_rysuj_dock(void);
 extern void okno_odrysuj_dolny_pas(void);
 
@@ -55,7 +59,7 @@ static inline uint8_t vbe_read8(volatile uint8_t *base, uint32_t off) {
 
 #define NAPIS_SZEROKOSC (27 * 8)
 #define NAPIS_X (EKRAN_SZEROKOSC - NAPIS_SZEROKOSC - 16)
-#define NAPIS_Y (DOCK_PAS_Y - 22)
+#define NAPIS_Y (DOCK_SZKLO_Y - 22)
 #define NAPIS_WYSOKOSC 8
 
 static volatile uint8_t *pamiec_graficzna = (volatile uint8_t *)0xFD000000;
@@ -522,8 +526,9 @@ static void narysuj_kursor_bitmapa(int x, int y)
 }
 
 /* Gorny pasek (24 px) + dock. Dock rozmywa to, co jest pod nim (tapete i okna),
- * wiec najpierw odtwarzamy dolny pas sceny (tapeta + okna), a dopiero potem
- * rysujemy na nim dock. Dzieki temu wielokrotne przerysowanie nie kumuluje rozmycia. */
+ * wiec najpierw odtwarzamy dolny pas sceny (tapeta + okna, razem z miejscem na
+ * powiekszone ikony), a dopiero potem rysujemy na nim dock. Dzieki temu
+ * wielokrotne przerysowanie nie kumuluje rozmycia. */
 void narysuj_pasek_zadan(void)
 {
     szklo_gorne(0, EKRAN_SZEROKOSC);

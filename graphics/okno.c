@@ -11,14 +11,18 @@
 #include <graphics/pulpit.h>
 #include <graphics/menu_start.h>
 
-/* --- uklad gornego paska i docka --- */
+/* --- uklad gornego paska i docka (musi byc zgodny z menu_start.c i rysowanie.c) --- */
 #ifndef PASEK_GORNY_WYSOKOSC
 #define PASEK_GORNY_WYSOKOSC 24
 #endif
 #define DOCK_WYSOKOSC_PX    60
 #define DOCK_MARGINES_DOLNY 10
-#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX)
-#define OKNA_DOL_MAKS       (DOCK_PAS_Y - 6)
+#define DOCK_MAG_GORA       28    /* miejsce nad dockiem na powiekszone ikony */
+/* gorna krawedz pasa, ktory przerysowujemy razem z dockiem */
+#define DOCK_PAS_Y          (EKRAN_WYSOKOSC - DOCK_MARGINES_DOLNY - DOCK_WYSOKOSC_PX - DOCK_MAG_GORA)
+/* gorna krawedz samego szkla docka */
+#define DOCK_SZKLO_Y        (DOCK_PAS_Y + DOCK_MAG_GORA)
+#define OKNA_DOL_MAKS       (DOCK_SZKLO_Y - 6)
 extern void menu_start_rysuj_dock(void);
 extern int menu_start_czy_w_docku(int x, int y);
 void okno_odrysuj_dolny_pas(void);
@@ -29,7 +33,7 @@ void okno_odrysuj_dolny_pas(void);
 #define KOLOR_OKNA  0x00FFFFFF
 #define OKNA_MAKS 8
 #define GENIE_KLATKI 26
-#define GENIE_CZEKAJ 250000  
+#define GENIE_CZEKAJ 250000
 
 #define GENIE_ICON_W 24
 #define GENIE_ICON_SPACJE 4
@@ -226,8 +230,9 @@ static void odrysuj_okna_surowe(int x, int y, int szerokosc, int wysokosc,
     klip_wylacz();
 }
 
-/* Czysta scena (tapeta + okna) w pasie, w ktorym stoi dock. Dock rozmywa
- * to, co ma pod soba, wiec zawsze rysujemy go na swiezo odtworzonej scenie. */
+/* Czysta scena (tapeta + okna) w pasie, w ktorym stoi dock (razem z miejscem
+ * na powiekszone ikony). Dock rozmywa to, co ma pod soba, wiec zawsze
+ * rysujemy go na swiezo odtworzonej scenie. */
 void okno_odrysuj_dolny_pas(void)
 {
     odrysuj_okna_surowe(0, DOCK_PAS_Y, EKRAN_SZEROKOSC, EKRAN_WYSOKOSC - DOCK_PAS_Y, 0);
@@ -563,7 +568,7 @@ void okno_obsluz_ruch(int x, int y)
         if (nx + aktywne_okno->szerokosc > EKRAN_SZEROKOSC)
             nx = EKRAN_SZEROKOSC - aktywne_okno->szerokosc;
         /* okno moze wejsc pod dock, ale pasek tytulu zostaje nad nim */
-        if (ny > DOCK_PAS_Y - 24) ny = DOCK_PAS_Y - 24;
+        if (ny > DOCK_SZKLO_Y - 24) ny = DOCK_SZKLO_Y - 24;
 
         if (nx == aktywne_okno->x && ny == aktywne_okno->y) return;
 
@@ -878,7 +883,7 @@ static void okno_genie_animuj(struct okno *okno, int odwrotnie)
     g.sh = okno->wysokosc;
     g.tl = g.sx + g.sw / 2 - GENIE_ICON_W / 2;
     g.tr = g.tl + GENIE_ICON_W;
-    g.ty = DOCK_PAS_Y;
+    g.ty = DOCK_SZKLO_Y;
     g.bx = g.sx;
     g.by = g.sy;
     g.bw = g.sw;
@@ -1128,6 +1133,6 @@ int okno_liczba_okien(void)
 
 struct okno *okno_pobierz_okno(int indeks)
 {
-    if (indeks >= 0 && indeks < liczba_okien) return okna[indeks];
+    if (indeks >= 0 && indeks < liczba_okien) return okno_pobierz_okno(indeks);
     return 0;
 }
