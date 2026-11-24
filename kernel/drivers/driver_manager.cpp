@@ -7,7 +7,7 @@
 
 #include <kernel/drivers/driver_manager.h>
 #include <kernel/core/proces.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 
 static void driver_idle_poll(void)
 {

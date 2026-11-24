@@ -10,7 +10,7 @@
 #include <graphics/rysowanie.h>
 #include <graphics/okno.h>
 #include <graphics/czcionka.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 #include <fs/system_plikow.h>
 #include <kernel/core/proces.h>
 #include <drivers/input/keyboard.h>
@@ -309,14 +309,14 @@ uint32_t syscall_handler(void)
         case SYSCALL_DRUKUJ:
             if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
                 return 0xFFFFFFFF;
-            printf((const char *)ebx);
+            kprint((const char *)ebx);
             return 0;
         case SYSCALL_WRITE_CONSOLE:
             if (!wskaznik_uzytkownika_prawidlowy((const void *)ebx))
                 return 0xFFFFFFFF;
             for (uint32_t i = 0; i < ecx; i++) {
                 char c = ((const char *)ebx)[i];
-                if (c == '\n') printf("\n"); else { char tmp[2] = {c, 0}; printf(tmp); }
+                if (c == '\n') kprint("\n"); else { char tmp[2] = {c, 0}; kprint(tmp); }
             }
             return (uint32_t)ecx;
         case SYSCALL_EXIT:

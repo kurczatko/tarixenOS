@@ -14,7 +14,7 @@
 /*includy*/
 
 #include <drivers/gsm/gsm.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 #include <include/printf/types.h>
 #include <lib/string.h>
 #include <lib/stddef.h>
@@ -144,7 +144,7 @@ static int gsm_rx_line_available(char *line, uint32_t max_len) {
 
 static void gsm_at_send_raw(const char *cmd) {
     gsm_uart_write_line(cmd);
-    printf("[GSM] TX: %s\n", cmd);
+    kprint("[GSM] TX: %s\n", cmd);
 }
 
 static int gsm_at_resp_match(const char *line, const char *expected) {
@@ -182,7 +182,7 @@ static void gsm_at_send_cmd(gsm_cmd_t type, const char *cmd, const char *expecte
 
 static void gsm_handle_unsolicited(const char *line) {
     if (gsm_at_resp_contains(line, "RING")) {
-        printf("[GSM] przychodzace polaczenie\n");
+        kprint("[GSM] przychodzace polaczenie\n");
         if (g_modem.active_call_count < GSM_MAX_CALLS) {
             int slot = -1;
             for (uint8_t i = 0; i < GSM_MAX_CALLS; i++) {
@@ -201,11 +201,11 @@ static void gsm_handle_unsolicited(const char *line) {
                 if (g_modem.on_call_state) {
                     g_modem.on_call_state(call_id, GSM_CALL_STATE_RINGING, "");
                 }
-                printf("[GSM] polaczenie przychodzace call_id=%d\n", call_id);
+                kprint("[GSM] polaczenie przychodzace call_id=%d\n", call_id);
             }
         }
     } else if (gsm_at_resp_contains(line, "+CRING: VOICE")) {
-        printf("[GSM] glosowe polaczenie przychodzace\n");
+        kprint("[GSM] glosowe polaczenie przychodzace\n");
     } else if (gsm_at_resp_contains(line, "NO CARRIER")) {
         for (uint8_t i = 0; i < GSM_MAX_CALLS; i++) {
             if (g_modem.calls[i].used) {
@@ -217,22 +217,22 @@ static void gsm_handle_unsolicited(const char *line) {
                     g_modem.on_call_state(g_modem.calls[i].call_id, GSM_CALL_STATE_IDLE, "");
                 }
                 if (g_modem.active_call_count > 0) g_modem.active_call_count--;
-                printf("[GSM] polaczenie zakonczone call_id=%d\n", g_modem.calls[i].call_id);
+                kprint("[GSM] polaczenie zakonczone call_id=%d\n", g_modem.calls[i].call_id);
             }
         }
         g_modem.incoming_call_id = 0;
     } else if (gsm_at_resp_contains(line, "+CMT:")) {
-        printf("[GSM] nowy sms\n");
+        kprint("[GSM] nowy sms\n");
         if (g_modem.on_sms_received) {
             g_modem.on_sms_received("nieznany", line);
         }
     } else if (gsm_at_resp_contains(line, "+CREG:")) {
         if (gsm_at_resp_contains(line, ",1") || gsm_at_resp_contains(line, ",5")) {
             g_modem.network_registered = 1;
-            printf("[GSM] zarejestrowany w sieci\n");
+            kprint("[GSM] zarejestrowany w sieci\n");
         } else {
             g_modem.network_registered = 0;
-            printf("[GSM] nie zarejestrowany w sieci\n");
+            kprint("[GSM] nie zarejestrowany w sieci\n");
         }
         if (g_modem.on_network_change) {
             g_modem.on_network_change(g_modem.network_registered);
@@ -253,7 +253,7 @@ static void gsm_handle_unsolicited(const char *line) {
         if (g_modem.on_signal_change) {
             g_modem.on_signal_change(g_modem.signal_strength);
         }
-        printf("[GSM] sygnal: %d%%\n", g_modem.signal_strength);
+        kprint("[GSM] sygnal: %d%%\n", g_modem.signal_strength);
     } else if (gsm_at_resp_contains(line, "+CBC:")) {
         int pct = -1;
         const char *p = strstr(line, "+CBC:");
@@ -266,9 +266,9 @@ static void gsm_handle_unsolicited(const char *line) {
                 g_modem.battery_percent = (uint8_t)pct;
             }
         }
-        printf("[GSM] bateria: %d%%\n", g_modem.battery_percent);
+        kprint("[GSM] bateria: %d%%\n", g_modem.battery_percent);
     } else if (gsm_at_resp_contains(line, "ERROR")) {
-        printf("[GSM] blad at\n");
+        kprint("[GSM] blad at\n");
         if (g_modem.current_cmd.type != GSM_CMD_NONE) {
             if (g_modem.current_cmd.retries > 0) {
                 g_modem.current_cmd.retries--;
@@ -305,7 +305,7 @@ static void gsm_check_cmd_timeout(void) {
 
     uint32_t now = timer_ticks_get();
     if (now - g_modem.current_cmd.start_tick > g_modem.current_cmd.timeout_ms) {
-        printf("[GSM] timeout cmd: %s\n", g_modem.current_cmd.cmd);
+        kprint("[GSM] timeout cmd: %s\n", g_modem.current_cmd.cmd);
         if (g_modem.current_cmd.retries > 0) {
             g_modem.current_cmd.retries--;
             gsm_at_send_raw(g_modem.current_cmd.cmd);
@@ -325,20 +325,20 @@ static void gsm_init_uart(void) {
     gsm_outb(GSM_UART_PORT + 2, 0xC7);
     gsm_outb(GSM_UART_PORT + 4, 0x0B);
     g_modem.uart_ready = 1;
-    printf("[GSM] uart zainicjalizowany na port 0x3F8\n");
+    kprint("[GSM] uart zainicjalizowany na port 0x3F8\n");
 }
 
 static int gsm_cb_init_done(const char *resp) {
     (void)resp;
     g_modem.state = GSM_STATE_INIT;
-    printf("[GSM] inicjalizacja modemu...\n");
+    kprint("[GSM] inicjalizacja modemu...\n");
     return 0;
 }
 
 static int gsm_cb_pin_done(const char *resp) {
     (void)resp;
     g_modem.sim_ready = 1;
-    printf("[GSM] sim gotowy\n");
+    kprint("[GSM] sim gotowy\n");
     return 0;
 }
 
@@ -346,7 +346,7 @@ static int gsm_cb_reg_done(const char *resp) {
     (void)resp;
     g_modem.network_registered = 1;
     if (g_modem.on_network_change) g_modem.on_network_change(1);
-    printf("[GSM] zarejestrowany w sieci gsm\n");
+    kprint("[GSM] zarejestrowany w sieci gsm\n");
     return 0;
 }
 
@@ -366,7 +366,7 @@ static int gsm_cb_imei_done(const char *resp) {
         }
         g_modem.imei[i] = '\0';
     }
-    printf("[GSM] imei: %s\n", g_modem.imei);
+    kprint("[GSM] imei: %s\n", g_modem.imei);
     return 0;
 }
 
@@ -377,7 +377,7 @@ static int gsm_cb_dial_done(const char *resp) {
         if (g_modem.on_call_state) {
             g_modem.on_call_state(g_modem.incoming_call_id, GSM_CALL_STATE_ACTIVE, g_modem.incoming_number);
         }
-        printf("[GSM] polaczenie aktywne call_id=%d\n", g_modem.incoming_call_id);
+        kprint("[GSM] polaczenie aktywne call_id=%d\n", g_modem.incoming_call_id);
     }
     return 0;
 }
@@ -398,7 +398,7 @@ static int gsm_cb_hangup_done(const char *resp) {
 
 static int gsm_cb_sms_done(const char *resp) {
     (void)resp;
-    printf("[GSM] sms wyslany\n");
+    kprint("[GSM] sms wyslany\n");
     return 0;
 }
 
@@ -456,7 +456,7 @@ void gsm_init(void) {
     g_modem.state = GSM_STATE_READY;
     g_modem.initialized = 1;
     g_modem.last_activity_tick = timer_ticks_get();
-    printf("[GSM] modem zainicjalizowany, stan: ready\n");
+    kprint("[GSM] modem zainicjalizowany, stan: ready\n");
 }
 
 void gsm_poll(void) {
@@ -466,7 +466,7 @@ void gsm_poll(void) {
 
     char line[GSM_CMD_BUF_SIZE];
     while (gsm_rx_line_available(line, GSM_CMD_BUF_SIZE)) {
-        printf("[GSM] RX: %s\n", line);
+        kprint("[GSM] RX: %s\n", line);
         gsm_process_at_response(line);
     }
 
@@ -488,12 +488,12 @@ gsm_state_t gsm_get_state(void) {
 
 int gsm_dial(const char *number) {
     if (!g_modem.initialized || g_modem.state != GSM_STATE_READY) {
-        printf("[GSM] modem niegotowy do dzwonienia\n");
+        kprint("[GSM] modem niegotowy do dzwonienia\n");
         return -1;
     }
 
     if (g_modem.active_call_count >= GSM_MAX_CALLS) {
-        printf("[GSM] osiagnieto maksymalna liczbe polaczen\n");
+        kprint("[GSM] osiagnieto maksymalna liczbe polaczen\n");
         return -1;
     }
 
@@ -521,7 +521,7 @@ int gsm_dial(const char *number) {
     gsm_strncat(at_cmd, ";", GSM_CMD_BUF_SIZE - gsm_strlen(at_cmd) - 1);
 
     gsm_at_send_cmd(GSM_CMD_DIAL, at_cmd, "OK", GSM_AT_MAX_RETRIES, GSM_AT_TIMEOUT_MS, gsm_cb_dial_done);
-    printf("[GSM] dzwonienie do %s call_id=%d\n", number, call_id);
+    kprint("[GSM] dzwonienie do %s call_id=%d\n", number, call_id);
     return call_id;
 }
 
@@ -535,7 +535,7 @@ int gsm_answer(uint8_t call_id) {
 
     g_modem.calls[slot].state = GSM_CALL_STATE_ACTIVE;
     gsm_at_send_cmd(GSM_CMD_ANSWER, "ATA", "OK", GSM_AT_MAX_RETRIES, GSM_AT_TIMEOUT_MS, NULL);
-    printf("[GSM] polaczenie odebrane call_id=%d\n", call_id);
+    kprint("[GSM] polaczenie odebrane call_id=%d\n", call_id);
     return 0;
 }
 
@@ -548,7 +548,7 @@ int gsm_hangup(uint8_t call_id) {
 
     g_modem.calls[slot].state = GSM_CALL_STATE_DISCONNECTING;
     gsm_at_send_cmd(GSM_CMD_HANGUP, "AT+CHUP", "OK", GSM_AT_MAX_RETRIES, GSM_AT_TIMEOUT_MS, gsm_cb_hangup_done);
-    printf("[GSM] zakonczono polaczenie call_id=%d\n", call_id);
+    kprint("[GSM] zakonczono polaczenie call_id=%d\n", call_id);
     return 0;
 }
 
@@ -565,7 +565,7 @@ int gsm_send_sms(const char *number, const char *message) {
     gsm_at_send_cmd(GSM_CMD_SEND_SMS, at_cmd, ">", GSM_AT_MAX_RETRIES, GSM_AT_TIMEOUT_MS, NULL);
 
     gsm_at_send_cmd(GSM_CMD_SEND_SMS, message, "OK", GSM_AT_MAX_RETRIES, GSM_AT_TIMEOUT_MS, gsm_cb_sms_done);
-    printf("[GSM] sms wyslany do %s\n", number);
+    kprint("[GSM] sms wyslany do %s\n", number);
     return 0;
 }
 
@@ -578,7 +578,7 @@ int gsm_send_ussd(const char *code) {
     gsm_strncat(at_cmd, code, GSM_CMD_BUF_SIZE - gsm_strlen(at_cmd) - 1);
     gsm_strncat(at_cmd, "\"", GSM_CMD_BUF_SIZE - gsm_strlen(at_cmd) - 1);
     gsm_at_send_cmd(GSM_CMD_SEND_USSD, at_cmd, "+CUSD:", GSM_AT_MAX_RETRIES, GSM_AT_TIMEOUT_MS, NULL);
-    printf("[GSM] ussd wyslany: %s\n", code);
+    kprint("[GSM] ussd wyslany: %s\n", code);
     return 0;
 }
 

@@ -7,7 +7,7 @@
 
 #include <tools/lexer_os.h>
 #include <tools/codegen_os.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 #include <fs/system_plikow.h>
 #include <kernel/loader/loader.h>
 #include <include/printf/types.h>
@@ -46,7 +46,7 @@ static void __attribute__((unused)) cc_os_free(void *p) {
 }
 
 static void cc_error(cc_t *cc, const char *msg) {
-    printf("blad: %s\n", msg);
+    kprint("blad: %s\n", msg);
     cc->cg.errors++;
 }
 
@@ -337,7 +337,7 @@ static int zapisz_elf_do_bufora(cg_t *cg, uint8_t *bufor, int max_rozmiar) {
 int kompiluj_plik(const char *wejsciowa, const char *wyjsciowa) {
     char *src = cc_os_malloc(65536 + 1);
     int len = read_file(wejsciowa, src, 65536);
-    if (len <= 0) { printf("nie mozna odczytac: %s\n", wejsciowa); return -1; }
+    if (len <= 0) { kprint("nie mozna odczytac: %s\n", wejsciowa); return -1; }
     src[len] = 0;
 
     cc_t cc; for (int i = 0; i < (int)sizeof(cc) / 4; i++) ((uint32_t *)&cc)[i] = 0;
@@ -364,14 +364,14 @@ int kompiluj_plik(const char *wejsciowa, const char *wyjsciowa) {
 
     uint8_t elf_buf[131072];
     int elf_size = zapisz_elf_do_bufora(&cc.cg, elf_buf, sizeof(elf_buf));
-    if (elf_size < 0) { printf("elf za duzy\n"); return -1; }
+    if (elf_size < 0) { kprint("elf za duzy\n"); return -1; }
 
     if (create_file(wyjsciowa, (uint32_t)elf_size) != 0) {
-        printf("nie mozna utworzyc: %s\n", wyjsciowa);
+        kprint("nie mozna utworzyc: %s\n", wyjsciowa);
         return -1;
     }
     if (write_file(wyjsciowa, (const char *)elf_buf, (uint32_t)elf_size) != 0) {
-        printf("blad zapisu: %s\n", wyjsciowa);
+        kprint("blad zapisu: %s\n", wyjsciowa);
         return -1;
     }
 
@@ -396,8 +396,8 @@ int kompiluj_i_uruchom(const char *wejsciowa) {
     wyjsciowa[n+4] = 0;
 
     int wynik = kompiluj_plik(wejsciowa, wyjsciowa);
-    if (wynik != 0) { printf("kompilacja nieudana (kod %d)\n", wynik); return wynik; }
+    if (wynik != 0) { kprint("kompilacja nieudana (kod %d)\n", wynik); return wynik; }
 
-    printf("uruchamiam: %s\n", wyjsciowa);
+    kprint("uruchamiam: %s\n", wyjsciowa);
     return userspace_load_and_run(wyjsciowa);
 }

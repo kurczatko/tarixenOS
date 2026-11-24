@@ -7,7 +7,7 @@
 
 #include <kernel/memory/wyjatki.h>
 #include <kernel/security/panika.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 
 static const char *wyjatek_nazwa(uint32_t numer)
 {

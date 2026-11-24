@@ -6,9 +6,9 @@
  */
 
 #include <lib/assert.h>
-#include <lib/stdio.h>
+#include <include/printf/kprint.h>
 
 void __assert_fail(const char *file, int line, const char *expr) {
-    printf("Assertion failed: %s, file %s, line %d\n", expr, file, line);
+    kprint("Assertion failed: %s, file %s, line %d\n", expr, file, line);
     for (;;) { __asm__ volatile ("hlt"); }
 }

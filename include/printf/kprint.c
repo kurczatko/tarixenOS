@@ -12,7 +12,7 @@
 * tekstu vga.
 */
 
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 #include <include/printf/serial.h>
 #include <include/printf/types.h>
 #include <include/printf/stdarg.h>
@@ -44,7 +44,7 @@ static void print_int(int value) {
     }
 }
 
-void printf(const char* format, ...) { // deklaracja funkcji printf
+void kprint(const char* format, ...) { // deklaracja funkcji kprint
     /*TODO: zmienic nazwe na printk (nie chce mi sie)*/
     va_list args;
     va_start(args, format);

@@ -6,7 +6,7 @@
 */
 
 #include <drivers/storage/plyty.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 #include <fs/system_plikow.h>
 
 static inline void ply_outb(uint16_t port, uint8_t value) {

@@ -61,7 +61,6 @@
 #include <kernel/apps/kalkulator.h>
 #include <kernel/apps/malowanie.h>
 #include <kernel/apps/browser.h>
-#include <user/konta.h>
 #include <kernel/memory/gdt.h>
 #include <kernel/memory/idt.h>
 #include <user/tapeta.h>
@@ -86,7 +85,7 @@
 #include <drivers/karty_dzwiekowe/intel_raptorlake_cavs.h>
 #include <drivers/kontrolery/intel_rst_vmd.h>
 #include <drivers/kontrolery/thunderbolt4.h>
-#include <include/printf/printf.h> /*do debugowania*/
+#include <include/printf/kprint.h> /*do debugowania*/
 
 /*wykrywanie sprzetu*/
 
@@ -304,65 +303,55 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     //__asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
     //__asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    //konta_start();
-    printf("q");
+    kprint("q");
     pik_init();
-    printf("w");
+    kprint("w");
     timer_init(100);
-    printf("e");
+    kprint("e");
     pik_enable_irq(0);
-    printf("r");
+    kprint("r");
     proces_init();
-    printf("t");
+    kprint("t");
     driver_manager_init_all();
     hal_gfx_init();
-    printf("y");
+    kprint("y");
     if (!net_ready()) {
-        printf("u");
+        kprint("u");
         net_init();
     }
-    printf("i");
+    kprint("i");
     ustaw_status_internetu(net_ready());
 
     /*glowna petla kernela*/
 
     while(1) {
-        printf("o");
+        kprint("o");
         char tekst_czasu[9];
-        printf("p");
+        kprint("p");
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
-        printf("r");
+        kprint("r");
         driver_manager_poll_all();
-        printf("s");
+        kprint("s");
         mouse_poll();
-        printf("t");
+        kprint("t");
         usb_poll();
-        printf("u");
+        kprint("u");
         bluetooth_poll();
-        printf("y");
+        kprint("y");
         hid_poll();
-        printf("z");
+        kprint("z");
         kursor_tekstowy_tick();
-        printf("a");
-        if (!konta_czy_zalogowano()) {
-            printf("s");
-            konta_obsluz();
-            printf("d");
-            keyboard_discard_pending();
-            printf("f");
-            if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
-            continue;
-        }
+        kprint("a");
         if (keyboard_windows_pressed()) {
-            printf("g");
+            kprint("g");
             menu_start_przelacz();
         }
         if (keyboard_dane_dostepne()) {
-            printf("h");
+            kprint("h");
             klawiatura_obsługa_aktywnego_okna();
         }
         if (!aktywne_okno || !aktywne_okno->otwarte) {
-            printf("j");
+            kprint("j");
             if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
         }
     }

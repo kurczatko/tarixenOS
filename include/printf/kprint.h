@@ -1,6 +1,6 @@
-#ifndef PRINTF_H
-#define PRINTF_H
+#ifndef KPRINT_H
+#define KPRINT_H
 
-void printf(const char* format, ...);
+void kprint(const char* format, ...);
 
 #endif

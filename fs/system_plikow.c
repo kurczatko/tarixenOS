@@ -10,7 +10,7 @@
 */
 
 #include <fs/system_plikow.h>
-#include <include/printf/printf.h>
+#include <include/printf/kprint.h>
 #include <drivers/storage/floppy.h>
 #include <drivers/storage/plyty.h>
 
@@ -498,7 +498,7 @@ static int mount_fs(void) {
 }
 
 void init_fs(void) {
-    if (!mount_fs()) printf("Blad: brak systemu FAT32\n");
+    if (!mount_fs()) kprint("Blad: brak systemu FAT32\n");
 }
 
 void fs_set_device_floppy(int use_floppy) {
@@ -728,7 +728,7 @@ int ls(const char *dir) {
     if (fs_use_cdrom) {
         struct fs_entry_info list[24];
         int n = fs_list_current(list, 24);
-        for (int i = 0; i < n; i++) printf("%s\n", list[i].name);
+        for (int i = 0; i < n; i++) kprint("%s\n", list[i].name);
         return 0;
     }
     char sector[SECTOR_SIZE]; uint32_t sector_number, directory = current_dir;
@@ -745,7 +745,7 @@ int ls(const char *dir) {
         if (e->name[0] == 0) break;
         if (!is_listable(e)) continue;
         format_short_name(e->name, name);       /* name[11] nie ma '\0' - wczesniej %s czytalo smieci */
-        printf("%s\n", name);
+        kprint("%s\n", name);
     }
     return 0;
 }
