@@ -1133,6 +1133,6 @@ int okno_liczba_okien(void)
 
 struct okno *okno_pobierz_okno(int indeks)
 {
-    if (indeks >= 0 && indeks < liczba_okien) return okno_pobierz_okno(indeks);
+    if (indeks >= 0 && indeks < liczba_okien) return okna[indeks];
     return 0;
 }
