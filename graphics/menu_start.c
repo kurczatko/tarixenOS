@@ -68,6 +68,7 @@ extern uint32_t *obraz;
 #define DOCK_IKONA_Y (DOCK_Y + 9)
 
 static uint8_t menu_otwarte;
+static int dock_hover_wylaczone;
 
 extern struct okno *aktywne_okno;
 
@@ -797,6 +798,11 @@ void menu_start_rysuj_dock(void)
  * przez co dock znikal na ulamek sekundy przy kazdym ruchu myszy. */
 void menu_start_dock_hover(int x, int y)
 {
+    if (dock_hover_wylaczone) {
+        dock_mx = x;
+        dock_my = y;
+        return;
+    }
     int aktywny = 0;
     int stary_x = dock_mx;
     int stary_y = dock_my;
@@ -848,6 +854,11 @@ void menu_start_dock_hover(int x, int y)
     /* 3. jedno odswiezenie gotowej klatki */
     odswiez_fragment_widoku(lewy, DOCK_PAS_Y, prawy - lewy,
                             EKRAN_WYSOKOSC - DOCK_PAS_Y);
+}
+
+void menu_start_dock_hover_toggle(void)
+{
+    dock_hover_wylaczone = !dock_hover_wylaczone;
 }
 
 /* ====================================================================

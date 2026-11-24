@@ -169,6 +169,10 @@ void klawiatura_obsługa_aktywnego_okna(void)
     if (ctrl && alt && (znak == 'i' || znak == 'I')) {
         podzespoly_otworz();
     }
+
+    if (ctrl && alt && (znak == 'd' || znak == 'D')) {
+        menu_start_dock_hover_toggle();
+    }
 }
 
 /*uruchamianie piersszego procesu*/
