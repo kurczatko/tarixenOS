@@ -220,4 +220,4 @@ $(ISO_IMAGE): $(UEFI_BIN) $(KERNEL_ELF64) | $(ISO_DIR)
 clean:
 	rm -rf build
 run: image
-	qemu-system-x86_64 -m 2G -enable-kvm -cpu host -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc -netdev user,id=net0 -device ne2k_pci,netdev=net0
+	qemu-system-x86_64 -m 2G -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc -netdev user,id=net0 -device ne2k_pci,netdev=net0qemu-system-x86_64 -m 2G -enable-kvm -cpu host -vga std -display sdl -boot c -drive file=build/tarixenOS.img,format=raw -machine pc -netdev user,id=net0 -device ne2k_pci,netdev=net0
