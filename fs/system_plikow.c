@@ -569,7 +569,9 @@ int create_file(const char *name, uint32_t size) {
 
 int read_file(const char *name, char *buffer, uint32_t size) {
     if (fs_use_cdrom) {
-        return plyty_read_file(name, buffer, size);
+        unsigned long long odczytano = 0;
+        if (!plyty_read_file(name, buffer, size, &odczytano)) return -1;
+        return (int)odczytano;
     }
     char sector[SECTOR_SIZE]; uint32_t sector_number, done = 0, cluster, file_size;
     struct fat32_entry *entry;
@@ -697,16 +699,18 @@ int delete_file(const char *name) {
 
 int fs_list_current(struct fs_entry_info *entries, int capacity) {
     if (fs_use_cdrom) {
-        struct plyty_file_entry pentries[24];
-        int count = plyty_list_root(pentries, capacity > 24 ? 24 : capacity);
+        struct plyty_wpis pentries[24];
+        unsigned int liczba = 0;
+        if (!plyty_list_root(pentries, capacity > 24 ? 24 : capacity, &liczba)) return -1;
+        int count = (int)liczba;
         for (int i = 0; i < count; i++) {
             uint32_t j = 0;
-            while (pentries[i].name[j] && j < 12) {
-                entries[i].name[j] = pentries[i].name[j];
+            while (pentries[i].nazwa[j] && j < 12) {
+                entries[i].name[j] = pentries[i].nazwa[j];
                 j++;
             }
             entries[i].name[j] = 0;
-            entries[i].is_directory = pentries[i].is_directory;
+            entries[i].is_directory = pentries[i].katalog;
         }
         return count;
     }
