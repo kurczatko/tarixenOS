@@ -25,6 +25,13 @@
 #define BROWSER_STYLE_DEPTH 32
 #define BROWSER_FIELDS_MAX 16
 
+#define BROWSER_TABS_MAX      8
+#define BROWSER_TAB_BAR_H     34
+#define BROWSER_TAB_AREA_W    692
+#define BROWSER_TAB_MAX_W     170
+#define BROWSER_TAB_PLUS_W    28
+#define BROWSER_TITLE_MAX     64
+
 #define FIELD_MARKER '\x02'
 #define BULLET_MARKER '\x03'
 
@@ -56,6 +63,17 @@ struct browser_field {
     uint32_t page_width;
 };
 
+/* Karta przegladarki: zapamietuje ostatnia odpowiedz HTTP, z ktorej strona
+ * jest odtwarzana przy przelaczeniu (bez ponownego pobierania z sieci). */
+struct browser_tab {
+    char address[128];
+    char title[BROWSER_TITLE_MAX];
+    char response[BROWSER_RESPONSE_MAX];
+    int response_length;
+    int scroll_y;
+    char status[64];
+};
+
 struct okno browser_window;
 static char address[128] = "http://motherfuckingwebsite.com/";
 static char response[BROWSER_RESPONSE_MAX];
@@ -82,6 +100,12 @@ static int page_scroll_y;
 static uint8_t browser_use_https;
 static char current_form_action[256];
 static uint8_t current_form_method_get;
+
+static char page_title[BROWSER_TITLE_MAX];
+static struct browser_tab tabs[BROWSER_TABS_MAX];
+static int tab_count = 1;
+static int active_tab = 0;
+static int browser_response_length;
 
 static char js_elem_id[32][64];
 static int js_elem_page[32];
@@ -116,6 +140,13 @@ static void copy_text(char *destination, uint32_t capacity, const char *source)
     if (!capacity) return;
     while (source[i] && i + 1 < capacity) { destination[i] = source[i]; i++; }
     destination[i] = 0;
+}
+
+static void copy_bytes(void *destination, const void *source, uint32_t count)
+{
+    uint8_t *d = (uint8_t *)destination;
+    const uint8_t *s = (const uint8_t *)source;
+    while (count--) *d++ = *s++;
 }
 
 static int starts_with(const char *text, const char *prefix)
@@ -391,6 +422,7 @@ static void page_from_response(int response_length)
     char anchor_url[256];
 
     page[0] = 0;
+    page_title[0] = 0;
     css_init();
     js_init();
     js_elem_count = 0;
@@ -466,6 +498,37 @@ static void page_from_response(int response_length)
                 continue;
             }
             if (in_style) { i = tag_end; continue; }
+
+            /* <title>...</title>: tytul trafia do nazwy karty, nie do tresci strony */
+            if (text_equal_nocase(tag, "title")) {
+                if (!closing) {
+                    int t_start = tag_end + 1;
+                    int t_end = t_start;
+                    while (t_end + 7 < response_length &&
+                           !(response[t_end] == '<' && response[t_end + 1] == '/' &&
+                             slice_equal_nocase(response, t_end + 2, 5, "title"))) t_end++;
+                    int tn = 0;
+                    int last_space = 1;
+                    for (int k = t_start; k < t_end && tn < (int)sizeof(page_title) - 1; k++) {
+                        unsigned char tc = (unsigned char)response[k];
+                        if (tc == ' ' || tc == '\t' || tc == '\n' || tc == '\r') {
+                            if (!last_space) { page_title[tn++] = ' '; last_space = 1; }
+                        } else if (tc >= 32 && tc < 127) {
+                            page_title[tn++] = (char)tc;
+                            last_space = 0;
+                        }
+                    }
+                    while (tn > 0 && page_title[tn - 1] == ' ') tn--;
+                    page_title[tn] = 0;
+                    int close_end = t_end;
+                    while (close_end < response_length && response[close_end] != '>') close_end++;
+                    i = close_end;
+                } else {
+                    i = tag_end;
+                }
+                continue;
+            }
+
             if (text_equal_nocase(tag, "script")) {
                 if (closing) { in_script = 0; i = tag_end; continue; }
                 int s_start = tag_end + 1;
@@ -860,6 +923,159 @@ static int response_location_is_https(void)
     return 0;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Rysowanie zaokraglonych prostokatow (promien 4 px)                */
+/* ------------------------------------------------------------------ */
+
+static void draw_round_rect(int x, int y, int w, int h, uint32_t color, int round_bottom)
+{
+    static const int inset[4] = {3, 2, 1, 1};
+    if (w < 10 || h < 10) { rysuj_prostokat(x, y, w, h, color); return; }
+    for (int i = 0; i < 4; i++) {
+        rysuj_prostokat(x + inset[i], y + i, w - 2 * inset[i], 1, color);
+        int bi = round_bottom ? inset[i] : 0;
+        rysuj_prostokat(x + bi, y + h - 1 - i, w - 2 * bi, 1, color);
+    }
+    rysuj_prostokat(x, y + 4, w, h - 8, color);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Karty                                                             */
+/* ------------------------------------------------------------------ */
+
+static int browser_tab_width(void)
+{
+    int w = (BROWSER_TAB_AREA_W - BROWSER_TAB_PLUS_W - 4) / tab_count;
+    return w > BROWSER_TAB_MAX_W ? BROWSER_TAB_MAX_W : w;
+}
+
+/* Nazwa karty: <title> strony, a gdy go nie ma - host z adresu, a dla pustej karty "Nowa karta". */
+static void tab_title(int index, char *out, int max_chars)
+{
+    char tmp[BROWSER_TITLE_MAX + 4];
+    const char *source = tabs[index].title;
+    int len = 0;
+
+    if (!source[0]) {
+        source = tabs[index].address;
+        if (starts_with(source, "https://")) source += 8;
+        else if (starts_with(source, "http://")) source += 7;
+        if (starts_with(source, "www.")) source += 4;
+        if (!source[0]) source = "Nowa karta";
+        while (source[len] && source[len] != '/' && source[len] != ':' && len < BROWSER_TITLE_MAX - 1) {
+            tmp[len] = source[len];
+            len++;
+        }
+    } else {
+        while (source[len] && len < BROWSER_TITLE_MAX - 1) { tmp[len] = source[len]; len++; }
+    }
+    tmp[len] = 0;
+    if (max_chars < 4) max_chars = 4;
+    if (max_chars > BROWSER_TITLE_MAX - 1) max_chars = BROWSER_TITLE_MAX - 1;
+    if (len > max_chars) {
+        tmp[max_chars - 2] = '.';
+        tmp[max_chars - 1] = '.';
+        tmp[max_chars] = 0;
+    }
+    copy_text(out, BROWSER_TITLE_MAX, tmp);
+}
+
+static void tab_save_current(void)
+{
+    struct browser_tab *t = &tabs[active_tab];
+    copy_text(t->address, sizeof(t->address), address);
+    copy_text(t->title, sizeof(t->title), page_title);
+    copy_bytes(t->response, response, BROWSER_RESPONSE_MAX);
+    t->response_length = browser_response_length;
+    t->scroll_y = page_scroll_y;
+    copy_text(t->status, sizeof(t->status), status);
+}
+
+static void tab_clear_page(void)
+{
+    css_init();
+    js_init();
+    js_elem_count = 0;
+    page[0] = 0;
+    page_title[0] = 0;
+    link_count = 0;
+    css_rule_count = 0;
+    field_count = 0;
+    focused_field = -1;
+    page_background = 0x00FFFFFF;
+    page_scroll_y = 0;
+}
+
+static void tab_load(int index)
+{
+    struct browser_tab *t = &tabs[index];
+    copy_text(address, sizeof(address), t->address);
+    copy_bytes(response, t->response, BROWSER_RESPONSE_MAX);
+    browser_response_length = t->response_length;
+    if (browser_response_length > 0) {
+        page_from_response(browser_response_length);
+        page_scroll_y = t->scroll_y;
+    } else {
+        tab_clear_page();
+    }
+    copy_text(status, sizeof(status), t->status);   /* po parsowaniu - JS mogl zmienic status */
+    address_focused = address[0] ? 0 : 1;
+}
+
+static void tab_switch(int index)
+{
+    if (index < 0 || index >= tab_count || index == active_tab) return;
+    tab_save_current();
+    active_tab = index;
+    tab_load(index);
+}
+
+static void tab_new(void)
+{
+    if (tab_count >= BROWSER_TABS_MAX) { set_status("Maksymalna liczba kart"); return; }
+    tab_save_current();
+    active_tab = tab_count++;
+    struct browser_tab *t = &tabs[active_tab];
+    t->address[0] = 0;
+    t->title[0] = 0;
+    t->response[0] = 0;
+    t->response_length = 0;
+    t->scroll_y = 0;
+    copy_text(t->status, sizeof(t->status), "Wpisz adres i nacisnij IDZ");
+    tab_load(active_tab);
+}
+
+static void tab_close(int index)
+{
+    if (tab_count <= 1 || index < 0 || index >= tab_count) return;
+    tab_save_current();
+    for (int k = index; k < tab_count - 1; k++)
+        copy_bytes(&tabs[k], &tabs[k + 1], sizeof(tabs[0]));
+    tab_count--;
+    if (index < active_tab) {
+        active_tab--;
+    } else if (index == active_tab) {
+        if (active_tab >= tab_count) active_tab = tab_count - 1;
+        tab_load(active_tab);
+    }
+}
+
+static void browser_tab_click(int x)
+{
+    int w = browser_tab_width();
+    int rel = x - 8;
+    if (rel < 0) return;
+    int idx = rel / w;
+    if (idx < tab_count) {
+        int in_tab = rel - idx * w;
+        if (tab_count > 1 && in_tab >= w - 24) tab_close(idx);
+        else tab_switch(idx);
+    } else if (rel >= tab_count * w && rel < tab_count * w + BROWSER_TAB_PLUS_W + 2) {
+        tab_new();
+    }
+    okno_narysuj(&browser_window);
+}
+
 static void browser_fetch(void)
 {
     char host[96];
@@ -899,6 +1115,7 @@ static void browser_fetch(void)
             else set_status("Blad pobierania strony");
         }
         page[0] = 0;
+        page_title[0] = 0;
     } else if (response_location_is_https() && !browser_use_https) {
         set_status("Strona przekierowuje do HTTPS");
         page_from_response(length);
@@ -910,6 +1127,8 @@ static void browser_fetch(void)
         set_status("Pobrano odpowiedz");
         page_from_response(length);
     }
+    browser_response_length = length > 0 ? length : 0;
+    tab_save_current();
     okno_narysuj(&browser_window);
 }
 
@@ -996,10 +1215,40 @@ static void browser_submit_form(struct browser_field *f)
 static void browser_draw(int x, int y, int width, int height)
 {
     uint32_t scroll_y = page_scroll_y;
-    (void)width;
-    rysuj_prostokat(x, y, 610, 24, address_focused ? 0x00FFF4CC : 0x00FFFFFF);
-    rysuj_tekst_chicago(x + 5, y + 8, address, 0x00000000);
-    rysuj_prostokat(x + 620, y, 72, 24, 0x00334155);
+
+    /* --- pasek kart --- */
+    {
+        int tw = browser_tab_width();
+        int cw0 = znak_szerokosc(0);
+        if (cw0 <= 0) cw0 = 8;
+        rysuj_prostokat(x, y, width, BROWSER_TAB_BAR_H, 0x00E2E8F0);
+        for (int ti = 0; ti < tab_count; ti++) {
+            int tx = x + ti * tw;
+            int act = (ti == active_tab);
+            char title[BROWSER_TITLE_MAX];
+            tab_title(ti, title, (tw - (tab_count > 1 ? 40 : 22)) / cw0);
+            if (act) {
+                draw_round_rect(tx, y + 4, tw - 2, BROWSER_TAB_BAR_H - 4, 0x003B82F6, 0);   /* akcent */
+                draw_round_rect(tx, y + 6, tw - 2, BROWSER_TAB_BAR_H - 6, 0x00FFFFFF, 0);
+            } else {
+                draw_round_rect(tx, y + 8, tw - 2, BROWSER_TAB_BAR_H - 8, 0x00CBD5E1, 0);
+            }
+            rysuj_tekst_chicago(tx + 10, y + (act ? 15 : 17), title, act ? 0x000F172A : 0x00475569);
+            if (tab_count > 1)
+                rysuj_tekst_chicago(tx + tw - 20, y + (act ? 15 : 17), "x", act ? 0x00EF4444 : 0x0064748B);
+        }
+        if (tab_count < BROWSER_TABS_MAX) {
+            int px = x + tab_count * tw + 2;
+            draw_round_rect(px, y + 8, BROWSER_TAB_PLUS_W - 4, 22, 0x00CBD5E1, 1);
+            rysuj_tekst_chicago(px + 8, y + 16, "+", 0x00334155);
+        }
+    }
+    y += BROWSER_TAB_BAR_H;          /* reszta okna zaczyna sie pod paskiem kart */
+    height -= BROWSER_TAB_BAR_H;
+
+    draw_round_rect(x, y, 610, 24, address_focused ? 0x00FFF4CC : 0x00FFFFFF, 1);
+    rysuj_tekst_chicago(x + 8, y + 8, address, 0x00000000);
+    draw_round_rect(x + 620, y, 72, 24, 0x00334155, 1);
     rysuj_tekst_chicago(x + 636, y + 8, "IDZ", 0x00FFFFFF);
     rysuj_tekst_chicago(x, y + 30, status, 0x00000000);
     rysuj_prostokat(x, y + 48, width, height - 48, page_background);
@@ -1149,11 +1398,11 @@ static int browser_field_at(int x, int y)
 static int browser_link_at(int x, int y)
 {
     int char_x = 0;
-    uint32_t target_y = (uint32_t)(page_scroll_y + (y - 86));
+    uint32_t target_y = (uint32_t)(page_scroll_y + (y - 86 - BROWSER_TAB_BAR_H));
     int target_px = x - 12;
     int page_index = -1;
 
-    if (x < 12 || y < 86 || target_px < 0) return -1;
+    if (x < 12 || y < 86 + BROWSER_TAB_BAR_H || target_px < 0) return -1;
     for (int i = 0; page[i]; i++) {
         if (page[i] == '\n') {
             char_x = 0;
@@ -1202,7 +1451,7 @@ void browser_scroll_wheel(int delta)
         int bottom = page_line_y[i] + page_line_height[i];
         if (bottom > total_height) total_height = bottom;
     }
-    int visible_height = BROWSER_HEIGHT - 64;
+    int visible_height = BROWSER_HEIGHT - 64 - BROWSER_TAB_BAR_H;
     page_scroll_y -= delta * 24;
     if (page_scroll_y < 0) page_scroll_y = 0;
     if (page_scroll_y > total_height - visible_height)
@@ -1212,7 +1461,12 @@ void browser_scroll_wheel(int delta)
 
 static void browser_click(int x, int y)
 {
-    if (y >= 30 && y < 58) {
+    if (y >= 30 && y < 30 + BROWSER_TAB_BAR_H) {
+        browser_tab_click(x);
+        return;
+    }
+
+    if (y >= 30 + BROWSER_TAB_BAR_H && y < 58 + BROWSER_TAB_BAR_H) {
         if (x >= 628 && x < 700) {
             address_focused = 1;
             focused_field = -1;
@@ -1283,6 +1537,15 @@ void browser_open(void)
 void browser_handle_keyboard_znak(char character)
 {
     if (!browser_opened || !browser_window.otwarte || !okno_czy_aktywne(&browser_window)) return;
+
+    /* klawisz Tab przelacza na nastepna karte */
+    if (character == '\t') {
+        if (tab_count > 1) {
+            tab_switch((active_tab + 1) % tab_count);
+            okno_narysuj(&browser_window);
+        }
+        return;
+    }
 
     if (focused_field >= 0) {
         struct browser_field *f = &fields[focused_field];
