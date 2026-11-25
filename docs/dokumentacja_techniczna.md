@@ -7715,6 +7715,69 @@ Integracja ze stosem sieciowym:
 
 `drivers/net.c` wywoluje `ne2000_init()` jako opcje rezerwowa na koncu lancucha inicjalizacji sieci (po `e1000` i `rtl8139`). gdy karta NE2000 jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika ne2000. przegladarka (`kernel/apps/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `drivers/net.c`, wiec po udanej inicjalizacji sterownika NE2000 przegladarka pobiera strony przez ta karte automatycznie.
 
+## sterownik sieciowy Novell NE2000 ISA - drivers/network/ne2000_isa.c
+
+Zaawansowany sterownik karty sieciowej Novell NE2000 na magistrali ISA (chip DS8390 / NIC i kompatybilne klony), napisany w C. W odroznieniu od wersji PCI (`drivers/network/ne2000.c`) karta ISA nie posiada konfigurowalnego konfigurowania, wiec sterownik nie opiera sie na PCI. Zgodnie z dokumentacja DS8390 sonduje known adresy portow I/O (0x300, 0x320, 0x340, 0x360) i weryfikuje obecnosc karty przez zapis i odczyt wzorca w pamieci buforowej karty za pomoca Remote DMA (karta nieobecna zwrocilaby 0xFF z plynaczej szyny, więc zgodny powrot jest dowodem obecnosci DS8390).
+
+Adres MAC pobierany jest z rejestrow PAR0..PAR5 (strona 1 DS8390), co jest zrodlem autorytatywnym zgodnym z dokumentacja DS8390 (chip laduje adres fizyczny do PAR po resecie). Pamieć buforowa karty (16 KB, strony po 256 bajtw, 0x0000-0x3FFF) jest dzielona na bufor nadawczy (strony 0x40-0x45) i pierścień odbiorczy (strony 0x46-0x7F).
+
+Sterownik:
+- wykrywa karte na known portach I/O ISA i weryfikuje ja przez test pamieci Remote DMA,
+- resetuje chip DS8390 (port RESET 0x1F) i czeka na bit ISR_RST,
+- konfiguruje rejestry DCR (transfery slowa), RCR (rozgloszenia/multicast/promiskuacja), TCR, IMR,
+- ustawia granice pierścienia odbiorczego (PSTART/PSTOP/BNRY) i bufor nadawczy (TPSR),
+- odczytuje adres MAC z rejestrow PAR0..PAR5 (strona 1),
+- nadaje i odbiera ramki Ethernet w trybie polling (zgodnie z petla net.c) z pelna obsluga bledow TSR/RSR,
+- prowadzi rozszerzone statystyki TX/RX (kolizje, przerwania, utrata nosnika, niedobor FIFO, CRC, ramki, FIFO, utracone pakiety, przepełnienie pierścienia, timeouty nadawania, bledy DMA),
+- obsluguje przepełnienie pierścienia odbiorczego (ISR_OVW) z odzyskaniem synchronizacji z CURR,
+- obsluguje zawijanie pierścienia odbiorczego przy kopiowaniu danych,
+- test petli (loopback) z wlaczeniem wewnetrznego loopback DS8390 (TCR_LB0),
+- konfiguruje filtr multicast (MAR) oraz tryb promiskuiczny (RCR_PRO),
+- posiada wlasna blokade spinlock opartana atomikach GCC (__atomic_*), co gwarantuje bezpieczenstwo SMP,
+- opcjonalnie obslguje przerwania (IDT + PIC EOI) przez `ne2000_isa_irq_enable()` (domyslnie wylaczone, tryb polling).
+
+Integracja: `net/net.c` (`net_init`) rejestruje ten sterownik jako kandydata na interfejs sieciowy, wiec po udanej inicjalizacji `net_send_fn` / `net_receive_fn` wskazuja na funkcje ne2000_isa. Stos TCP/IP, DHCP, HTTP oraz przegladarka (`kernel/apps/browser.c`, przez `net_http_get`) korzystaja z tej karty automatycznie.
+
+### Inicjalizacja i stan
+
+| funkcja | opis |
+|---------|------|
+| `const char *ne2000_isa_driver_name(void)` | Zwraca nazwe sterownika ("ne2000_isa") uzywana przez driver manager i logi. |
+| `int ne2000_isa_init(void)` | Sonduje porty I/O ISA (0x300/0x320/0x340/0x360), weryfikuje karte przez test pamieci Remote DMA, resetuje DS8390, konfiguruje rejestry, odczytuje MAC z PAR0..PAR5, uruchamia chip. Zwraca 1 przy sukcesie, 0 gdy karta nie zostala wykryta lub inicjalizacja nie powiodla sie. |
+| `int ne2000_isa_is_ready(void)` | Zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy, 0 w przeciwnym razie. |
+| `int ne2000_isa_get_mac(uint8_t mac[6])` | Kopiuje adres MAC karty (z PAR0..PAR5) do tablicy 6-bajtowej. Zwraca 1 przy sukcesie, 0 gdy sterownik nie jest gotowy lub mac jest NULL. |
+| `void ne2000_isa_shutdown(void)` | Zatrzymuje chip (CR_STP), wylacza przerwania (IMR = 0), czyści ISR, przechodzi w tryb monitora (RCR_MON), oznacza sterownik jako niegotowy. |
+
+### Nadawanie i odbieranie ramek
+
+| funkcja | opis |
+|---------|------|
+| `int ne2000_isa_send(const void *frame, uint16_t length)` | Wysyla ramke Ethernet. Czeka zwolnienie nadajnika (CR_TXP), pelni ramke do minimalnej dlugosci 60 bajtow, zapisuje przez Remote DMA do bufora nadawczego (TPSR, TBCR0/1), wyzwala nadawanie (CR_TXP), czeka na ISR_PTX/ISR_TXE, klasyfikuje bledy z TSR (kolizje, abort, utrata nosnika, ni edobor FIFO). Zwraca 1 przy sukcesie, 0 przy bledzie/timeoutie, -1 przy blednych argumentach. |
+| `int ne2000_isa_receive(void *frame, uint16_t capacity)` | Odbiera nastepna ramke z pierścienia odbiorczego do podanego bufora (polling, ISR_PRX). Odczytuje naglowek (status, nastepna strona, dlugosc) przez Remote DMA, sprawdza RSR_PRX, kopiuje dane z obsluga zawijania pierścienia, aktualizuje granice (BNRY) i statystyki. Zwraca dlugosc ramki (>0), 0 gdy brak ramki/przepełnienie, -1 przy bledzie. |
+| `int ne2000_isa_loopback_test(void)` | Wlacza wewnetrzny loopback (TCR_LB0), wysyla 64-bajtowa ramke testowa, odbiera i porownuje zawartosc. Zwraca 1 gdy zgodna, 0 przy rozbieznosci/bladzie, -1 gdy niegotowy. Przywraca standardowa RCR/TCR po teście. |
+
+### Diagnostyka, statystyki i filtry
+
+| funkcja | opis |
+|---------|------|
+| `void ne2000_isa_stats_reset(void)` | Zeruje wszystkie liczniki statystyk (tx_packets, rx_packets, tx_errors, rx_errors, tx_collisions, tx_aborts, tx_carrier_lost, tx_fifo_underrun, rx_crc_errors, rx_frame_errors, rx_fifo_overrun, rx_missed_packets, rx_overflow_errors, tx_timeouts, dma_errors). |
+| `int ne2000_isa_stats_get(struct ne2000_isa_stats *out)` | Wypelnia podana strukture aktualnymi wartosciami licznikow pakietow i bledow. Zwraca 1 przy sukcesie, 0 gdy out jest NULL. |
+| `int ne2000_isa_set_multicast(const uint8_t *addr)` | Programuje filtr adresow multicast w rejestrach MAR0..MAR7 (strona 1). Gdy addr jest NULL, przyjmuje caly multicast (0xFF). Zwraca 1 przy sukcesie, 0 gdy niegotowy. |
+| `int ne2000_isa_set_promiscuous(int enable)` | Wlacza/wylacza tryb promiskuiczny (bit RCR_PRO). Zwraca 1 przy sukcesie, 0 gdy niegotowy. |
+| `void ne2000_isa_register_dump(void)` | Wypisuje aktualne wartosci rejestrow DS8390 (CR, ISR, RCR, TCR, DCR, IMR, BNRY, CURR) do celow debugowania. |
+
+### Obsluga przerwan (opcjonalna)
+
+| funkcja | opis |
+|---------|------|
+| `int ne2000_isa_irq_enable(uint8_t irq)` | Instaluje bramke IDT dla wektora 0x20 + irq, odmazuje IRQ w PIC (`pik_enable_irq`), wlacza maski przerwan w IMR. Domyslnie wylaczone (tryb polling). Zwraca 1 przy sukcesie, 0 gdy niegotowy. |
+| `void ne2000_isa_irq_disable(void)` | Wylacza przerwania (IMR = 0), czyści ISR, oznacza sterownik jako pracujacy w trybie polling. |
+| `int ne2000_isa_irq_handler(void)` | Procedura przerwania wywoływana z IDT. Potwierdza zdarzenia w ISR, ustawia flage przerwania, aktualizuje liczniki, wysyla EOI do PIC (slave 0xA0, master 0x20). Zwraca 1 gdy obslgl przerwanie karty, 0 w przeciwnym razie. |
+
+Integracja ze stosem sieciowym:
+
+`net/net.c` wywoluje `ne2000_isa_init()` w lancuchu inicjalizacji sieci (`net_init`), przed opcja PCI NE2000. gdk arta NE2000 ISA jest wykryta, `net_send_fn` i `net_receive_fn` wskazuja na funkcje sterownika ne2000_isa. Przegladarka (`kernel/apps/browser.c`) uzywa `net_ready()` oraz `net_http_get()` z `net/net.c`, wiec po udanej inicjalizacji przegladarka pobiera strony przez karte NE2000 ISA automatycznie.
+
 ## karta graficzna - drivers/karty_graficzne/radeon_8500.cpp
 
 Zaawansowany sterownik karty graficznej ATI Radeon 8500 (architektura R200, DirectX 8.1) napisany w C++. obsluguje pelny potok graficzny 2D i 3D, programowalne shadery (vertex, pixel, geometry), akceleracje sprzetowa przez Command Processor (CP), przezroczystosc (alpha blending), tekstury z mipmapami i kompresja (DXT, ATI1N, ATI2N), render targety, depth-stencil, fences, semaphory, command buffer oraz presentation (swap chain, vsync, potrojne buforowanie). Sterownik zarządza pamiecia wideo (VRAM allocator), taktowaniem GPU i pamieci, temperatura, wentylatorem oraz sterowaniem RGB. Eksportuje interfejs C przez nagłówek radeon_8500.h i jest inicjalizowany z kernel/core/kernel.c przez `radeon_8500_init()`.
