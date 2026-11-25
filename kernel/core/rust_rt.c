@@ -15,6 +15,6 @@ void _RNvNtCs8TsIGpfNWzP_4core9panicking18panic_bounds_check(void) {
     for (;;) {}
 }
 
-void _RNvNtNtCs8TsIGpfNWzP_4core9panicking11panic_const23panic_const_rem_by_zero(void) {
+void _RNvNtNtCs8TsIGpfNWzP_4core9panicking11panic_const23panic_const_rem_by_zero(void) { // co to kurwa jest za randomowe litery
     for (;;) {}
 }
