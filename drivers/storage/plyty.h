@@ -1,67 +1,61 @@
-#ifndef PLITY_H
-#define PLITY_H
+/*
+* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
+* prosze nie kraść
+* 2026
+* kurczatkojestslodkie@gmail.com
+*/
 
-#include <include/printf/types.h>
+#ifndef PLYTY_H
+#define PLYTY_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define PLITY_CDROM     0x01
-#define PLITY_DVDROM    0x02
-#define PLITY_BDROM     0x04
-#define PLITY_HDDVD     0x08
-#define PLITY_CDI       0x10
-#define PLITY_PHOTOCD   0x20
-#define PLITY_CDR       0x40
-#define PLITY_CDRW      0x80
-#define PLITY_DVDR      0x100
-#define PLITY_DVDRW     0x200
-#define PLITY_BDR       0x400
-#define PLITY_BDRE      0x800
-#define PLITY_MO        0x1000
-#define PLITY_WO        0x2000
-
-#define PLITY_FS_ISO9660   0x01
-#define PLITY_FS_UDF       0x02
-#define PLITY_FS_JOLIET    0x04
-#define PLITY_FS_ROCKRIDGE 0x08
-#define PLITY_FS_HFS       0x10
-#define PLITY_FS_CDFS      0x20
-
-struct plyty_disc {
-    uint32_t type;
-    uint32_t fs_type;
-    uint64_t sector_count;
-    uint32_t sector_size;
-    uint8_t present;
-    uint8_t ready;
-    char volume_label[128];
+enum plyty_typ
+{
+    PLY_TYP_BRAK = 0,
+    PLY_TYP_CD_ROM,
+    PLY_TYP_CD_R,
+    PLY_TYP_CD_RW,
+    PLY_TYP_DVD_ROM,
+    PLY_TYP_DVD_R,
+    PLY_TYP_DVD_RW,
+    PLY_TYP_DVD_RAM,
+    PLY_TYP_DVD_PLUS_R,
+    PLY_TYP_DVD_PLUS_RW,
+    PLY_TYP_DVD_DL,
+    PLY_TYP_BD_ROM,
+    PLY_TYP_BD_R,
+    PLY_TYP_BD_RE,
+    PLY_TYP_INNY
 };
 
-struct plyty_file_entry {
-    char name[256];
-    uint8_t is_directory;
-    uint64_t size;
-    uint64_t sector;
+struct plyty_wpis
+{
+    char nazwa[256];
+    unsigned long long rozmiar;
+    unsigned long long lba;
+    unsigned int atrybuty;
+    unsigned char katalog;
 };
 
-int plyty_init(void);
-int plyty_present(void);
-int plyty_ready(void);
-uint32_t plyty_type(void);
-uint64_t plyty_sector_count(void);
-uint32_t plyty_sector_size(void);
-int plyty_read_sector(uint64_t sector, char *buffer);
-int plyty_read_sectors(uint64_t sector, uint32_t count, char *buffer);
-const char *plyty_volume_label(void);
-uint32_t plyty_fs_type(void);
-int plyty_list_root(struct plyty_file_entry *entries, int capacity);
-int plyty_find_file(const char *name, struct plyty_file_entry *entry);
-int plyty_read_file(const char *name, char *buffer, uint64_t size);
-int plyty_disc_changed(void);
-void plyty_eject(void);
-void plyty_close_tray(void);
+void plyty_init(void);
+bool plyty_present(void);
+bool plyty_ready(void);
+enum plyty_typ plyty_type(void);
+unsigned long long plyty_sector_count(void);
+unsigned int plyty_sector_size(void);
+bool plyty_read_sector(unsigned long long lba, void* bufor);
+bool plyty_read_sectors(unsigned long long lba, unsigned int liczba, void* bufor);
+const char* plyty_volume_label(void);
+const char* plyty_fs_type(void);
+bool plyty_list_root(struct plyty_wpis* wpisy, unsigned int maks, unsigned int* liczba);
+bool plyty_find_file(const char* sciezka, struct plyty_wpis* wynik);
+bool plyty_read_file(const char* sciezka, void* bufor, unsigned long long pojemnosc, unsigned long long* odczytano);
+bool plyty_disc_changed(void);
+bool plyty_eject(void);
+bool plyty_close_tray(void);
 
 #ifdef __cplusplus
 }
