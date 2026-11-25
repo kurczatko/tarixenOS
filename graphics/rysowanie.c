@@ -718,7 +718,7 @@ static void narysuj_tapete_tlo(void)
 int tapeta_wczytaj(void)
 {
     char buf[64];
-    char tryb = '3';
+    char tryb = '2';
     fs_reset_directory();
     int n = read_file(PLIK_TAPETA, buf, sizeof(buf) - 1);
     if (n > 0) {
