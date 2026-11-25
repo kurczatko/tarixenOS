@@ -20,6 +20,7 @@
 #include <drivers/network/virtio_net.h>
 #include <drivers/network/virtio_net_legacy.h>
 #include <drivers/network/sun_gem.h>
+#include <drivers/network/vmxnet3.h>
 
 extern int intel_82578dc_driver_init(void);
 extern int intel_82578dc_driver_detected(void);
@@ -233,10 +234,10 @@ static int __attribute__((unused)) dhcp_configure(void)
 
 int net_init(void)
 {
-    if (virtio_net_init() && virtio_net_get_mac(mac_address)) {
-        net_send_fn = virtio_net_send;
-        net_receive_fn = virtio_net_receive;
-    } else     if (virtio_net_legacy_init() && virtio_net_legacy_get_mac(mac_address)) {
+    if (vmxnet3_init() && vmxnet3_get_mac(mac_address)) {
+        net_send_fn = vmxnet3_send;
+        net_receive_fn = vmxnet3_receive;
+    } else     if (virtio_net_init() && virtio_net_get_mac(mac_address)) {
         net_send_fn = virtio_net_legacy_send;
         net_receive_fn = virtio_net_legacy_receive;
     } else if (sun_gem_init() && sun_gem_get_mac(mac_address)) {
