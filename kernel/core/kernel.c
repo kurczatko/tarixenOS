@@ -320,8 +320,12 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     kprint("t");
     /*FIXME: jak uruchamiam w qemu z kvm zatrzymuje sie po tym logu (bez kvm dziala)*/
     /*prawdopodobnie wina jakiegos gownianego sterownika*/
-    driver_manager_init_all();
-    hal_gfx_init();
+
+    /*tymczasowo zakomentowane odkomentowac w przyszlosci*/
+    
+    //driver_manager_init_all();
+    //hal_gfx_init();
+    
     kprint("y");
     if (!net_ready()) {
         kprint("u");
