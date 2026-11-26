@@ -5,6 +5,8 @@
 * kurczatkojestslodkie@gmail.com
 */
 
+//FIXME: caly sterownik nie dziala
+
 #include <drivers/hid/kamerki/quanta_acer_hd.h>
 
 typedef unsigned int uintptr_t;
