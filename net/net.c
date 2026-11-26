@@ -11,6 +11,7 @@
 #include <drivers/network/rtl8139.h>
 #include <drivers/network/ne2000.h>
 #include <drivers/network/ne2000_isa.h>
+#include <drivers/network/ne1000_isa.h>
 #include <drivers/network/3c509.h>
 #include <drivers/network/pcnet.h>
 #include <drivers/internet/rtl8168b.h>
@@ -274,6 +275,9 @@ int net_init(void)
     } else if (ne2000_isa_init() && ne2000_isa_get_mac(mac_address)) {
         net_send_fn = ne2000_isa_send;
         net_receive_fn = ne2000_isa_receive;
+    } else if (ne1000_isa_init() && ne1000_isa_get_mac(mac_address)) {
+        net_send_fn = ne1000_isa_send;
+        net_receive_fn = ne1000_isa_receive;
     } else if (ne2000_init() && ne2000_get_mac(mac_address)) {
         net_send_fn = ne2000_send;
         net_receive_fn = ne2000_receive;

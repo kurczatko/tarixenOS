@@ -815,6 +815,175 @@ int sun_gem_set_mtu(uint16_t mtu);
 uint16_t sun_gem_get_mtu(void);
 ```
 
+## sterownik sieciowy NE1000 (ISA) - drivers/network/ne1000_isa.c
+
+I TAK HUJ WIE CZY TEN STEROWNIK DZIALA BO CHOLERNE QEMU TEGO NIE EMULUJE
+
+Semiconductor DS8390 (Network Interface Controller). NE1000 to wersja
+8-bitowa NE2000: ten sam uklad DS8390, te same rejestry i mapa pamieci
+buforowej (16 KB, strony po 256 bajtow), ale z 8-bitowa szyna danych do szyny
+ISA. Implementacja opiera sie na dokumentacji DS8390 (National Semiconductor):
+rejestry strony 0 i 1, Remote DMA, pierscien odbiorczy, bufor nadawczy,
+odzyskiwanie po przepelnieniu RX, filtry multicast (MAR0-7) i tryb
+promiskuiczny.
+
+W rozroznieniu od NE2000, w rejestrze DCR bit WTS jest wyzerowany (0), co
+oznacza transfery bajtowe (8-bit), a port danych (DATAPORT) jest obslugiwany
+bajt po bajcie. Adres MAC czytany jest z PROM karty (bufory 0x00..0x1F, bajty
+niezdwojone) z zapasowym odczytem z rejestrow PAR0..PAR5 strony 1.
+
+Porty I/O: 0x300, 0x320, 0x340, 0x360. IRQ: 2/9, 3, 4 lub 5 (zworka na karcie).
+
+Sterownik:
+- wykrywa karte przez reset sprzetowy (ISR.RST) oraz test zapisu/odczytu
+  pamieci buforowej (wzór 0xA5 ^ i),
+- odczytuje adres MAC z PROM (z zapasem PAR0..PAR5),
+- inicjalizuje pierscien odbiorczy (0x46..0x7F) i bufor nadawczy (0x40..0x45),
+- obsluguje wysylanie i odbieranie ramek Ethernet w trybie pollingu,
+- realizuje odzyskiwanie po przepelnieniu pierscienia RX (procedura DS8390),
+- prowadzi pelne statystyki (pakiety, kolizje, przerwania nośnika, underrun
+  FIFO, bledy CRC/ramki, przepelnienia FIFO RX, utracone pakiet, timeouty,
+  bledy DMA),
+- wspiera filtry multicast (MAR0-7) i tryb promiskuiczny (RCR.PRO),
+- udostepnia test loopback (wewnetrzny DS8390), MTU get/set oraz stan lacza
+  (carrier sense z TSR.CRS),
+- opcjonalnie obsluguje przerwania (bramka IDT + EOI PIC), domyslnie polling,
+- rejestrowany przez driver manager i uzywany przez stos sieciowy net.c oraz
+  przegladarke.
+
+### ne1000_isa_init
+
+inicjalizuje sterownik NE1000 ISA: wykrywa karte na portach ISA, resetuje
+uklad DS8390, weryfikuje pamiec buforowa, odczytuje adres MAC, konfiguruje
+rejestry i wlacza odbior.
+
+```
+int ne1000_isa_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy karta nie zostanie wykryta lub inicjalizacja
+nie powiedzie sie.
+
+### ne1000_isa_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int ne1000_isa_is_ready(void)
+```
+
+### ne1000_isa_get_mac
+
+pobiera adres MAC karty NE1000 do bufora 6 bajtow.
+
+```
+int ne1000_isa_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### ne1000_isa_send
+
+wysyla ramke Ethernet przez karte NE1000. Ramka jest zapisywana do bufora
+nadawczego przez Remote DMA, nastepnie wysylana przez bit CR.TXP. Sterownik
+czeka na potwierdzenie transmisji (ISR.PTX lub ISR.TXE) i aktualizuje
+statystyki bledow (kolizje, przerwania, underrun FIFO, timeouty).
+
+```
+int ne1000_isa_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 gdy blad sprzetowy lub transmisji, -1 przy blednych
+argumentach.
+
+### ne1000_isa_receive
+
+odbiera jedna ramke Ethernet z pierscienia odbiorczego. Kopiuje dane do
+podanego bufora, aktualizuje BNRY i statystyki odbioru (CRC, ramka, FIFO RX,
+utracone pakiety, overflow).
+
+```
+int ne1000_isa_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe bajtow ramki, 0 gdy brak nowej ramki, -1 przy bledzie.
+
+### ne1000_isa_shutdown
+
+zatrzymuje kartę (CR.STP, wyłącza odbior/nadawanie, maskuje przerwania) i
+oznacza sterownik jako niegotowy.
+
+```
+void ne1000_isa_shutdown(void)
+```
+
+### ne1000_isa_loopback_test
+
+wykonuje test wlaczenia (wewnetrzny loopback DS8390): wysyla ramke probna i
+oczekuje na jej powrot. Zwraca 1 gdy test sie powiedzie.
+
+```
+int ne1000_isa_loopback_test(void)
+```
+
+### ne1000_isa_stats_get / ne1000_isa_stats_reset
+
+pobiera lub zeruje statystyki sterownika (liczniki tx/rx, bledy, kolizje,
+timeouty, bledy DMA).
+
+```
+void ne1000_isa_stats_reset(void);
+int ne1000_isa_stats_get(struct ne1000_isa_stats *out);
+```
+
+### ne1000_isa_set_multicast / ne1000_isa_set_promiscuous
+
+konfiguruje filtry odbioru: tablica multicast MAR0-7 (strona 1) oraz tryb
+promiskuiczny (RCR.PRO).
+
+```
+int ne1000_isa_set_multicast(const uint8_t *addr);
+int ne1000_isa_set_promiscuous(int enable);
+```
+
+### ne1000_isa_set_mtu / ne1000_isa_get_mtu
+
+ustawia lub pobiera MTU karty NE1000 (zakres 68..1500).
+
+```
+int ne1000_isa_set_mtu(uint16_t mtu);
+uint16_t ne1000_isa_get_mtu(void);
+```
+
+### ne1000_isa_link_up
+
+zwraca 1 gdy lacze sieciowe jest aktywne (carrier sense, bit TSR.CRS), 0 w
+przeciwnym razie.
+
+```
+int ne1000_isa_link_up(void);
+```
+
+### ne1000_isa_irq_enable / ne1000_isa_irq_disable / ne1000_isa_irq_handler
+
+opcjonalna obsluga przerwan: instaluje bramke IDT, wlacza linie IRQ w PIC i
+potwierdza zdarzenia ISR (domyslnie sterownik pracuje w trybie pollingu).
+
+```
+int ne1000_isa_irq_enable(uint8_t irq);
+void ne1000_isa_irq_disable(void);
+int ne1000_isa_irq_handler(void);
+```
+
+### ne1000_isa_register_dump
+
+wypisuje rejestry DS8390 (CR, ISR, BNRY, CURR, RCR, TCR) oraz stan lacza do
+logu jadra (debug).
+
+```
+void ne1000_isa_register_dump(void);
+```
+
 ## sterownik sieciowy Intel e1000e - drivers/network/e1000e.c
 
 Zaawansowany sterownik karty sieciowej Intel e1000e (82574/82578/82579/I217 Gigabit Ethernet). Karta e1000e to kontroler Ethernet PCI (vendor 0x8086) z Nowszą architektura niz e1000, rejestrami MMIO w BAR0, pierścieniami deskryptorow RX/TX i dostepem do PHY przez rejestr MDIC (MDIO). Implementacja opiera sie na dokumentacji Intel 82574/82578/82579 Gigabit Ethernet Controller (rejestry CTRL, STATUS, CTRL_EXT, MDIC, RCTL, TCTL, RDBAL/RDBAH/RDLEN/RDH/RDT, TDBAL/TDBAH/TDLEN/TDH/TDT, RAL/RAH, ICR/IMS/IMC, EICS/EIMS/EIMC/EICR).
