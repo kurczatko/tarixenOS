@@ -95,6 +95,7 @@ static int focused_field;
 static uint32_t page_background = 0x00FFFFFF;
 static char status[64] = "Wpisz adres i nacisnij IDZ";
 static uint8_t address_focused = 1;
+static int address_cursor = 0;
 uint8_t browser_opened;
 static int page_scroll_y;
 static uint8_t browser_use_https;
@@ -868,6 +869,7 @@ static int copy_resolved_link(const char *link_url)
         while (*link_url && output + 1 < sizeof(address)) address[output++] = *link_url++;
     }
     address[output] = 0;
+    address_cursor = 0;
     return 1;
 }
 
@@ -1010,6 +1012,7 @@ static void tab_load(int index)
 {
     struct browser_tab *t = &tabs[index];
     copy_text(address, sizeof(address), t->address);
+    address_cursor = 0;
     copy_bytes(response, t->response, BROWSER_RESPONSE_MAX);
     browser_response_length = t->response_length;
     if (browser_response_length > 0) {
@@ -1247,7 +1250,27 @@ static void browser_draw(int x, int y, int width, int height)
     height -= BROWSER_TAB_BAR_H;
 
     draw_round_rect(x, y, 610, 24, address_focused ? 0x00FFF4CC : 0x00FFFFFF, 1);
-    rysuj_tekst_chicago(x + 8, y + 8, address, 0x00000000);
+    /* oblicz przesuniecie tekstu aby kursor byl widoczny */
+    int addr_scroll_x = 0;
+    if (address_focused) {
+        int addr_len = 0;
+        while (address[addr_len]) addr_len++;
+        int visible_chars = 74;
+        if (addr_len > visible_chars) {
+            int start_char = address_cursor - visible_chars + 1;
+            if (start_char < 0) start_char = 0;
+            if (start_char > addr_len - visible_chars) start_char = addr_len - visible_chars;
+            addr_scroll_x = -start_char * 8;
+        }
+    }
+    rysuj_tekst_chicago(x + 8 + addr_scroll_x, y + 8, address, 0x00000000);
+    /* kursor w polu adresu */
+    if (address_focused) {
+        int cursor_x = x + 8 + address_cursor * 8 + addr_scroll_x;
+        if (cursor_x >= x + 8 && cursor_x <= x + 600) {
+            rysuj_prostokat(cursor_x, y + 8, 2, 12, 0x00000000);
+        }
+    }
     draw_round_rect(x + 620, y, 72, 24, 0x00334155, 1);
     rysuj_tekst_chicago(x + 636, y + 8, "IDZ", 0x00FFFFFF);
     rysuj_tekst_chicago(x, y + 30, status, 0x00000000);
@@ -1568,8 +1591,27 @@ void browser_handle_keyboard_znak(char character)
     if (!address_focused) return;
     uint32_t length = 0;
     while (address[length]) length++;
-    if (character == '\b') {
-        if (length) address[length - 1] = 0;
+    if (address_cursor < 0) address_cursor = 0;
+    if (address_cursor > (int)length) address_cursor = (int)length;
+    if (character == KEYBOARD_LEFT) {
+        if (address_cursor > 0) address_cursor--;
+    } else if (character == KEYBOARD_RIGHT) {
+        if (address_cursor < (int)length) address_cursor++;
+    } else if (character == KEYBOARD_HOME) {
+        address_cursor = 0;
+    } else if (character == KEYBOARD_END) {
+        address_cursor = (int)length;
+    } else if (character == KEYBOARD_DEL) {
+        if (address_cursor < (int)length) {
+            for (uint32_t i = address_cursor; i < length; i++) address[i] = address[i + 1];
+            address[length] = 0;
+        }
+    } else if (character == '\b') {
+        if (address_cursor > 0) {
+            for (int i = address_cursor - 1; i < (int)length - 1; i++) address[i] = address[i + 1];
+            address[length - 1] = 0;
+            address_cursor--;
+        }
     } else if (character == '\n' || character == '\r') {
         address_focused = 0;
         focused_field = -1;
@@ -1577,8 +1619,10 @@ void browser_handle_keyboard_znak(char character)
         browser_fetch();
         return;
     } else if (character >= 32 && character <= 126 && length + 1 < sizeof(address)) {
-        address[length] = character;
+        for (int i = (int)length; i > address_cursor; i--) address[i] = address[i - 1];
+        address[address_cursor] = character;
         address[length + 1] = 0;
+        address_cursor++;
     }
     okno_narysuj(&browser_window);
 }

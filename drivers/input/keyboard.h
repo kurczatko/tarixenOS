@@ -11,6 +11,9 @@
 #define KEYBOARD_RIGHT 2
 #define KEYBOARD_UP    3
 #define KEYBOARD_DOWN  4
+#define KEYBOARD_HOME  5
+#define KEYBOARD_END   6
+#define KEYBOARD_DEL   7
 
 // funkcje klawiaturowe
 void keyboard_init(void);

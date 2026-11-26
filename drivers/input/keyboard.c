@@ -69,6 +69,21 @@ uint8_t keyboard_try_getchar(char *character)
             altgr_pressed = 1;
         } else if (scancode == 0xB8) {
             altgr_pressed = 0;
+        } else if (scancode == 0x4B) {
+            *character = KEYBOARD_LEFT;
+            return 1;
+        } else if (scancode == 0x4D) {
+            *character = KEYBOARD_RIGHT;
+            return 1;
+        } else if (scancode == 0x47) {
+            *character = KEYBOARD_HOME;
+            return 1;
+        } else if (scancode == 0x4F) {
+            *character = KEYBOARD_END;
+            return 1;
+        } else if (scancode == 0x53) {
+            *character = KEYBOARD_DEL;
+            return 1;
         }
         return 0;
     }
