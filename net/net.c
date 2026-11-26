@@ -23,6 +23,7 @@
 #include <drivers/network/virtio_net_legacy.h>
 #include <drivers/network/sun_gem.h>
 #include <drivers/network/vmxnet3.h>
+#include <drivers/network/i210.h>
 
 extern int intel_82578dc_driver_init(void);
 extern int intel_82578dc_driver_detected(void);
@@ -245,6 +246,9 @@ int net_init(void)
     } else if (sun_gem_init() && sun_gem_get_mac(mac_address)) {
         net_send_fn = sun_gem_send;
         net_receive_fn = sun_gem_receive;
+    } else if (i210_init() && i210_get_mac(mac_address)) {
+        net_send_fn = i210_send;
+        net_receive_fn = i210_receive;
     } else if (intel_82578dc_driver_init() && intel_82578dc_driver_detected()) {
         net_send_fn = intel_82578dc_send_packet;
         net_receive_fn = intel_82578dc_receive_packet;

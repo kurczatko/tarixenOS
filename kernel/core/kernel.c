@@ -83,6 +83,7 @@
 #include <drivers/network/virtio_net.h>
 #include <drivers/network/virtio_net_legacy.h>
 #include <drivers/network/sun_gem.h>
+#include <drivers/network/i210.h>
 #include <drivers/karty_dzwiekowe/intel_raptorlake_cavs.h>
 #include <drivers/kontrolery/intel_rst_vmd.h>
 #include <drivers/kontrolery/thunderbolt4.h>
@@ -264,6 +265,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("virtio_net_net", virtio_net_init, virtio_net_shutdown, 0, 2);
     driver_manager_register("virtio_net_legacy_net", virtio_net_legacy_init, virtio_net_legacy_shutdown, 0, 2);
     driver_manager_register("sun_gem_net", sun_gem_init, sun_gem_shutdown, 0, 2);
+    driver_manager_register("i210_net", i210_init, i210_shutdown, 0, 2);
     driver_manager_register("ne1000_isa_net", ne1000_isa_init, ne1000_isa_shutdown, 0, 2);
     driver_manager_register("mt7921_wifi", mt7921_init, mt7921_shutdown, mt7921_poll, 2);
     driver_manager_register("bluetooth", bluetooth_init, 0, bluetooth_poll, 2);

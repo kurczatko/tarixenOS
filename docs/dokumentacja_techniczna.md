@@ -1092,6 +1092,122 @@ zwraca 1 gdy lacze sieciowe jest aktywne (link up po autonegocjacji), 0 w przeci
 int e1000e_link_up(void);
 ```
 
+## sterownik sieciowy Intel I210 - drivers/network/i210.c
+
+Zaawansowany sterownik karty sieciowej Intel I210 / I211 Gigabit Ethernet. Karta Intel I210 to kontroler Ethernet PCIe (vendor 0x8086, urzadzenia 0x1075/0x1076/0x10A9/0x10D6/0x157C) z zintegrowanym PHY, rejestrami MMIO w BAR0 (architektura e1000 MAC), pierścieniami deskryptorow RX i TX oraz dostepem do PHY przez rejestr MDIC (MDIO). Implementacja opiera sie na dokumentacji Intel Ethernet Controller I210 (Intel I210 Datasheet) oraz specyfikacji e1000 MAC.
+
+Sterownik:
+- wykrywa karte po PCI (vendor 0x8086, urzadzenia I210: 0x1075, 0x1076, 0x10A9, 0x10D6, 0x157C),
+- mapuje BAR0 (MMIO),
+- resetuje urzadzenie (CTRL.RST), odczytuje adres MAC z RAL/RAH,
+- inicjalizuje PHY przez MDIC/MDIO (autonegocjacja 10/100/1000 Mbps, full/half duplex),
+- buduje pierścienie deskryptorow RX i TX (64 RX, 16 TX, 16 bajtow na deskryptor),
+- obsluguje wysylanie i odbieranie ramek Ethernet w trybie pollingu,
+- prowadzi statystyki (pakiety, błędy, porzucone ramki),
+- wspiera MTU get/set,
+- rejestrowany przez driver manager i uzywany przez stos sieciowy net.c oraz przegladarke.
+
+### i210_init
+
+inicjalizuje sterownik i210: wykrywa karte PCI, mapuje BAR0 (MMIO), resetuje urzadzenie, odczytuje adres MAC, inicjalizuje PHY (autonegocjacja), tworzy kolejki RX i TX (deskryptory, baza tablic, dlugosc pierścienia), konfiguruje MAC i DMA, wynegocjowuje link i wlacza urzadzenie.
+
+```
+int i210_init(void)
+```
+
+zwraca 1 przy sukcesie, 0 gdy urzadzenie nie zostanie wykryte lub inicjalizacja nie powiedzie sie.
+
+### i210_last_error
+
+zwraca kod ostatniego problemu z inicjalizacji (I210_ERR_*), do diagnostyki.
+
+```
+int i210_last_error(void)
+```
+
+### i210_is_ready
+
+zwraca 1 gdy sterownik jest zainicjowany i gotowy do pracy.
+
+```
+int i210_is_ready(void)
+```
+
+### i210_get_mac
+
+pobiera adres MAC karty i210 do bufora 6 bajtow.
+
+```
+int i210_get_mac(uint8_t mac[6])
+```
+
+zwraca 1 przy sukcesie, 0 przy bledzie.
+
+### i210_send
+
+wysyla ramke Ethernet przez karte i210. Ramka jest kopiowana do bufora deskryptora TX, otwierana bitami EOP/IFCS/RS i przekazywana przez zapis indeksu TDT. Sterownik czeka na bit DD w deskryptorze (potwierdzenie transmisji).
+
+```
+int i210_send(const void *frame, uint16_t length)
+```
+
+zwraca 1 przy sukcesie, 0 gdy brak wolnego deskryptora lub blad transmisji, -1 przy blednych argumentach.
+
+### i210_receive
+
+odbiera ramke Ethernet z pierścienia RX. Sprawdza bit DD w deskryptorze RX, kopiuje dane do podanego bufora i zwraca deskryptor do ponownego uzycia przez zapis RDT.
+
+```
+int i210_receive(void *frame, uint16_t capacity)
+```
+
+zwraca liczbe bajtow ramki, 0 gdy brak nowej ramki, -1 przy bledzie.
+
+### i210_shutdown
+
+zatrzymuje TX i RX, maskuje przerwania i oznacza sterownik jako niegotowy.
+
+```
+void i210_shutdown(void)
+```
+
+### i210_stats_get
+
+pobiera statystyki sterownika: liczba wyslanych/odebranych pakietow, bledy nadawania/odbioru, porzucone ramki.
+
+```
+int i210_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                   uint32_t *tx_errors, uint32_t *rx_errors,
+                   uint32_t *tx_dropped, uint32_t *rx_dropped)
+```
+
+zwraca 1 przy sukcesie, 0 przy blednych argumentach.
+
+### i210_stats_reset
+
+zeruje wszystkie liczniki statystyk sterownika.
+
+```
+void i210_stats_reset(void)
+```
+
+### i210_set_mtu / i210_get_mtu
+
+ustawia lub pobiera MTU karty i210.
+
+```
+int i210_set_mtu(uint16_t mtu);
+uint16_t i210_get_mtu(void);
+```
+
+### i210_link_up
+
+zwraca 1 gdy lacze sieciowe jest aktywne (link up po autonegocjacji), 0 w przeciwnym razie.
+
+```
+int i210_link_up(void);
+```
+
 ## konta uzytkownikow - user_land/konta.c
 
 ### konta_start
