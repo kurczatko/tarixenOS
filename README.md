@@ -13,6 +13,8 @@ jeżeli chcesz dodać jakąś funkcje śmiało wyślij zmiane a ja ją zatwierdz
 musisz pisać komentarze po polsku i commity po polsku i większość rzeczy po polsku ponieważ to polski projekt
 komentarze mają być tylko wtedy jeżeli kod jest w danym miejscu mniej czytelniejszy
 
+WAŻNE: NIE UŻYWAĆ STDINT TYLKO UZYWAJ #include <include/printf/types.h> albo definiuj wlasne typy.
+
 # jak uruchomić?
 
 to zależy czy pobierasz wydanie czy kod zródłowy
