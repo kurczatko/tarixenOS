@@ -5,6 +5,9 @@
 * kurczatkojestslodkie@gmail.com
 */
 
+#include <drivers/sound/intel_hd.h>
+#include <include/printf/kprint.h>
+
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
@@ -106,6 +109,7 @@ static uint32_t hda_send_verb(uint32_t verb) {
 }
 
 void init_intel_hda(void) {
+    kprint("intel hda sie wlaczylo");
     uint8_t bus, slot, func;
     uint32_t bar0 = 0;
     
