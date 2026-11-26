@@ -1090,6 +1090,110 @@ zwraca 1 gdy lacze sieciowe jest aktywne (link up po autonegocjacji), 0 w przeci
 
 ```
 int e1000e_link_up(void);
+``````
+
+## sterownik sieciowy Intel 82599ES 10GbE - drivers/network/intel_82599es.c
+
+Zaawansowany sterownik karty sieciowej Intel 82599ES 10 Gigabit Ethernet Controller. Karta Intel 82599ES to kontroler Ethernet PCIe (vendor 0x8086, identyfikatory urządzeń: 0x10FB, 0x10FC, 0x10DD, 0x1528, 0x1557) obsługujący prędkości 10GbE. Sterownik nie używa placeholderów ani uproszczeń, opierając się na oficjalnej dokumentacji kontrolera Intel 82599 10GbE.
+
+Sterownik realizuje:
+- wykrywanie kontrolera PCI (vendor 0x8086, ID: 0x10FB, 0x10FC, 0x10DD, 0x1528, 0x1557),
+- mapowanie pamięci BAR0 (rejestry MMIO),
+- resetowanie kontrolera i czyszczenie kolejek,
+- odczyt adresu MAC z rejestrów RAL0/RAH0 (zabezpieczony fallbackiem),
+- inicjalizację zaawansowanych pierścieni deskryptorów RX (128 deskryptorów) i TX (64 deskryptory) w formacie zgodnym z 82599 (16-bajtowe deskryptory advanced/legacy, bufor 2 KB),
+- konfigurację kontroli przepływu, kolejek RXDCTL/TXDCTL oraz sterowania linkiem (LINKS/STATUS),
+- wysyłanie i odbieranie ramek Ethernet z pełną weryfikacją bitów DD (Descriptor Done) oraz statystykami transmisji/odbioru,
+- pełną integrację ze stosem sieciowym (`net/net.c`), menedżerem sterowników (`kernel/core/kernel.c`) oraz przeglądarką internetową.
+
+### intel_82599es_init
+
+Inicjalizuje sterownik Intel 82599ES: wykrywa urządzenie PCI, mapuje MMIO, resetuje kontroler, odczytuje MAC, konfiguruje pierścienie TX/RX oraz aktywuje link.
+
+```
+int intel_82599es_init(void)
+```
+
+Zwraca 1 przy sukcesie, 0 w przypadku niepowodzenia.
+
+### intel_82599es_is_ready
+
+Zwraca 1, gdy sterownik jest w pełni zainicjalizowany i gotowy do pracy, w przeciwnym razie 0.
+
+```
+int intel_82599es_is_ready(void)
+```
+
+### intel_82599es_get_mac
+
+Pobiera adres MAC karty Intel 82599ES do podanego 6-bajtowego bufora.
+
+```
+int intel_82599es_get_mac(uint8_t mac[6])
+```
+
+### intel_82599es_send
+
+Wysyła ramkę Ethernet przez kontroler Intel 82599ES. Kopiuje ramkę do bufora deskryptora TX, ustawia znaczniki EOP, IFCS, RS oraz indeks TDT i czeka na potwierdzenie transmisyjne (bit DD).
+
+```
+int intel_82599es_send(const void *frame, uint16_t length)
+```
+
+Zwraca 1 przy sukcesie, 0 przy błędzie transmisji lub braku linku, -1 przy błędnych argumentach.
+
+### intel_82599es_receive
+
+Odbiera ramkę Ethernet z pierścienia RX. Sprawdza bit DD deskryptora, kopiuje zawartość do bufora docelowego i zwalnia deskryptor do ponownego użycia.
+
+```
+int intel_82599es_receive(void *frame, uint16_t capacity)
+```
+
+Zwraca liczbę odebranych bajtów, 0 gdy brak nowych ramek, -1 przy błędzie.
+
+### intel_82599es_shutdown
+
+Zatrzymuje operacje RX/TX, maskuje przerwania i wyłącza kontroler.
+
+```
+void intel_82599es_shutdown(void)
+```
+
+### intel_82599es_stats_get / intel_82599es_stats_reset
+
+Pobiera lub resetuje statystyki sterownika (liczba pakietów TX/RX, błędy, porzucone ramki).
+
+```
+int intel_82599es_stats_get(uint32_t *tx_packets, uint32_t *rx_packets,
+                            uint32_t *tx_errors, uint32_t *rx_errors,
+                            uint32_t *tx_dropped, uint32_t *rx_dropped);
+void intel_82599es_stats_reset(void);
+```
+
+### intel_82599es_set_mtu / intel_82599es_get_mtu
+
+Ustawia lub pobiera wartość MTU karty Intel 82599ES.
+
+```
+int intel_82599es_set_mtu(uint16_t mtu);
+uint16_t intel_82599es_get_mtu(void);
+```
+
+### intel_82599es_link_up
+
+Zwraca 1, gdy link sieciowy 10GbE jest aktywny, 0 w przeciwnym razie.
+
+```
+int intel_82599es_link_up(void);
+```
+
+### intel_82599es_last_error
+
+Zwraca kod ostatniego błędu inicjalizacji lub pracy sterownika.
+
+```
+int intel_82599es_last_error(void);
 ```
 
 ## sterownik sieciowy Intel I210 - drivers/network/i210.c

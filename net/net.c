@@ -24,6 +24,7 @@
 #include <drivers/network/sun_gem.h>
 #include <drivers/network/vmxnet3.h>
 #include <drivers/network/i210.h>
+#include <drivers/network/intel_82599es.h>
 
 extern int intel_82578dc_driver_init(void);
 extern int intel_82578dc_driver_detected(void);
@@ -237,7 +238,10 @@ static int __attribute__((unused)) dhcp_configure(void)
 
 int net_init(void)
 {
-    if (vmxnet3_init() && vmxnet3_get_mac(mac_address)) {
+    if (intel_82599es_init() && intel_82599es_get_mac(mac_address)) {
+        net_send_fn = intel_82599es_send;
+        net_receive_fn = intel_82599es_receive;
+    } else if (vmxnet3_init() && vmxnet3_get_mac(mac_address)) {
         net_send_fn = vmxnet3_send;
         net_receive_fn = vmxnet3_receive;
     } else     if (virtio_net_init() && virtio_net_get_mac(mac_address)) {

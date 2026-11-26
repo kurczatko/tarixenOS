@@ -34,6 +34,7 @@
 #include <drivers/audio/alc650.h>
 #include <drivers/gsm/gsm.h>
 #include <net/net.h>
+#include <drivers/network/intel_82599es.h>
 #include <drivers/storage/floppy.h>
 #include <drivers/storage/plyty.h>
 #include <drivers/storage/nvme.h>
@@ -265,6 +266,7 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("virtio_net_net", virtio_net_init, virtio_net_shutdown, 0, 2);
     driver_manager_register("virtio_net_legacy_net", virtio_net_legacy_init, virtio_net_legacy_shutdown, 0, 2);
     driver_manager_register("sun_gem_net", sun_gem_init, sun_gem_shutdown, 0, 2);
+    driver_manager_register("intel_82599es_net", intel_82599es_init, intel_82599es_shutdown, 0, 2);
     driver_manager_register("i210_net", i210_init, i210_shutdown, 0, 2);
     driver_manager_register("ne1000_isa_net", ne1000_isa_init, ne1000_isa_shutdown, 0, 2);
     driver_manager_register("mt7921_wifi", mt7921_init, mt7921_shutdown, mt7921_poll, 2);
