@@ -507,6 +507,174 @@ void wypelnij_okrag(int x0, int y0, int promien, uint32_t kolor)
     }
 }
 
+void rysuj_linie(int x0, int y0, int x1, int y1, uint32_t kolor)
+{
+    int dx = x1 >= x0 ? x1 - x0 : x0 - x1;
+    int dy = y1 >= y0 ? y1 - y0 : y0 - y1;
+    int sx = x0 < x1 ? 1 : -1;
+    int sy = y0 < y1 ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+    int e2;
+
+    for (;;) {
+        rysuj_piksel(x0, y0, kolor);
+        if (x0 == x1 && y0 == y1) break;
+        e2 = err;
+        if (e2 > -dx) { err -= dy; x0 += sx; }
+        if (e2 < dy) { err += dx; y0 += sy; }
+    }
+}
+
+static void projektuj_3d(int x, int y, int z, int *sx, int *sy)
+{
+    int kamera_z = 500;
+    int z_perspektywa = z + kamera_z;
+    if (z_perspektywa < 1) z_perspektywa = 1;
+    int skala = 300;
+    *sx = EKRAN_SZEROKOSC / 2 + (x * skala) / z_perspektywa;
+    *sy = EKRAN_WYSOKOSC / 2 + (y * skala) / z_perspektywa;
+}
+
+void rysuj_okrag_3d(int cx, int cy, int cz, int promien, uint32_t kolor)
+{
+    int sx, sy;
+    projektuj_3d(cx, cy, cz, &sx, &sy);
+    int kamera_z = 500;
+    int z_persp = cz + kamera_z;
+    if (z_persp < 1) z_persp = 1;
+    int screen_promien = (promien * 300) / z_persp;
+    if (screen_promien < 1) screen_promien = 1;
+    rysuj_okrag(sx, sy, screen_promien, kolor);
+}
+
+void wypelnij_okrag_3d(int cx, int cy, int cz, int promien, uint32_t kolor)
+{
+    int sx, sy;
+    projektuj_3d(cx, cy, cz, &sx, &sy);
+    int kamera_z = 500;
+    int z_persp = cz + kamera_z;
+    if (z_persp < 1) z_persp = 1;
+    int screen_promien = (promien * 300) / z_persp;
+    if (screen_promien < 1) screen_promien = 1;
+    wypelnij_okrag(sx, sy, screen_promien, kolor);
+}
+
+void rysuj_kwadrat_3d(int x, int y, int z, int bok, uint32_t kolor)
+{
+    int half = bok / 2;
+    int x1 = x - half, y1 = y - half;
+    int x2 = x + half, y2 = y - half;
+    int x3 = x + half, y3 = y + half;
+    int x4 = x - half, y4 = y + half;
+
+    int sx1, sy1, sx2, sy2, sx3, sy3, sx4, sy4;
+    projektuj_3d(x1, y1, z, &sx1, &sy1);
+    projektuj_3d(x2, y2, z, &sx2, &sy2);
+    projektuj_3d(x3, y3, z, &sx3, &sy3);
+    projektuj_3d(x4, y4, z, &sx4, &sy4);
+
+    rysuj_linie(sx1, sy1, sx2, sy2, kolor);
+    rysuj_linie(sx2, sy2, sx3, sy3, kolor);
+    rysuj_linie(sx3, sy3, sx4, sy4, kolor);
+    rysuj_linie(sx4, sy4, sx1, sy1, kolor);
+}
+
+void rysuj_szescian_3d(int x, int y, int z, int bok, uint32_t kolor)
+{
+    int half = bok / 2;
+    int f_x1 = x - half, f_y1 = y - half, f_z1 = z - half;
+    int f_x2 = x + half, f_y2 = y - half, f_z2 = z - half;
+    int f_x3 = x + half, f_y3 = y + half, f_z3 = z - half;
+    int f_x4 = x - half, f_y4 = y + half, f_z4 = z - half;
+
+    int b_x1 = x - half, b_y1 = y - half, b_z1 = z + half;
+    int b_x2 = x + half, b_y2 = y - half, b_z2 = z + half;
+    int b_x3 = x + half, b_y3 = y + half, b_z3 = z + half;
+    int b_x4 = x - half, b_y4 = y + half, b_z4 = z + half;
+
+    int fsx1, fsy1, fsx2, fsy2, fsx3, fsy3, fsx4, fsy4;
+    int bsx1, bsy1, bsx2, bsy2, bsx3, bsy3, bsx4, bsy4;
+
+    projektuj_3d(f_x1, f_y1, f_z1, &fsx1, &fsy1);
+    projektuj_3d(f_x2, f_y2, f_z2, &fsx2, &fsy2);
+    projektuj_3d(f_x3, f_y3, f_z3, &fsx3, &fsy3);
+    projektuj_3d(f_x4, f_y4, f_z4, &fsx4, &fsy4);
+
+    projektuj_3d(b_x1, b_y1, b_z1, &bsx1, &bsy1);
+    projektuj_3d(b_x2, b_y2, b_z2, &bsx2, &bsy2);
+    projektuj_3d(b_x3, b_y3, b_z3, &bsx3, &bsy3);
+    projektuj_3d(b_x4, b_y4, b_z4, &bsx4, &bsy4);
+
+    rysuj_linie(fsx1, fsy1, fsx2, fsy2, kolor);
+    rysuj_linie(fsx2, fsy2, fsx3, fsy3, kolor);
+    rysuj_linie(fsx3, fsy3, fsx4, fsy4, kolor);
+    rysuj_linie(fsx4, fsy4, fsx1, fsy1, kolor);
+
+    rysuj_linie(bsx1, bsy1, bsx2, bsy2, kolor);
+    rysuj_linie(bsx2, bsy2, bsx3, bsy3, kolor);
+    rysuj_linie(bsx3, bsy3, bsx4, bsy4, kolor);
+    rysuj_linie(bsx4, bsy4, bsx1, bsy1, kolor);
+
+    rysuj_linie(fsx1, fsy1, bsx1, bsy1, kolor);
+    rysuj_linie(fsx2, fsy2, bsx2, bsy2, kolor);
+    rysuj_linie(fsx3, fsy3, bsx3, bsy3, kolor);
+    rysuj_linie(fsx4, fsy4, bsx4, bsy4, kolor);
+}
+
+void rysuj_trojkat_3d(int x1, int y1, int z1, int x2, int y2, int z2, int x3, int y3, int z3, uint32_t kolor)
+{
+    int sx1, sy1, sx2, sy2, sx3, sy3;
+    projektuj_3d(x1, y1, z1, &sx1, &sy1);
+    projektuj_3d(x2, y2, z2, &sx2, &sy2);
+    projektuj_3d(x3, y3, z3, &sx3, &sy3);
+
+    rysuj_linie(sx1, sy1, sx2, sy2, kolor);
+    rysuj_linie(sx2, sy2, sx3, sy3, kolor);
+    rysuj_linie(sx3, sy3, sx1, sy1, kolor);
+}
+
+void wypelnij_trojkat_3d(int x1, int y1, int z1, int x2, int y2, int z2, int x3, int y3, int z3, uint32_t kolor)
+{
+    int sx1, sy1, sx2, sy2, sx3, sy3;
+    projektuj_3d(x1, y1, z1, &sx1, &sy1);
+    projektuj_3d(x2, y2, z2, &sx2, &sy2);
+    projektuj_3d(x3, y3, z3, &sx3, &sy3);
+
+    int tx, ty;
+    if (sy1 > sy2) { tx = sx1; sx1 = sx2; sx2 = tx; ty = sy1; sy1 = sy2; sy2 = ty; }
+    if (sy2 > sy3) { tx = sx2; sx2 = sx3; sx3 = tx; ty = sy2; sy2 = sy3; sy3 = ty; }
+    if (sy1 > sy2) { tx = sx1; sx1 = sx2; sx2 = tx; ty = sy1; sy1 = sy2; sy2 = ty; }
+
+    int total_height = sy3 - sy1;
+    if (total_height == 0) {
+        rysuj_linie(sx1, sy1, sx2, sy2, kolor);
+        rysuj_linie(sx2, sy2, sx3, sy3, kolor);
+        rysuj_linie(sx3, sy3, sx1, sy1, kolor);
+        return;
+    }
+
+    for (int i = 0; i < total_height; i++) {
+        int second_half = i > sy2 - sy1 || sy2 == sy1;
+        int segment_height = second_half ? sy3 - sy2 : sy2 - sy1;
+        if (segment_height == 0) continue;
+        int alpha_i = i;
+        int beta_i = i - (second_half ? sy2 - sy1 : 0);
+
+        int A_x = sx1 + (int)((long long)(sx3 - sx1) * alpha_i / total_height);
+        int B_x = second_half ? 
+                  sx2 + (int)((long long)(sx3 - sx2) * beta_i / segment_height) :
+                  sx1 + (int)((long long)(sx2 - sx1) * beta_i / segment_height);
+
+        int y = sy1 + i;
+        if (y < 0 || y >= EKRAN_WYSOKOSC) continue;
+
+        if (A_x > B_x) { int t = A_x; A_x = B_x; B_x = t; }
+        for (int x = A_x; x <= B_x; x++) {
+            rysuj_piksel(x, y, kolor);
+        }
+    }
+}
+
 static void narysuj_kursor_bitmapa(int x, int y)
 {
     for (int cy = 0; cy < CURSOR_H; cy++) {
