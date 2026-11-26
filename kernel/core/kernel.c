@@ -331,6 +331,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
 
     /*glowna petla kernela*/
 
+    kprint("system doszedl do glownej petli");
+
     while(1) {
         char tekst_czasu[9];
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
