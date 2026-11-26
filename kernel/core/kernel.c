@@ -332,33 +332,21 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     /*glowna petla kernela*/
 
     while(1) {
-        kprint("o");
         char tekst_czasu[9];
-        kprint("p");
         if (zegar_pobierz(tekst_czasu)) ustaw_czas_paska(tekst_czasu);
-        kprint("r");
         driver_manager_poll_all();
-        kprint("s");
         mouse_poll();
-        kprint("t");
         usb_poll();
-        kprint("u");
         bluetooth_poll();
-        kprint("y");
         hid_poll();
-        kprint("z");
         kursor_tekstowy_tick();
-        kprint("a");
         if (keyboard_windows_pressed()) {
-            kprint("g");
             menu_start_przelacz();
         }
         if (keyboard_dane_dostepne()) {
-            kprint("h");
             klawiatura_obsługa_aktywnego_okna();
         }
         if (!aktywne_okno || !aktywne_okno->otwarte) {
-            kprint("j");
             if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
         }
     }
