@@ -216,9 +216,9 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     __asm__ volatile ("mov %0, %%cr4" :: "r"(cr4_val));
 
     __asm__ volatile ("movb $'A', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    rysowanie_init();
-    __asm__ volatile ("movb $'B', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     zegar_init();
+    __asm__ volatile ("movb $'B', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+    rysowanie_init();
     __asm__ volatile ("movb $'C', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     {
         char tekst_czasu[9];

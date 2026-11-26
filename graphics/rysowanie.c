@@ -9,6 +9,7 @@
 #include <graphics/czcionka.h>
 #include <graphics/okno.h>
 #include <fs/system_plikow.h>
+#include <kernel/sys/zegar.h>
 #include <drivers/bluetooth/bluetooth.h>
 #include <drivers/baterie/bateria.h>
 #include <graphics/menu_start.h>
@@ -807,6 +808,45 @@ void kursor_graficzny_pozycja(int *x, int *y)
     *y = kursor_y;
 }
 
+/* Ekran powitalny: logi ladowania na czarnym tle, bialy tekst czcionka 8x8. */
+static void ekran_logi_ladowania(void)
+{
+    int lx = 0;
+    int ly = 0;
+
+    /* Czarnie tlo - czysc caly bufor obrazu. */
+    for (uint32_t i = 0; i < (uint32_t)EKRAN_SZEROKOSC * EKRAN_WYSOKOSC; i++) {
+        obraz[i] = KOLOR_CZARNY;
+    }
+
+    rysuj_tekst_chicago(lx, ly, "tarixenOS - ladowanie systemu", KOLOR_BIALY); ly += 16;
+    rysuj_tekst_chicago(lx, ly, "  tryb graficzny VESA... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  GDT... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  IDT... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  zegar systemowy... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  system plikow... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  sterowniki urzadzen... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  stos sieciowy... OK", KOLOR_BIALY); ly += 12;
+    rysuj_tekst_chicago(lx, ly, "  srodowisko graficzne... uruchamianie", KOLOR_BIALY); ly += 20;
+    rysuj_tekst_chicago(lx, ly, "Czekaj 5 sekund...", KOLOR_BIALY);
+
+    odswiez_widok();
+
+    /* Zatrzymanie na 5 sekund uzywajac zegara systemowego. */
+    char czas[9];
+    zegar_pobierz(czas);
+    uint8_t start_sekunda = (uint8_t)((czas[6] - '0') * 10 + (czas[7] - '0'));
+    uint32_t uplynelo = 0;
+    while (uplynelo < 5U) {
+        if (zegar_pobierz(czas)) {
+            uint8_t sekunda = (uint8_t)((czas[6] - '0') * 10 + (czas[7] - '0'));
+            int diff = (int)sekunda - (int)start_sekunda;
+            if (diff < 0) diff += 60;
+            uplynelo = (uint32_t)diff;
+        }
+    }
+}
+
 void rysowanie_init(void)
 {
     volatile uint8_t *mode_info = (volatile uint8_t *)0x0500;
@@ -848,6 +888,10 @@ void rysowanie_init(void)
 #pragma GCC diagnostic pop
     }
 
+    /* Najpierw: ekran powitalny z logami ladowania na czarnym tle. */
+    ekran_logi_ladowania();
+
+    /* Potem: normalne srodowisko graficzne (tapeta + pasek zadan). */
     tapeta_gradientowa = 1;
     narysuj_tlo_poziome(0, EKRAN_WYSOKOSC);   /* cala tapeta, szklo rozmyje ja potem */
 

@@ -1130,7 +1130,11 @@ okno dla aplikacji uzytkownika.
 
 ### rysowanie_init
 
-inicjalizuje subsystem graficzny.
+inicjalizuje subsystem graficzny. Na poczatku wyswietla ekran powitalny z logami
+ladowania systemu (bialy tekst czcionka 8x8 na czarnym tle): tryb graficzny VESA,
+GDT, IDT, zegar, system plikow, sterowniki, stos sieciowy i srodowisko graficzne.
+Po wypisaniu logow system zatrzymuje sie na okolo 5 sekund, a nastepnie rysuje
+tapete, pasek zadan, dock i kursor myszy (normalne srodowisko graficzne).
 
 ```
 void rysowanie_init(void)
