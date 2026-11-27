@@ -52,6 +52,7 @@ int tapeta_wczytaj(void);
 void tapeta_zapisz(void);
 int tapeta_czy_jasna(void);
 int tapeta_ustaw_obraz(int jasna);
+int tapeta_ustaw_bmp(const char *filename);
 void pasek_zadan_rysuj_ikony_minimalizowanych(void);
 struct okno *pasek_zadan_ikona_na_pozycji(int x, int y);
 void pasek_zadan_rysuj_ikone(int x, int y, const char *tytul);
