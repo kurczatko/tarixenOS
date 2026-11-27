@@ -50,6 +50,7 @@ public:
     void init(void);
     void deinit(void);
     void irq_handler(void);
+    uint8_t is_initialized(void) const { return initialized; }
 
     int pcm_open(uint16_t channels, uint32_t rate, uint16_t format);
     int pcm_write(const void* data, uint32_t bytes);
@@ -73,14 +74,30 @@ public:
     void set_master_volume(uint8_t percent);
     uint8_t get_master_volume(void);
 
-private:
     Audigy2();
     ~Audigy2();
 
-    void write_reg(uint32_t offset, uint32_t value);
-    uint32_t read_reg(uint32_t offset);
+    static Audigy2* g_instance;
+
+private:
+    uint32_t pci_read32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset);
+    void pci_write32(uint8_t bus, uint8_t slot, uint8_t func, uint8_t offset, uint32_t value);
+
+    void write_reg(uint32_t reg, uint32_t ch, uint32_t value);
+    uint32_t read_reg(uint32_t reg, uint32_t ch);
+
+    void write_direct32(uint32_t offset, uint32_t value);
+    uint32_t read_direct32(uint32_t offset);
+    void write_direct16(uint32_t offset, uint16_t value);
+    uint16_t read_direct16(uint32_t offset);
+    void write_direct8(uint32_t offset, uint8_t value);
+    uint8_t read_direct8(uint32_t offset);
+
     void write_dsp(uint32_t addr, uint32_t value);
     uint32_t read_dsp(uint32_t addr);
+
+    void ac97_write(uint8_t reg, uint16_t val);
+    uint16_t ac97_read(uint8_t reg);
 
     void dma_alloc(PcmBuffer* buf, uint32_t size);
     void dma_free(PcmBuffer* buf);
@@ -92,7 +109,6 @@ private:
     void efx_init(void);
     void spatial_mix_update(void);
 
-    uint32_t mmio_base;
     uint32_t io_base;
     uint16_t pci_seg, pci_bus, pci_dev, pci_func;
     uint8_t irq;
