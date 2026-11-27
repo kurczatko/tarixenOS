@@ -208,6 +208,8 @@ static void obsluz_klik_plikow(int x, int y)
                 if (cd(lista_plikow[klikniety_index].name) == 0) wybrany_element = -1;
             } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".TXT")) {
                 notatnik_otworz_plik(lista_plikow[klikniety_index].name);
+            } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".BMP")) {
+                tapeta_ustaw_bmp(lista_plikow[klikniety_index].name);
             } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".TSI")) {
                 zainstaluj_pakiet_tsi(lista_plikow[klikniety_index].name);
             } else if (ma_rozszerzenie(lista_plikow[klikniety_index].name, ".ELF")) {
