@@ -224,4 +224,4 @@ $(ISO_IMAGE): $(UEFI_BIN) $(KERNEL_ELF64) | $(ISO_DIR)
 clean:
 	rm -rf build
 run: image
-	qemu-system-x86_64 -m 2G -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc -netdev user,id=net0 -device ne2k_pci,netdev=net0 --enable-kvm
+	qemu-system-x86_64 -m 2G -vga std -display sdl -boot c -drive file=$(OS_IMAGE),format=raw -machine pc -netdev user,id=net0 -device ne2k_pci,netdev=net0 --enable-kvm -usb -device usb-kbd -device usb-mouse
