@@ -1,9 +1,4 @@
-/*
-* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
-* prosze nie kraść
-* 2026
-* kurczatkojestslodkie@gmail.com
-*/
+
 
 #include <graphics/eksplorator_plikow.h>
 #include <graphics/okno.h>
@@ -16,6 +11,7 @@
 #include <tools/cc_os.h>
 #include <drivers/storage/floppy.h>
 #include <drivers/storage/plyty.h>
+#include <drivers/usb/storage/storage.h>
 #include <kernel/core/proces.h>
 #include <kernel/loader/loader.h>
 
@@ -29,6 +25,7 @@ static int dlugosc_nazwy;
 static char status_plikow[24];
 static int view_floppy = 0;
 static int view_cdrom = 0;
+static int view_usb = 0;
 
 static int ma_rozszerzenie(const char *nazwa, const char *rozszerzenie)
 {
@@ -106,6 +103,24 @@ static void rysuj_zawartosc_plikow(int x, int y, int szerokosc, int wysokosc)
         }
         row_start += 16;
     }
+    if (!view_usb && usb_storage_present()) {
+        if (wybrany_element == -4) {
+            rysuj_prostokat(x, row_start, 250, 14, 0x003B82F6);
+            rysuj_tekst_chicago(x, row_start, "PENDRIVE USB", 0x00FFFFFF);
+        } else {
+            rysuj_tekst_chicago(x, row_start, "PENDRIVE USB", 0x00000000);
+        }
+        row_start += 16;
+    }
+    if (view_usb) {
+        if (wybrany_element == -4) {
+            rysuj_prostokat(x, row_start, 250, 14, 0x003B82F6);
+            rysuj_tekst_chicago(x, row_start, "DYSK TWARDY", 0x00FFFFFF);
+        } else {
+            rysuj_tekst_chicago(x, row_start, "DYSK TWARDY", 0x00000000);
+        }
+        row_start += 16;
+    }
 
     for (int i = 0; i < liczba_plikow; i++) {
         int row_y = row_start + i * 16;
@@ -138,59 +153,59 @@ static void obsluz_klik_plikow(int x, int y)
         return;
     }
 
-    int has_toggle = (!view_floppy && floppy_present()) || view_floppy || (!view_cdrom && plyty_present()) || view_cdrom;
     int toggle_row = 88;
-    int cdrom_toggle_row = toggle_row + 16;
+    int floppy_visible = (!view_floppy && floppy_present()) || view_floppy;
+    int cdrom_visible = (!view_cdrom && plyty_present()) || view_cdrom;
+    int usb_visible = (!view_usb && usb_storage_present()) || view_usb;
 
-    if (has_toggle && y >= toggle_row && y < toggle_row + 14) {
-        if (!view_floppy && floppy_present()) {
-            view_floppy = 1;
+    int cur_row = toggle_row;
+    if (floppy_visible) {
+        if (y >= cur_row && y < cur_row + 14) {
+            view_floppy = !view_floppy;
             view_cdrom = 0;
-            fs_set_device_floppy(1);
+            view_usb = 0;
             fs_set_device_cdrom(0);
+            fs_set_device_usb(0);
+            fs_set_device_floppy(view_floppy);
             fs_reset_directory();
-        } else if (view_floppy) {
-            view_floppy = 0;
-            fs_set_device_floppy(0);
-            fs_reset_directory();
-        } else if (!view_cdrom && plyty_present()) {
-            view_cdrom = 1;
-            view_floppy = 0;
-            fs_set_device_cdrom(1);
-            fs_set_device_floppy(0);
-            fs_reset_directory();
-        } else if (view_cdrom) {
-            view_cdrom = 0;
-            fs_set_device_cdrom(0);
-            fs_reset_directory();
+            wybrany_element = -2;
+            okno_narysuj(&pliki);
+            return;
         }
-        wybrany_element = -2;
-        okno_narysuj(&pliki);
-        return;
+        cur_row += 16;
+    }
+    if (cdrom_visible) {
+        if (y >= cur_row && y < cur_row + 14) {
+            view_cdrom = !view_cdrom;
+            view_floppy = 0;
+            view_usb = 0;
+            fs_set_device_floppy(0);
+            fs_set_device_usb(0);
+            fs_set_device_cdrom(view_cdrom);
+            fs_reset_directory();
+            wybrany_element = -3;
+            okno_narysuj(&pliki);
+            return;
+        }
+        cur_row += 16;
+    }
+    if (usb_visible) {
+        if (y >= cur_row && y < cur_row + 14) {
+            view_usb = !view_usb;
+            view_floppy = 0;
+            view_cdrom = 0;
+            fs_set_device_floppy(0);
+            fs_set_device_cdrom(0);
+            fs_set_device_usb(view_usb);
+            fs_reset_directory();
+            wybrany_element = -4;
+            okno_narysuj(&pliki);
+            return;
+        }
+        cur_row += 16;
     }
 
-    if (has_toggle && y >= cdrom_toggle_row && y < cdrom_toggle_row + 14 && plyty_present()) {
-        if (!view_cdrom) {
-            view_cdrom = 1;
-            view_floppy = 0;
-            fs_set_device_cdrom(1);
-            fs_set_device_floppy(0);
-            fs_reset_directory();
-        } else {
-            view_cdrom = 0;
-            fs_set_device_cdrom(0);
-            fs_reset_directory();
-        }
-        wybrany_element = -2;
-        okno_narysuj(&pliki);
-        return;
-    }
-
-    int toggle_count = 0;
-    if (!view_floppy && floppy_present()) toggle_count++;
-    if (view_floppy) toggle_count++;
-    if (!view_cdrom && plyty_present()) toggle_count++;
-    if (view_cdrom) toggle_count++;
+    int toggle_count = floppy_visible + cdrom_visible + usb_visible;
     int file_base = 88 + toggle_count * 16;
     int klikniety_index = (y - file_base) / 16;
     if (klikniety_index < 0) klikniety_index = -1;
@@ -229,8 +244,10 @@ void eksplorator_plikow(void)
     fs_reset_directory();
     fs_set_device_floppy(0);
     fs_set_device_cdrom(0);
+    fs_set_device_usb(0);
     view_floppy = 0;
     view_cdrom = 0;
+    view_usb = 0;
     wybrany_element = -1;
     tryb_tworz = 0;
     status_plikow[0] = 0;

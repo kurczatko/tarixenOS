@@ -1,19 +1,3 @@
-/*
-* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
-* prosze nie kraść
-* 2026
-* kurczatkojestslodkie@gmail.com
-*/
-
-/*
-* ten plik to najwazniejszy plik systemu 
-* prosze go nie ruszać bez potrzeby
-* polowa includów nic nie robi bo zostaly dodane rok temu 
-* ale najwazniejsze jest ze sie kompiluje
-*/
-
-/*includy*/
-
 #include <drivers/input/keyboard.h>
 #include <drivers/plyty_glowne/asus_p4p800.h>
 #include <drivers/plyty_glowne/intel_915.h>
@@ -24,6 +8,7 @@
 #include <drivers/usb/core/hid.h>
 #include <drivers/usb/mouse/mouse.h>
 #include <drivers/usb/keyboard/keyboard.h>
+#include <drivers/usb/storage/storage.h>
 #include <fs/system_plikow.h>
 #include <graphics/rysowanie.h>
 #include <graphics/menu_start.h>
@@ -88,9 +73,7 @@
 #include <drivers/karty_dzwiekowe/intel_raptorlake_cavs.h>
 #include <drivers/kontrolery/intel_rst_vmd.h>
 #include <drivers/kontrolery/thunderbolt4.h>
-#include <include/printf/kprint.h> /*do debugowania*/
-
-/*wykrywanie sprzetu*/
+#include <include/printf/kprint.h>
 
 bool amd_r7_265_driver_init(void);
 bool amd_r7_265_driver_detected(void);
@@ -145,15 +128,26 @@ extern struct okno browser_window;
 void userspace_uruchom(uint32_t eip, uint32_t esp);
 void syscall_install(void);
 
-/*obsluga wpisywania tekstu do okna*/
+/* Znak z klawiatury PS/2 albo z USB (PS/2 ma pierwszenstwo). */
+static int klawiatura_pobierz_znak(char *znak)
+{
+    if (keyboard_try_getchar(znak)) return 1;
+    return usb_keyboard_try_getchar(znak);
+}
+
+/* Czy ktorakolwiek klawiatura ma dane do odczytu. */
+static int klawiatura_dane_dostepne(void)
+{
+    return keyboard_dane_dostepne() || usb_keyboard_dane_dostepne();
+}
 
 void klawiatura_obsługa_aktywnego_okna(void)
 {
     char znak;
-    if (!keyboard_try_getchar(&znak)) return;
+    if (!klawiatura_pobierz_znak(&znak)) return;
 
-    uint8_t ctrl = keyboard_ctrl_pressed();
-    uint8_t alt = keyboard_alt_pressed();
+    uint8_t ctrl = keyboard_ctrl_pressed() || usb_keyboard_ctrl_pressed();
+    uint8_t alt = keyboard_alt_pressed() || usb_keyboard_alt_pressed();
 
     if (notatnik_otwarty && okno_notatnik.otwarte && okno_czy_aktywne(&okno_notatnik) && !okno_notatnik.w_polu_tekstowym) {
         notatnik_obsluz_klawiature_znak(znak);
@@ -178,8 +172,6 @@ void klawiatura_obsługa_aktywnego_okna(void)
     }
 }
 
-/*uruchamianie piersszego procesu*/
-
 void proces_uruchom_pierwszy(struct proces *p) {
     struct tss *tss = gdt_tss();
     tss->esp0 = p->kernel_stack;
@@ -192,8 +184,6 @@ void proces_uruchom_pierwszy(struct proces *p) {
     userspace_uruchom(eip, esp);
 }
 
-/*glowna funkcja kernela*/
-
 void __attribute__((section(".text.entry"))) kernel_main(void)
 {
     for (uint32_t *bss = &__bss_start; bss < &__bss_end; bss++) {
@@ -203,18 +193,14 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     gdt_install();
     idt_install();
 
-    /*
-    * i tak nie zrozumiesz tych hackow w assemblerze
-    */
-
     __asm__ volatile ("fninit" ::: "memory");
     uint32_t cr0_val;
     __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0_val));
-    cr0_val |= (1 << 1);                 /* CR0.MP = 1 */
+    cr0_val |= (1 << 1);
     __asm__ volatile ("mov %0, %%cr0" :: "r"(cr0_val));
     uint32_t cr4_val;
     __asm__ volatile ("mov %%cr4, %0" : "=r"(cr4_val));
-    cr4_val |= (1 << 9)  | (1 << 10);   /* CR4.OSFXSR | CR4.OSXMMEXCPT */
+    cr4_val |= (1 << 9)  | (1 << 10);
     __asm__ volatile ("mov %0, %%cr4" :: "r"(cr4_val));
 
     __asm__ volatile ("movb $'A', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
@@ -228,15 +214,8 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         ustaw_czas_paska(tekst_czasu);
     }
     __asm__ volatile ("movb $'D', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    /*
-    * architektura jest tak zaprojektowana aby zaprzeczac wszelkim prawom logiki
-    * dlatego kazdy sterownik jest wywolywany w petli kernela
-    * wiec prosze sie nie spłakiwać ze zżera 400 terabajtów ramu
-    */
 
-    init_fs(); //system plikow
-
-    /*rejestracja sterownikow*/
+    init_fs();
 
     driver_manager_register("floppy", floppy_init, 0, 0, 4);
     driver_manager_register("plyty", plyty_init, 0, 0, 4);
@@ -291,9 +270,11 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     driver_manager_register("gtx560", gtx560_init, gtx560_shutdown, 0, 4);
     driver_manager_register("gtx360", gtx360_init, gtx360_shutdown, 0, 4);
     driver_manager_register("keyboard", keyboard_init, 0, 0, 4);
-    driver_manager_register("usb", usb_init, 0, usb_poll, 2);
-    driver_manager_register("usb_mouse", usb_mouse_init, 0, 0, 4);
-    driver_manager_register("usb_keyboard", usb_keyboard_init, 0, 0, 4);
+    hid_init();
+    driver_manager_register("usb", usb_init, 0, 0, 2);
+    driver_manager_register("usb_mouse", usb_mouse_init, 0, usb_mouse_poll, 4);
+    driver_manager_register("usb_keyboard", usb_keyboard_init, 0, usb_keyboard_poll, 4);
+    driver_manager_register("usb_storage", usb_storage_init, 0, 0, 4);
     driver_manager_register("intel_hda", init_intel_hda, 0, 0, 4);
     driver_manager_register("alc650", alc650_init, alc650_shutdown, 0, 4);
     driver_manager_register("es1370", es1370_init, es1370_shutdown, es1370_poll, 2);
@@ -304,15 +285,11 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     kamera_ui_init();
     pulp_init();
     tapeta_app();
-    //__asm__ volatile ("movb $'G', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+
     menu_start();
 
-    //__asm__ volatile ("movb $'H', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    //__asm__ volatile ("movb $'I', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    //__asm__ volatile ("movb $'J', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
-    //__asm__ volatile ("movb $'K', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
     pulp_init();
-    //__asm__ volatile ("movb $'L', %%al; movw $0x3F8, %%dx; outb %%al, %%dx" ::: "eax", "edx");
+
     kprint("q");
     pik_init();
     kprint("w");
@@ -322,10 +299,9 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     kprint("r");
     proces_init();
     kprint("t");
-    
+
     driver_manager_init_all();
-    //hal_gfx_init();
-    
+
     kprint("y");
     if (!net_ready()) {
         kprint("u");
@@ -334,9 +310,9 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
     kprint("i");
     ustaw_status_internetu(net_ready());
 
-    /*glowna petla kernela*/
-
     kprint("system doszedl do glownej petli");
+
+    static uint32_t usb_reinit_counter = 0;
 
     while(1) {
         char tekst_czasu[9];
@@ -346,13 +322,27 @@ void __attribute__((section(".text.entry"))) kernel_main(void)
         usb_poll();
         bluetooth_poll();
         hid_poll();
+        usb_storage_poll();
+
+        usb_reinit_counter++;
+        if (usb_reinit_counter >= 500) {
+            usb_reinit_counter = 0;
+            usb_keyboard_init();
+            usb_mouse_init();
+        }
+
         kursor_tekstowy_tick();
-        if (keyboard_windows_pressed()) {
+
+        uint8_t win = keyboard_windows_pressed();
+        win |= usb_keyboard_windows_pressed();
+        if (win) {
             menu_start_przelacz();
         }
-        if (keyboard_dane_dostepne()) {
+
+        if (klawiatura_dane_dostepne()) {
             klawiatura_obsługa_aktywnego_okna();
         }
+
         if (!aktywne_okno || !aktywne_okno->otwarte) {
             if (pulp_czy_trzeba_odswiezyc()) pulp_odswiez();
         }

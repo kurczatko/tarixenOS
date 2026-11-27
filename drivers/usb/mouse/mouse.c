@@ -1,45 +1,32 @@
-/*
-* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
-* prosze nie kraść
-* 2026
-* kurczatkojestslodkie@gmail.com
-*/
-
 #include <drivers/usb/mouse/mouse.h>
 #include <drivers/usb/core/hid.h>
+#include <drivers/input/mouse.h>
 #include <graphics/rysowanie.h>
 
-static int usb_mouse_x = 0;
-static int usb_mouse_y = 0;
 static uint8_t usb_mouse_buttons = 0;
 
 static void mouse_callback(int8_t dx, int8_t dy, int8_t dz, uint8_t buttons) {
-    (void)dz;
     usb_mouse_buttons = buttons;
-    usb_mouse_x += dx;
-    usb_mouse_y += dy;
-    if (usb_mouse_x < 0) usb_mouse_x = 0;
-    if (usb_mouse_y < 0) usb_mouse_y = 0;
-    kursor_graficzny_przesun(dx, -dy);
+    mouse_process_event((int)dx, (int)dy, (int)dz, buttons);
 }
 
-void usb_mouse_init(void) {
-    int i;
-    for (i = 0; i < usb_device_count(); i++) {
+int usb_mouse_init(void) {
+    int registered = 0;
+    for (int i = 0; i < usb_device_count(); i++) {
         usb_device_t *dev = usb_device_get(i);
         if (!dev || !dev->configured) continue;
-        if (dev->dev_class == USB_CLASS_HID) {
-            if (hid_register_mouse(dev, mouse_callback) == 0) {
-                return;
-            }
-        }
+        if (dev->dev_class != USB_CLASS_HID) continue;
+        /* hid_register_mouse sam sprawdza z deskryptora raportu, czy to mysz. */
+        if (hid_register_mouse(dev, mouse_callback) == 0) registered++;
     }
+    return registered > 0 ? 1 : 0;
 }
 
+/* Odpytywanie HID robi hid_poll() wywolywane z petli glownej; tu nic nie robimy,
+ * zeby raporty nie byly czytane dwa razy na jeden obrot petli. */
 void usb_mouse_poll(void) {
 }
 
 void usb_mouse_pozycja(int *x, int *y) {
-    *x = usb_mouse_x;
-    *y = usb_mouse_y;
+    kursor_graficzny_pozycja(x, y);
 }

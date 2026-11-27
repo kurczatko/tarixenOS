@@ -1,9 +1,4 @@
-/*
-* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
-* prosze nie kraść
-* 2026
-* kurczatkojestslodkie@gmail.com
-*/
+
 
 #include <drivers/input/mouse.h>
 #include <include/printf/types.h>
@@ -88,38 +83,10 @@ void mouse_init(void) {
     kursor_graficzny_init();
 }
 
-void mouse_poll(void) {
-    uint8_t status;
-    uint8_t packet_byte;
-    int delta_x;
-    int delta_y;
+void mouse_process_event(int delta_x, int delta_y, int wheel, uint8_t buttons) {
+    if (wheel) browser_scroll_wheel(wheel);
 
-    status = mouse_inb(MOUSE_STATUS_PORT);
-    if (!(status & 1) || !(status & 0x20)) {
-        return;
-    }
-
-    packet_byte = mouse_inb(MOUSE_DATA_PORT);
-    if (packet_index == 0 && !(packet_byte & 0x08)) {
-        return;
-    }
-    packet[packet_index++] = packet_byte;
-    if (packet_index < packet_size) {
-        return;
-    }
-    packet_index = 0;
-
-    if (!(packet[0] & 0x08)) {
-        return;
-    }
-
-    if (packet_size == 4) {
-        int wheel = packet[3] & 0x0F;
-        if (wheel & 0x08) wheel -= 16;
-        if (wheel) browser_scroll_wheel(wheel);
-    }
-
-    if ((packet[0] & 1) && !left_button_pressed) {
+    if ((buttons & 1) && !left_button_pressed) {
         left_button_pressed = 1;
         {
             int x;
@@ -147,7 +114,7 @@ void mouse_poll(void) {
             }
         }
     }
-    if (!(packet[0] & 1)) {
+    if (!(buttons & 1)) {
         left_button_pressed = 0;
         okno_zakoncz_przeciaganie();
         {
@@ -156,6 +123,52 @@ void mouse_poll(void) {
             mouse_pozycja(&x, &y);
             pulp_mouse_release(x, y);
         }
+    }
+
+    if (delta_x != 0 || delta_y != 0) {
+        kursor_graficzny_przesun(delta_x, delta_y);
+        {
+            int x;
+            int y;
+            mouse_pozycja(&x, &y);
+            if (left_button_pressed) {
+                okno_obsluz_ruch(x, y);
+                pulp_mouse_ruch(x, y);
+            }
+            menu_start_dock_hover(x, y);
+        }
+    }
+}
+
+void mouse_poll(void) {
+    uint8_t status;
+    uint8_t packet_byte;
+    int delta_x;
+    int delta_y;
+    int wheel = 0;
+
+    status = mouse_inb(MOUSE_STATUS_PORT);
+    if (!(status & 1) || !(status & 0x20)) {
+        return;
+    }
+
+    packet_byte = mouse_inb(MOUSE_DATA_PORT);
+    if (packet_index == 0 && !(packet_byte & 0x08)) {
+        return;
+    }
+    packet[packet_index++] = packet_byte;
+    if (packet_index < packet_size) {
+        return;
+    }
+    packet_index = 0;
+
+    if (!(packet[0] & 0x08)) {
+        return;
+    }
+
+    if (packet_size == 4) {
+        wheel = packet[3] & 0x0F;
+        if (wheel & 0x08) wheel -= 16;
     }
 
     delta_x = (int)packet[1];
@@ -170,19 +183,7 @@ void mouse_poll(void) {
     accumulated_x %= 2;
     accumulated_y %= 2;
 
-    if (delta_x != 0 || delta_y != 0) {
-        kursor_graficzny_przesun(delta_x, -delta_y);
-        {
-            int x;
-            int y;
-            mouse_pozycja(&x, &y);
-            if (left_button_pressed) {
-                okno_obsluz_ruch(x, y);
-                pulp_mouse_ruch(x, y);
-            }
-            menu_start_dock_hover(x, y);
-        }
-    }
+    mouse_process_event(delta_x, -delta_y, wheel, packet[0]);
 }
 
 uint8_t mouse_lewy_przycisk(void)

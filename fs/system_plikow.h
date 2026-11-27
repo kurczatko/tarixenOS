@@ -46,4 +46,6 @@ void fs_set_device_floppy(int use_floppy);
 int fs_is_floppy(void);
 void fs_set_device_cdrom(int use_cdrom);
 int fs_is_cdrom(void);
+void fs_set_device_usb(int use_usb);
+int fs_is_usb(void);
 #endif

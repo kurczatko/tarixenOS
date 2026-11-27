@@ -1,12 +1,8 @@
-/*
-* prawa autorskie (C) gpl v3.0 naleza sie do mnie (radosław sitarski)
-* prosze nie kraść
-* 2026
-* kurczatkojestslodkie@gmail.com
-*/
+
 
 #include <drivers/input/keyboard.h>
 #include <drivers/input/mouse.h>
+#include <drivers/usb/keyboard/keyboard.h>
 #include <include/printf/types.h>
 
 uint8_t inb(uint16_t port) {
@@ -41,6 +37,7 @@ void keyboard_init(void) {
 }
 
 uint8_t keyboard_dane_dostepne(void) {
+    if (usb_keyboard_dane_dostepne()) return 1;
     uint8_t status = inb(KEYBOARD_STATUS_PORT);
     return (status & 1) && !(status & 0x20);
 }
@@ -55,6 +52,10 @@ uint8_t keyboard_try_getchar(char *character)
         *character = (char)utf8_kolejka[utf8_glowa];
         utf8_glowa = (utf8_glowa + 1) & 7;
         utf8_liczba--;
+        return 1;
+    }
+
+    if (usb_keyboard_try_getchar(character)) {
         return 1;
     }
 
@@ -158,18 +159,21 @@ void keyboard_discard_pending(void) {
 uint8_t keyboard_windows_pressed(void) {
     uint8_t tmp = windows_key_pressed;
     windows_key_pressed = 0;
+    if (usb_keyboard_windows_pressed()) tmp = 1;
     return tmp;
 }
 
 uint8_t keyboard_ctrl_pressed(void) {
     uint8_t tmp = ctrl_pressed;
     ctrl_pressed = 0;
+    if (usb_keyboard_ctrl_pressed()) tmp = 1;
     return tmp;
 }
 
 uint8_t keyboard_alt_pressed(void) {
     uint8_t tmp = alt_pressed;
     alt_pressed = 0;
+    if (usb_keyboard_alt_pressed()) tmp = 1;
     return tmp;
 }
 
@@ -229,10 +233,10 @@ char keyboard_getchar(void) {
 }
 
 static const char keyboard_us_shift[128] = {
-    0,  0,  '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',   // klawisze 0-15
-    '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0,  // klawisze 16-31
-    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|',        // klawisze 32-47
-    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0         // klawisze 48-63
+    0,  0,  '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', '\b',   
+    '\t', 'Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', '{', '}', '\n', 0,  
+    'A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', ':', '"', '~', 0, '|',        
+    'Z', 'X', 'C', 'V', 'B', 'N', 'M', '<', '>', '?', 0, '*', 0, ' ', 0         
 };
 
 uint8_t keyboard_scancode_to_char(uint8_t scancode, uint8_t shift) {
