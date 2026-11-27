@@ -104,13 +104,24 @@ static void narysuj_kursor_bitmapa(int x, int y);
 uint32_t *obraz = (uint32_t *)0x00400000;
 #define TAPETA_BITMAPA_ADRES 0x02000000u
 #define TAPETA_BITMAPA_BAJTY (EKRAN_SZEROKOSC * EKRAN_WYSOKOSC * 4u)
-#define PLIK_TAPETA_CIEMNA "TAPETA.RAW"
-#define PLIK_TAPETA_JASNA "TAPETAJ.RAW"
+#define PLIK_TAPETA_CIEMNA "TAPETA.BMP"
+#define PLIK_TAPETA_JASNA "TAPETAJ.BMP"
 static uint32_t *tapeta_bitmapa = (uint32_t *)TAPETA_BITMAPA_ADRES;
 static int tapeta_bitmapa_wczytana;
 static int tapeta_jasna;
 static uint32_t kolor_tapety = KOLOR_TLA;
 static int tapeta_gradientowa = 1;
+
+/* Bufor na surowy plik BMP: lezy w pamieci zaraz za bitmapa tapety
+ * (zaokraglony w gore do 1 MB).
+ */
+#define TAPETA_BMP_BUF_ADRES (TAPETA_BITMAPA_ADRES + ((TAPETA_BITMAPA_BAJTY + 0xFFFFFu) & ~0xFFFFFu))
+#define TAPETA_BMP_BUF_MAX   (10u * 1024u * 1024u)
+/* Full HD 1920x1080: 24 bpp = 6.2 MB, 32 bpp = 8.3 MB (+ naglowki).
+ * Razem z bitmapa tapety (8.3 MB) uzywamy pamieci do ok. 0x03200000,
+ * czyli potrzeba > 50 MB RAM-u. */
+static int bmp_src_x[EKRAN_SZEROKOSC];
+static uint8_t *const bmp_file_buf = (uint8_t *)TAPETA_BMP_BUF_ADRES;
 
 static uint32_t kolor_tla_dla_x(int x)
 {
@@ -840,15 +851,153 @@ int tapeta_czy_jasna(void)
     return tapeta_jasna;
 }
 
+static int tapeta_zaladuj_bmp(const char *filename);
+
+/* Domyslne tapety (ciemna / jasna) to pliki BMP w katalogu glownym:
+ * TAPETA.BMP i TAPETAJ.BMP (generowane przez Makefile). */
 int tapeta_ustaw_obraz(int jasna)
 {
     const char *plik = jasna ? PLIK_TAPETA_JASNA : PLIK_TAPETA_CIEMNA;
     fs_reset_directory();
-    int bajty = read_file(plik, (char *)tapeta_bitmapa, TAPETA_BITMAPA_BAJTY);
-    if (bajty != (int)TAPETA_BITMAPA_BAJTY) return 0;
+    if (!tapeta_zaladuj_bmp(plik)) return 0;
     tapeta_jasna = jasna != 0;
+    narysuj_tapete_tlo();
+    return 1;
+}
+
+/* ---- wczytywanie tapety z pliku BMP ----
+ * Obslugiwane: 8 bpp (z paleta), 16 bpp (555 / 565), 24 bpp, 32 bpp,
+ * bez kompresji (BI_RGB) lub BI_BITFIELDS dla 16/32 bpp; naglowek
+ * BITMAPINFOHEADER lub nowszy; obrazy bottom-up i top-down.
+ * Obraz jest skalowany (najblizszy sasiad) do rozmiaru ekranu. */
+static uint16_t bmp_u16(const uint8_t *p)
+{
+    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+}
+
+static uint32_t bmp_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+/* Dekoduje BMP do tapeta_bitmapa, NIE rysuje (zwraca 1 = OK, 0 = blad;
+ * przy bledzie aktualna tapeta zostaje nietknieta). */
+static int tapeta_zaladuj_bmp(const char *filename)
+{
+    /* UWAGA: tu celowo NIE ma fs_reset_directory() - plik jest w biezacym
+     * katalogu eksploratora. Reset wracal do roota i BMP z podkatalogu
+     * nie byl znajdowany (a eksplorator "skakal" do roota). */
+    int sz = read_file(filename, (char *)bmp_file_buf, TAPETA_BMP_BUF_MAX);
+    if (sz < 54) return 0;
+
+    const uint8_t *f = bmp_file_buf;
+    if (f[0] != 'B' || f[1] != 'M') return 0;
+
+    uint32_t rozmiar_pliku = bmp_u32(f + 2);
+    if (rozmiar_pliku != 0 && rozmiar_pliku > (uint32_t)sz) return 0;   /* plik obciety / za duzy na bufor */
+
+    uint32_t data_off = bmp_u32(f + 10);
+    uint32_t dib_size = bmp_u32(f + 14);
+    if (dib_size < 40) return 0;                    /* stary naglowek OS/2 - nieobslugiwany */
+
+    int32_t width = (int32_t)bmp_u32(f + 18);
+    int32_t height = (int32_t)bmp_u32(f + 22);
+    uint16_t planes = bmp_u16(f + 26);
+    uint16_t bpp = bmp_u16(f + 28);
+    uint32_t compression = bmp_u32(f + 30);
+    uint32_t colors_used = bmp_u32(f + 46);
+
+    /* ujemna wysokosc = obraz top-down, to jest poprawny BMP */
+    if (width <= 0 || height == 0 || planes != 1) return 0;
+    int top_down = height < 0;
+    int32_t abs_h = top_down ? -height : height;
+    if (width > 16384 || abs_h > 16384) return 0;
+
+    if (bpp != 8 && bpp != 16 && bpp != 24 && bpp != 32) return 0;
+    if (compression != 0 && !(compression == 3 && (bpp == 16 || bpp == 32))) return 0;   /* bez RLE */
+
+    uint32_t row_stride = (((uint32_t)width * bpp + 31u) / 32u) * 4u;
+    uint32_t dane_bajty = row_stride * (uint32_t)abs_h;
+    if (data_off >= (uint32_t)sz) return 0;
+    if (dane_bajty > (uint32_t)sz - data_off) return 0;     /* dane wychodza poza plik */
+
+    /* paleta dla 8 bpp: wpisy po 4 bajty B,G,R,A tuz za naglowkiem DIB */
+    const uint8_t *paleta = 0;
+    uint32_t paleta_wpisy = 0;
+    if (bpp == 8) {
+        paleta_wpisy = colors_used ? colors_used : 256;
+        if (paleta_wpisy > 256) return 0;
+        uint32_t paleta_off = 14u + dib_size;
+        if (paleta_off + paleta_wpisy * 4u > (uint32_t)sz) return 0;
+        paleta = f + paleta_off;
+    }
+
+    /* 16 bpp: BI_BITFIELDS zwykle oznacza 565, BI_RGB to 555 */
+    int rgb565 = (bpp == 16 && compression == 3);
+
+    /* tablica kolumn zrodlowych liczona raz (bez dzielenia na kazdy piksel) */
+    for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+        int sx = (int)((uint32_t)x * (uint32_t)width / EKRAN_SZEROKOSC);
+        if (sx >= width) sx = width - 1;
+        bmp_src_x[x] = sx;
+    }
+
+    /* wszystko sprawdzone - dopiero teraz piszemy do bitmapy tapety */
+    for (int y = 0; y < EKRAN_WYSOKOSC; y++) {
+        int src_y = (int)((uint32_t)y * (uint32_t)abs_h / EKRAN_WYSOKOSC);
+        if (src_y >= abs_h) src_y = abs_h - 1;
+        if (!top_down) src_y = abs_h - 1 - src_y;
+        const uint8_t *row_ptr = f + data_off + (uint32_t)src_y * row_stride;
+
+        for (int x = 0; x < EKRAN_SZEROKOSC; x++) {
+            int src_x = bmp_src_x[x];
+            uint32_t color = 0x00FFFFFF;
+
+            if (bpp == 24) {
+                const uint8_t *p = row_ptr + src_x * 3;
+                color = ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+            } else if (bpp == 32) {
+                const uint8_t *p = row_ptr + src_x * 4;
+                color = ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+            } else if (bpp == 16) {
+                uint32_t val = bmp_u16(row_ptr + src_x * 2);
+                uint32_t r, g, b;
+                if (rgb565) {
+                    r = (val >> 11) & 0x1F;
+                    g = (val >> 5) & 0x3F;
+                    b = val & 0x1F;
+                    r = (r << 3) | (r >> 2);
+                    g = (g << 2) | (g >> 4);
+                    b = (b << 3) | (b >> 2);
+                } else {
+                    r = (val >> 10) & 0x1F;
+                    g = (val >> 5) & 0x1F;
+                    b = val & 0x1F;
+                    r = (r << 3) | (r >> 2);
+                    g = (g << 3) | (g >> 2);
+                    b = (b << 3) | (b >> 2);
+                }
+                color = (r << 16) | (g << 8) | b;
+            } else { /* 8 bpp */
+                uint32_t idx = row_ptr[src_x];
+                if (idx < paleta_wpisy) {
+                    const uint8_t *p = paleta + idx * 4;
+                    color = ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+                }
+            }
+            tapeta_bitmapa[(uint32_t)y * EKRAN_SZEROKOSC + (uint32_t)x] = color;
+        }
+    }
     tapeta_bitmapa_wczytana = 1;
     tapeta_gradientowa = 0;
+    return 1;
+}
+
+/* Ustawia tapete z pliku BMP z biezacego katalogu (eksplorator plikow). */
+int tapeta_ustaw_bmp(const char *filename)
+{
+    if (!tapeta_zaladuj_bmp(filename)) return 0;
     narysuj_tapete_tlo();
     return 1;
 }
@@ -904,15 +1053,11 @@ int tapeta_wczytaj(void)
     if (tryb == '2' || tryb == '3') {
         const char *plik = tapeta_jasna ? PLIK_TAPETA_JASNA : PLIK_TAPETA_CIEMNA;
         fs_reset_directory();
-        int bitmapa_bajty = read_file(plik, (char *)tapeta_bitmapa,
-                                      TAPETA_BITMAPA_BAJTY);
-        tapeta_bitmapa_wczytana = bitmapa_bajty == (int)TAPETA_BITMAPA_BAJTY;
+        tapeta_bitmapa_wczytana = tapeta_zaladuj_bmp(plik);
         if (!tapeta_bitmapa_wczytana && tapeta_jasna) {
             tapeta_jasna = 0;
             fs_reset_directory();
-            bitmapa_bajty = read_file(PLIK_TAPETA_CIEMNA, (char *)tapeta_bitmapa,
-                                      TAPETA_BITMAPA_BAJTY);
-            tapeta_bitmapa_wczytana = bitmapa_bajty == (int)TAPETA_BITMAPA_BAJTY;
+            tapeta_bitmapa_wczytana = tapeta_zaladuj_bmp(PLIK_TAPETA_CIEMNA);
         }
         if (!tapeta_bitmapa_wczytana && n <= 0) return 0;
         tapeta_gradientowa = 0;
@@ -1098,7 +1243,7 @@ void quickcam_ui_init(void)
 {
 }
 
-/* ikona kamery w gornym pasku (bez ramki, jak ikony w macOS) */
+/* ikona kamery w gornym pasku (bez ramki) */
 void quickcam_ui_rysuj_pasek(void)
 {
     extern unsigned char quickcam_driver_is_detected(void);
