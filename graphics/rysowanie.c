@@ -660,10 +660,10 @@ void wypelnij_trojkat_3d(int x1, int y1, int z1, int x2, int y2, int z2, int x3,
         int alpha_i = i;
         int beta_i = i - (second_half ? sy2 - sy1 : 0);
 
-        int A_x = sx1 + (int)((long long)(sx3 - sx1) * alpha_i / total_height);
+        int A_x = sx1 + ((sx3 - sx1) * alpha_i) / total_height;
         int B_x = second_half ? 
-                  sx2 + (int)((long long)(sx3 - sx2) * beta_i / segment_height) :
-                  sx1 + (int)((long long)(sx2 - sx1) * beta_i / segment_height);
+                  sx2 + ((sx3 - sx2) * beta_i) / segment_height :
+                  sx1 + ((sx2 - sx1) * beta_i) / segment_height;
 
         int y = sy1 + i;
         if (y < 0 || y >= EKRAN_WYSOKOSC) continue;
