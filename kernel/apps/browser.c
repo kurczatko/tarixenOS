@@ -79,7 +79,7 @@ struct browser_tab {
 };
 
 struct okno browser_window;
-static char address[128] = "http://www.mathematik.net/homepage/mupad-24Bit.bmp";
+static char address[128] = "http://motherfuckingwebsite.com";
 static char response[BROWSER_RESPONSE_MAX];
 static char page[BROWSER_PAGE_MAX];
 static uint32_t page_colors[BROWSER_PAGE_MAX];
@@ -1203,7 +1203,11 @@ static void tab_new(void)
     tab_save_current();
     active_tab = tab_count++;
     struct browser_tab *t = &tabs[active_tab];
-    t->address[0] = 0;
+    if (active_tab == 1) {
+        copy_text(t->address, sizeof(t->address), "http://www.mathematik.net/homepage/mupad-24Bit.bmp");
+    } else {
+        t->address[0] = 0;
+    }
     t->title[0] = 0;
     t->response[0] = 0;
     t->response_length = 0;
