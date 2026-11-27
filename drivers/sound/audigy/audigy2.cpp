@@ -7,6 +7,8 @@
 
 #include <drivers/sound/audigy/audigy2.h>
 
+typedef unsigned int uintptr_t;
+
 #define AUDIGY2_VENDOR_ID                           0x1102
 #define AUDIGY2_DEVICE_ID                           0x0004
 
