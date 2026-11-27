@@ -5,8 +5,9 @@ BOOT_BIN32 := $(BUILD_DIR)/boot.bin
 KERNEL_ELF32 := $(BUILD_DIR)/kernel32.elf
 KERNEL_BIN32 := $(BUILD_DIR)/kernel32.bin
 OS_IMAGE := $(BUILD_DIR)/tarixenOS.img
-TAPETA_RAW := $(BUILD_DIR)/tapeta.raw
-TAPETA_JASNA_RAW := $(BUILD_DIR)/tapeta_jasna.raw
+# Domyslne tapety: pliki BMP 1920x1080, 24 bpp (generowane z JPEG-ow przez ImageMagick)
+TAPETA_BMP := $(BUILD_DIR)/tapeta.bmp
+TAPETA_JASNA_BMP := $(BUILD_DIR)/tapeta_jasna.bmp
 KERNEL_MAX_SECTORS := 1536
 FLOPPY_SIZE := 67108864
 FAT32_SECTORS := 125952
@@ -136,11 +137,12 @@ $(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
 	$(CC32) $(CFLAGS32) -c $< -o $@
 
-$(TAPETA_RAW): tapety/IMG_0449.JPEG | $(BUILD_DIR)
-	magick $< -auto-orient -resize 1920x1080! -depth 8 BGRA:$@
+# Tapety BMP: 1920x1080, 24 bpp, bez kompresji, bez kanalu alfa (BMP3 = naglowek BITMAPINFOHEADER)
+$(TAPETA_BMP): tapety/IMG_0449.JPEG | $(BUILD_DIR)
+	magick $< -auto-orient -resize 1920x1080! -alpha off -depth 8 -type TrueColor BMP3:$@
 
-$(TAPETA_JASNA_RAW): tapety/IMG_0395.JPEG | $(BUILD_DIR)
-	magick $< -auto-orient -resize 1920x1080! -depth 8 BGRA:$@
+$(TAPETA_JASNA_BMP): tapety/IMG_0395.JPEG | $(BUILD_DIR)
+	magick $< -auto-orient -resize 1920x1080! -alpha off -depth 8 -type TrueColor BMP3:$@
 
 $(BUILD_DIR)/%64.o: %.S | $(BUILD_DIR)
 	mkdir -p $(dir $@)
@@ -177,7 +179,7 @@ $(KERNEL_ELF64): $(KERNEL_OBJECTS64) linker64.ld | $(BUILD_DIR)
 $(KERNEL_BIN32): $(KERNEL_ELF32)
 	$(OBJCOPY) -O binary $< $@
 
-$(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) $(TAPETA_JASNA_RAW) | $(BUILD_DIR)
+$(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_BMP) $(TAPETA_JASNA_BMP) | $(BUILD_DIR)
 	dd if=/dev/zero of=$@ bs=$(FLOPPY_SIZE) count=1 status=none
 	dd if=/dev/zero of=$(BUILD_DIR)/fat32.img bs=512 count=$(FAT32_SECTORS) status=none
 	@if command -v mkfs.fat >/dev/null 2>&1; then \
@@ -198,8 +200,8 @@ $(OS_IMAGE): $(BOOT_BIN32) $(KERNEL_BIN32) $(TAPETA_RAW) $(TAPETA_JASNA_RAW) | $
 			mcopy -i $@ $(BUILD_DIR)/$$app ::/$$app; \
 		fi; \
 	done
-	mcopy -i $@ $(TAPETA_RAW) ::/TAPETA.RAW
-	mcopy -i $@ $(TAPETA_JASNA_RAW) ::/TAPETAJ.RAW
+	mcopy -i $@ $(TAPETA_BMP) ::/TAPETA.BMP
+	mcopy -i $@ $(TAPETA_JASNA_BMP) ::/TAPETAJ.BMP
 	dd if=$(KERNEL_BIN32) of=$@ bs=512 seek=$(KERNEL_START_LBA) conv=notrunc status=none
 	@if [ -f $(UEFI_BIN) ]; then \
 		echo "UEFI stub gotowy (img BIOS32)"; \
