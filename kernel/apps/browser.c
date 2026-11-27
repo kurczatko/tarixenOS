@@ -15,6 +15,7 @@
 #include <kernel/apps/browser_css.h>
 #include <kernel/apps/browser_js.h>
 #include <kernel/core/proces.h>
+#include <fs/system_plikow.h>
 
 #define BROWSER_WIDTH 760
 #define BROWSER_HEIGHT 570
@@ -64,7 +65,9 @@ struct browser_field {
 };
 
 /* Karta przegladarki: zapamietuje ostatnia odpowiedz HTTP, z ktorej strona
- * jest odtwarzana przy przelaczeniu (bez ponownego pobierania z sieci). */
+ * jest odtwarzana przy przelaczeniu (bez ponownego pobierania z sieci).
+ * Wyjatek: karta z obrazem BMP (is_bmp) - surowy plik jest zbyt duzy,
+ * wiec przy powrocie do takiej karty obraz jest pobierany ponownie. */
 struct browser_tab {
     char address[128];
     char title[BROWSER_TITLE_MAX];
@@ -72,6 +75,7 @@ struct browser_tab {
     int response_length;
     int scroll_y;
     char status[64];
+    uint8_t is_bmp;
 };
 
 struct okno browser_window;
@@ -111,6 +115,8 @@ static int browser_response_length;
 static char js_elem_id[32][64];
 static int js_elem_page[32];
 static int js_elem_count;
+
+static void browser_fetch(void);
 
 static void js_note_element(const char *tag, const char *id, int page_index)
 {
@@ -406,9 +412,150 @@ static void create_field(uint8_t type, const char *value, int width, const char 
     while (f->value[f->cursor]) f->cursor++;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Obrazy BMP (do Full HD)                                           */
+/* ------------------------------------------------------------------ */
+
+/* Surowy plik BMP: 1920x1080x32bpp = 8,3 MB + naglowki. */
+#define BROWSER_BMP_RAW_MAX (9u * 1024u * 1024u)
+/* Maksymalny rozmiar obrazu po przeskalowaniu (miesci sie w oknie). */
+#define BROWSER_BMP_OUT_W 740
+#define BROWSER_BMP_OUT_H 460
+
+static uint8_t  bmp_raw[BROWSER_BMP_RAW_MAX];
+static uint32_t browser_bmp_pixels[BROWSER_BMP_OUT_W * BROWSER_BMP_OUT_H];
+static int browser_bmp_width = 0;
+static int browser_bmp_height = 0;
+static int is_bmp_page = 0;
+
+static uint16_t bmp_u16(const uint8_t *p)
+{
+    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8));
+}
+
+static uint32_t bmp_u32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) |
+           ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static uint32_t bmp_read_pixel(const uint8_t *row, int x, uint16_t bpp, int rgb565,
+                               const uint8_t *pal, uint32_t pal_n)
+{
+    if (bpp == 24) {
+        const uint8_t *p = row + x * 3;
+        return ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+    }
+    if (bpp == 32) {
+        const uint8_t *p = row + x * 4;
+        return ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+    }
+    if (bpp == 16) {
+        uint32_t v = bmp_u16(row + x * 2), r, g, b;
+        if (rgb565) {
+            r = (v >> 11) & 0x1F; g = (v >> 5) & 0x3F; b = v & 0x1F;
+            r = (r << 3) | (r >> 2); g = (g << 2) | (g >> 4); b = (b << 3) | (b >> 2);
+        } else {
+            r = (v >> 10) & 0x1F; g = (v >> 5) & 0x1F; b = v & 0x1F;
+            r = (r << 3) | (r >> 2); g = (g << 3) | (g >> 2); b = (b << 3) | (b >> 2);
+        }
+        return (r << 16) | (g << 8) | b;
+    }
+    {
+        uint32_t idx = row[x];                  /* 8 bpp */
+        if (idx < pal_n) {
+            const uint8_t *p = pal + idx * 4;
+            return ((uint32_t)p[2] << 16) | ((uint32_t)p[1] << 8) | (uint32_t)p[0];
+        }
+    }
+    return 0x00FFFFFF;
+}
+
+/* Dekoduje BMP i skaluje go w dol (z zachowaniem proporcji) do max_w x max_h.
+ * Kazdy piksel wyjsciowy to srednia z odpowiadajacego mu prostokata zrodla,
+ * dzieki czemu Full HD zmniejszony do ~740 px nie ma aliasingu. */
+static int parse_bmp_data(const uint8_t *f, uint32_t size, uint32_t *out,
+                          int *out_w, int *out_h, int max_w, int max_h)
+{
+    if (size < 54 || f[0] != 'B' || f[1] != 'M') return 0;
+
+    uint32_t data_off = bmp_u32(f + 10);
+    uint32_t dib_size = bmp_u32(f + 14);
+    if (dib_size < 40) return 0;
+
+    int32_t width = (int32_t)bmp_u32(f + 18);
+    int32_t height = (int32_t)bmp_u32(f + 22);
+    uint16_t planes = bmp_u16(f + 26);
+    uint16_t bpp = bmp_u16(f + 28);
+    uint32_t compression = bmp_u32(f + 30);
+    uint32_t colors_used = bmp_u32(f + 46);
+
+    if (width <= 0 || height == 0 || planes != 1) return 0;
+    int top_down = height < 0;
+    int abs_h = top_down ? -height : height;
+    if (width > 4096 || abs_h > 4096) return 0;
+
+    if (bpp != 8 && bpp != 16 && bpp != 24 && bpp != 32) return 0;
+    if (compression != 0 && !(compression == 3 && (bpp == 16 || bpp == 32))) return 0;
+
+    uint32_t row_stride = (((uint32_t)width * bpp + 31u) / 32u) * 4u;
+    uint32_t data_bytes = row_stride * (uint32_t)abs_h;
+    if (data_off >= size || data_bytes > size - data_off) return 0;   /* plik niepelny */
+
+    const uint8_t *pal = 0;
+    uint32_t pal_n = 0;
+    if (bpp == 8) {
+        pal_n = colors_used ? colors_used : 256;
+        if (pal_n > 256) return 0;
+        uint32_t pal_off = 14u + dib_size;
+        if (pal_off + pal_n * 4u > size) return 0;
+        pal = f + pal_off;
+    }
+    int rgb565 = (bpp == 16 && compression == 3);
+
+    /* wspolna skala: bez powiekszania i bez znieksztalcen */
+    int tw = width, th = abs_h;
+    if (tw > max_w) { th = (int)((uint32_t)th * (uint32_t)max_w / (uint32_t)tw); tw = max_w; }
+    if (th > max_h) { tw = (int)((uint32_t)tw * (uint32_t)max_h / (uint32_t)th); th = max_h; }
+    if (tw < 1) tw = 1;
+    if (th < 1) th = 1;
+    *out_w = tw;
+    *out_h = th;
+
+    for (int y = 0; y < th; y++) {
+        int sy0 = (int)((uint32_t)y * (uint32_t)abs_h / (uint32_t)th);
+        int sy1 = (int)((uint32_t)(y + 1) * (uint32_t)abs_h / (uint32_t)th);
+        if (sy1 <= sy0) sy1 = sy0 + 1;
+        if (sy1 > abs_h) sy1 = abs_h;
+
+        for (int x = 0; x < tw; x++) {
+            int sx0 = (int)((uint32_t)x * (uint32_t)width / (uint32_t)tw);
+            int sx1 = (int)((uint32_t)(x + 1) * (uint32_t)width / (uint32_t)tw);
+            if (sx1 <= sx0) sx1 = sx0 + 1;
+            if (sx1 > width) sx1 = width;
+
+            uint32_t r = 0, g = 0, b = 0;
+            for (int sy = sy0; sy < sy1; sy++) {
+                int file_row = top_down ? sy : abs_h - 1 - sy;
+                const uint8_t *row = f + data_off + (uint32_t)file_row * row_stride;
+                for (int sx = sx0; sx < sx1; sx++) {
+                    uint32_t c = bmp_read_pixel(row, sx, bpp, rgb565, pal, pal_n);
+                    r += (c >> 16) & 0xFF;
+                    g += (c >> 8) & 0xFF;
+                    b += c & 0xFF;
+                }
+            }
+            uint32_t n = (uint32_t)(sx1 - sx0) * (uint32_t)(sy1 - sy0);
+            out[(uint32_t)y * (uint32_t)tw + (uint32_t)x] =
+                ((r / n) << 16) | ((g / n) << 8) | (b / n);
+        }
+    }
+    return 1;
+}
+
 static void page_from_response(int response_length)
 {
-    int body = 0;
+    is_bmp_page = 0;
     int output = 0;
     int in_script = 0;
     int in_style = 0;
@@ -438,6 +585,7 @@ static void page_from_response(int response_length)
     uint32_t current_line_y = 0;
     uint32_t current_line_height = 8;
     int char_x = 0;
+    int body = 0;
     while (body + 3 < response_length) {
         if (response[body] == '\r' && response[body + 1] == '\n' &&
             response[body + 2] == '\r' && response[body + 3] == '\n') {
@@ -990,6 +1138,7 @@ static void tab_save_current(void)
     copy_bytes(t->response, response, BROWSER_RESPONSE_MAX);
     t->response_length = browser_response_length;
     t->scroll_y = page_scroll_y;
+    t->is_bmp = is_bmp_page ? 1 : 0;
     copy_text(t->status, sizeof(t->status), status);
 }
 
@@ -1006,6 +1155,7 @@ static void tab_clear_page(void)
     focused_field = -1;
     page_background = 0x00FFFFFF;
     page_scroll_y = 0;
+    is_bmp_page = 0;
 }
 
 static void tab_load(int index)
@@ -1013,6 +1163,16 @@ static void tab_load(int index)
     struct browser_tab *t = &tabs[index];
     copy_text(address, sizeof(address), t->address);
     address_cursor = 0;
+
+    if (t->is_bmp) {
+        /* surowego BMP nie trzymamy w kartach - pobierz obraz ponownie */
+        browser_response_length = 0;
+        tab_clear_page();
+        address_focused = 0;
+        browser_fetch();   /* sam zapisze karte i odswiezy okno */
+        return;
+    }
+
     copy_bytes(response, t->response, BROWSER_RESPONSE_MAX);
     browser_response_length = t->response_length;
     if (browser_response_length > 0) {
@@ -1044,6 +1204,7 @@ static void tab_new(void)
     t->response[0] = 0;
     t->response_length = 0;
     t->scroll_y = 0;
+    t->is_bmp = 0;
     copy_text(t->status, sizeof(t->status), "Wpisz adres i nacisnij IDZ");
     tab_load(active_tab);
 }
@@ -1079,6 +1240,44 @@ static void browser_tab_click(int x)
     okno_narysuj(&browser_window);
 }
 
+/* ------------------------------------------------------------------ */
+/*  Pobieranie stron i obrazow                                        */
+/* ------------------------------------------------------------------ */
+
+/* Czy sciezka z adresu konczy sie na .bmp (ignorujac ?query i #fragment). */
+static int path_is_bmp(const char *path)
+{
+    int n = 0;
+    while (path[n] && path[n] != '?' && path[n] != '#') n++;
+    return n >= 4 && path[n - 4] == '.' && lower_char(path[n - 3]) == 'b' &&
+           lower_char(path[n - 2]) == 'm' && lower_char(path[n - 1]) == 'p';
+}
+
+/* Dekoduje odpowiedz HTTP z BMP do browser_bmp_pixels i czyści stan strony. */
+static int browser_show_bmp(const uint8_t *buf, int length)
+{
+    int body = 0, found = 0;
+    while (body + 3 < length) {
+        if (buf[body] == '\r' && buf[body + 1] == '\n' &&
+            buf[body + 2] == '\r' && buf[body + 3] == '\n') {
+            body += 4;
+            found = 1;
+            break;
+        }
+        body++;
+    }
+    if (!found) body = 0;
+
+    tab_clear_page();      /* zeruje linki, pola, JS, tytul, scroll i is_bmp_page */
+    if (body >= length) return 0;
+    if (!parse_bmp_data(buf + body, (uint32_t)(length - body), browser_bmp_pixels,
+                        &browser_bmp_width, &browser_bmp_height,
+                        BROWSER_BMP_OUT_W, BROWSER_BMP_OUT_H))
+        return 0;
+    is_bmp_page = 1;
+    return 1;
+}
+
 static void browser_fetch(void)
 {
     char host[96];
@@ -1086,16 +1285,21 @@ static void browser_fetch(void)
     uint16_t port = 0;
     int parsed = extract_host_path(host, sizeof(host), path, sizeof(path), &port);
     int length;
+    int stored = 0;
     if (parsed == 0) { set_status("Nieprawidlowy adres"); okno_narysuj(&browser_window); return; }
     if (!net_ready()) { net_init(); if (!net_ready()) { set_status("Brak sieci: sterownik/DHCP niedostepne"); okno_narysuj(&browser_window); return; } }
 
-    set_status("Laczenie... czekaj");
+    int want_bmp = path_is_bmp(path);
+    char *buf = want_bmp ? (char *)bmp_raw : response;
+    uint32_t cap = want_bmp ? (uint32_t)BROWSER_BMP_RAW_MAX : (uint32_t)sizeof(response);
+
+    set_status(want_bmp ? "Pobieranie obrazu... czekaj" : "Laczenie... czekaj");
     okno_narysuj(&browser_window);
 
     if (browser_use_https) {
-        length = tls13_https_get(host, port, path, response, sizeof(response));
+        length = tls13_https_get(host, port, path, buf, cap);
     } else {
-        length = net_http_get(host, port, path, response, sizeof(response));
+        length = net_http_get(host, port, path, buf, cap);
     }
     if (length < 0) {
         if (browser_use_https) {
@@ -1119,6 +1323,22 @@ static void browser_fetch(void)
         }
         page[0] = 0;
         page_title[0] = 0;
+        is_bmp_page = 0;
+    } else if (want_bmp) {
+        if (starts_with(buf, "HTTP/1.1 30") || starts_with(buf, "HTTP/1.0 30")) {
+            set_status("Przekierowanie; otworz nowy adres recznie");
+            tab_clear_page();
+        } else if (browser_show_bmp((const uint8_t *)buf, length)) {
+            set_status("Obraz BMP");
+        } else {
+            /* to nie BMP (np. strona bledu 404) - pokaz poczatek odpowiedzi jako HTML */
+            int n = length < (int)sizeof(response) ? length : (int)sizeof(response);
+            copy_bytes(response, bmp_raw, (uint32_t)n);
+            if (n < (int)sizeof(response)) response[n] = 0;
+            page_from_response(n);
+            stored = n;
+            set_status("BMP nieprawidlowy, niepelny lub nieobslugiwany");
+        }
     } else if (response_location_is_https() && !browser_use_https) {
         set_status("Strona przekierowuje do HTTPS");
         page_from_response(length);
@@ -1130,7 +1350,8 @@ static void browser_fetch(void)
         set_status("Pobrano odpowiedz");
         page_from_response(length);
     }
-    browser_response_length = length > 0 ? length : 0;
+    if (!want_bmp && length > 0) stored = length;
+    browser_response_length = stored;
     tab_save_current();
     okno_narysuj(&browser_window);
 }
@@ -1185,6 +1406,9 @@ static void browser_submit_form(struct browser_field *f)
     if (f->method_get) {
         uint32_t rlen = 0;
         while (resolved[rlen]) rlen++;
+        copy_bytes(url, resolved, rlen < sizeof(url) ? rlen : (uint32_t)sizeof(url) - 1);
+        if (rlen >= sizeof(url)) rlen = sizeof(url) - 1;
+        url[rlen] = 0;
         if (rlen + 1 < sizeof(url)) { url[rlen++] = '?'; url[rlen] = 0; }
         for (uint32_t fi = 0; fi < field_count; fi++) {
             struct browser_field *ff = &fields[fi];
@@ -1275,6 +1499,24 @@ static void browser_draw(int x, int y, int width, int height)
     rysuj_tekst_chicago(x + 636, y + 8, "IDZ", 0x00FFFFFF);
     rysuj_tekst_chicago(x, y + 30, status, 0x00000000);
     rysuj_prostokat(x, y + 48, width, height - 48, page_background);
+
+    if (is_bmp_page) {
+        int img_x = x + (width - browser_bmp_width) / 2;
+        int img_y = y + 48 + (height - 48 - browser_bmp_height) / 2;
+        if (img_x < x + 4) img_x = x + 4;
+        if (img_y < y + 48) img_y = y + 48;
+        for (int iy = 0; iy < browser_bmp_height; iy++) {
+            int py = img_y + iy;
+            if (py >= y + height - 4) break;
+            for (int ix = 0; ix < browser_bmp_width; ix++) {
+                int px = img_x + ix;
+                if (px >= x + width - 4) break;
+                uint32_t col = browser_bmp_pixels[iy * browser_bmp_width + ix];
+                rysuj_piksel(px, py, col);
+            }
+        }
+        return;
+    }
 
 #define MAX_DRAW_LINES 512
     int line_x_offset[MAX_DRAW_LINES];
