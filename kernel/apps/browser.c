@@ -79,7 +79,7 @@ struct browser_tab {
 };
 
 struct okno browser_window;
-static char address[128] = "http://contemporary-home-computing.org";
+static char address[128] = "http://www.mathematik.net/homepage/mupad-24Bit.bmp";
 static char response[BROWSER_RESPONSE_MAX];
 static char page[BROWSER_PAGE_MAX];
 static uint32_t page_colors[BROWSER_PAGE_MAX];
