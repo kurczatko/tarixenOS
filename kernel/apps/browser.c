@@ -416,14 +416,18 @@ static void create_field(uint8_t type, const char *value, int width, const char 
 /*  Obrazy BMP (do Full HD)                                           */
 /* ------------------------------------------------------------------ */
 
-/* Surowy plik BMP: 1920x1080x32bpp = 8,3 MB + naglowki. */
-#define BROWSER_BMP_RAW_MAX (9u * 1024u * 1024u)
+/* Surowy plik BMP: 1920x1080x32bpp = 8,3 MB + naglowki.
+ * Bufory umieszczone poza .bss (powyzej obszaru tapety 0x02000000-0x03200000),
+ * zeby .bss nie przekraczalo 0x02000000 i nie kolidowalo ze stosem ani tapeta. */
+#define BROWSER_BMP_RAW_MAX      (9u * 1024u * 1024u)
 /* Maksymalny rozmiar obrazu po przeskalowaniu (miesci sie w oknie). */
-#define BROWSER_BMP_OUT_W 740
-#define BROWSER_BMP_OUT_H 460
+#define BROWSER_BMP_OUT_W        740
+#define BROWSER_BMP_OUT_H        460
+#define BROWSER_BMP_RAW_ADRES    0x03400000u
+#define BROWSER_BMP_PIXELS_ADRES (BROWSER_BMP_RAW_ADRES + BROWSER_BMP_RAW_MAX)
 
-static uint8_t  bmp_raw[BROWSER_BMP_RAW_MAX];
-static uint32_t browser_bmp_pixels[BROWSER_BMP_OUT_W * BROWSER_BMP_OUT_H];
+static uint8_t  *const bmp_raw = (uint8_t *)BROWSER_BMP_RAW_ADRES;
+static uint32_t *const browser_bmp_pixels = (uint32_t *)BROWSER_BMP_PIXELS_ADRES;
 static int browser_bmp_width = 0;
 static int browser_bmp_height = 0;
 static int is_bmp_page = 0;
