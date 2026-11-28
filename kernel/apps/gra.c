@@ -16,6 +16,9 @@
 #include <kernel/core/proces.h>
 
 extern uint32_t *obraz;
+extern void driver_manager_poll_all(void);
+extern void usb_poll(void);
+extern void hid_poll(void);
 
 #define GRA_MAP_W 16
 #define GRA_MAP_H 16
@@ -441,7 +444,10 @@ void gra(void)
             if (znak == 'a') gra_obrot(-0.05);
             if (znak == 'd') gra_obrot(0.05);
         }
+        driver_manager_poll_all();
         mouse_poll();
+        usb_poll();
+        hid_poll();
         if (!okno_gra.otwarte) break;
         int mx;
         int my;
